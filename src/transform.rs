@@ -6,6 +6,25 @@ use ndarray::{self, Array2};
 
 use std::ops;
 
+pub struct Rotation(Rotation3<f32>);
+
+impl ops::Mul<&ndarray::Array2<f32>> for &Rotation {
+    type Output = ndarray::Array2<f32>;
+
+    fn mul(self, rhs: &ndarray::Array2<f32>) -> Self::Output {
+        let mut result = ndarray::Array2::<f32>::zeros((rhs.len_of(Axis(0)), 3));
+
+        for (in_iter, mut out_iter) in rhs.axis_iter(Axis(0)).zip(result.axis_iter_mut(Axis(0))) {
+            let v = self.0 * Vector3::new(in_iter[0], in_iter[1], in_iter[2]);
+            out_iter[0] = v[0];
+            out_iter[1] = v[1];
+            out_iter[2] = v[2];
+        }
+
+        result
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct Transform(Isometry3<f32>);
 
@@ -47,11 +66,10 @@ impl Transform {
         rhs
     }
 
-    pub fn for_normals(&self) -> Self {
-        Self(Isometry3::<f32>::from_parts(
-            Translation3::new(0.0, 0.0, 0.0),
-            self.0.rotation.clone(),
-        ))
+    pub fn ortho_rotation(&self) -> Rotation {
+        Rotation(
+            self.0.rotation.to_rotation_matrix().clone()
+        )
     }
 }
 

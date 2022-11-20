@@ -1,14 +1,12 @@
-// use nalgebra::RowVector3;
-// use ndarray::iter::Indices;
 use ndarray::prelude::*;
-use ndarray::Array2;
+use ndarray::{ArcArray2, Array2};
 
 use super::io::Geometry;
 
 pub struct PointCloud {
     pub points: Array2<f32>,
     pub normals: Option<Array2<f32>>,
-    pub colors: Option<Array2<u8>>,
+    pub colors: Option<ArcArray2<u8>>,
 }
 
 impl PointCloud {
@@ -16,7 +14,7 @@ impl PointCloud {
         Self {
             points: geometry.points,
             normals: geometry.normals,
-            colors: geometry.colors,
+            colors: geometry.colors.map(|colors| colors.into()),
         }
     }
 
@@ -24,7 +22,7 @@ impl PointCloud {
         Self {
             points: Array2::<f32>::zeros((len, 3)),
             normals: Some(Array2::<f32>::zeros((len, 3))),
-            colors: Some(Array2::<u8>::zeros((len, 3))),
+            colors: Some(ArcArray2::<u8>::zeros((len, 3))),
         }
     }
 
@@ -38,6 +36,34 @@ impl PointCloud {
 //{
 //    fn index(&self, index: Idx) -> &Self::Output
 //}
+
+use crate::transform::Transform;
+
+impl std::ops::Mul<&PointCloud> for &Transform {
+    type Output = PointCloud;
+    fn mul(self, rhs: &PointCloud) -> PointCloud {
+        PointCloud {
+            points: self * &rhs.points,
+            normals: rhs
+                .normals
+                .as_ref()
+                .map(|normals| &self.ortho_rotation() * &normals),
+            colors: rhs.colors.clone(),
+        }
+    }
+}
+
+impl Into<Geometry> for PointCloud {
+    fn into(self) -> Geometry {
+        Geometry {
+            points: self.points,
+            normals: self.normals.map(|normals| normals),
+            colors: self.colors.map(|colors| colors.into_owned()),
+            indices: None,
+            texcoords: None,
+        }
+    }
+}
 
 #[cfg(test)]
 mod tests {

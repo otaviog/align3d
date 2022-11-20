@@ -242,9 +242,6 @@ where
 
 #[cfg(test)]
 mod test {
-    use crate::io::Geometry;
-    use ndarray::Array2;
-
     use super::{read_ply, write_ply};
 
     #[test]

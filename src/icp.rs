@@ -81,12 +81,12 @@ impl<'a> ICP<'a> {
                     }
                 }
             }
-            let JtJ = jt_j_array.sum_axis(Axis(0));
-            let Jtr = jt_r_array.sum_axis(Axis(0));
+            let jt_j = jt_j_array.sum_axis(Axis(0));
+            let jt_r = jt_r_array.sum_axis(Axis(0));
 
-            let update = Cholesky::new(JtJ.into_nalgebra())
+            let update = Cholesky::new(jt_j.into_nalgebra())
                 .unwrap()
-                .solve(&Jtr.into_nalgebra());
+                .solve(&jt_r.into_nalgebra());
             // let up2 = Vector6::from_row_slice(update.rows(0, 6));
             let update = Vector6::new(
                 update[0], update[1], update[2], update[3], update[4], update[5],
@@ -105,7 +105,7 @@ mod tests {
     use rstest::*;
 
     use crate::{
-        imagepointcloud::ImagePointCloud, io::dataset::RGBDDataset, pointcloud::PointCloud,
+        imagepointcloud::ImagePointCloud, io::{dataset::RGBDDataset, write_ply}, pointcloud::PointCloud,
     };
 
     #[fixture]
@@ -116,10 +116,15 @@ mod tests {
 
         let (cam1, rgbd_image1) = dataset.get_item(0).unwrap();
         let (cam2, rgbd_image2) = dataset.get_item(0).unwrap();
+        let mut source = ImagePointCloud::from_rgbd_image(cam1, rgbd_image1);
+        let mut target = ImagePointCloud::from_rgbd_image(cam2, rgbd_image2);
+
+        source.compute_normals();
+        target.compute_normals();
 
         (
-            ImagePointCloud::from_rgbd_image(cam1, rgbd_image1).into(),
-            ImagePointCloud::from_rgbd_image(cam2, rgbd_image2).into(),
+            source.into(),
+            target.into()
         )
     }
 
@@ -129,8 +134,8 @@ mod tests {
 
         let transform = ICP::new(ICPParams::default(), &target_pcl).align(&source_pcl);
 
-        // let aligned_source_pcl = &transform * source_pcl;
-
+        let aligned_source_pcl = &transform * &source_pcl;
+        write_ply("tests/data/out-icp1.ply", &aligned_source_pcl.into()).expect("Unable to write result");
     }
 }
 

@@ -1,7 +1,7 @@
 use super::camera::Camera;
 use super::io::rgbdimage::RGBDImage;
 
-use ndarray::{Array2, Array3};
+use ndarray::{ArcArray2, Array2, Array3, Axis};
 
 pub struct ImagePointCloud {
     pub points: Array3<f32>,
@@ -145,40 +145,69 @@ impl ImagePointCloud {
 }
 
 use crate::io::Geometry;
-
-impl Into<Geometry> for ImagePointCloud {
-    fn into(self) -> Geometry {
-        let total_points = self.width() * self.height();
-
-        Geometry {
-            points: self.points.into_shape((total_points, 3)).unwrap(),
-            colors: self
-                .colors
-                .map(|colors| colors.into_shape((total_points, 3)).unwrap()),
-            normals: self
-                .normals
-                .map(|normals| normals.into_shape((total_points, 3)).unwrap()),
-            indices: None,
-            texcoords: None,
-        }
-    }
-}
-
 use crate::pointcloud::PointCloud;
 
 impl Into<PointCloud> for ImagePointCloud {
     fn into(self) -> PointCloud {
-        let total_points = self.width() * self.height();
+        let num_total_points = self.width() * self.height();
+
+        let mask = self.mask.into_shape((num_total_points,)).unwrap();
+        let num_valid_points = mask.iter().map(|x| *x as usize).sum();
+
+        // TODO: Improve mask and make a generic function/macro.
+        let v: Vec<f32> = self
+            .points
+            .into_shape((num_total_points, 3))
+            .unwrap()
+            .axis_iter(Axis(0))
+            .enumerate()
+            .filter(|(idx, _)| mask[*idx] != 0)
+            .flat_map(|(_, v)| [v[0], v[1], v[2]])
+            .collect();
+        let points = Array2::from_shape_vec((num_valid_points, 3), v).unwrap();
+
+        let normals = self.normals.map(|normals| {
+            Array2::from_shape_vec(
+                (num_valid_points, 3),
+                normals
+                    .into_shape((num_total_points, 3))
+                    .unwrap()
+                    .axis_iter(Axis(0))
+                    .enumerate()
+                    .filter(|(idx, _)| mask[*idx] != 0)
+                    .flat_map(|(_, v)| [v[0], v[1], v[2]])
+                    .collect(),
+            )
+            .unwrap()
+        });
+
+        let colors = self.colors.map(|colors| {
+            ArcArray2::from_shape_vec(
+                (num_valid_points, 3),
+                colors
+                    .into_shape((num_total_points, 3))
+                    .unwrap()
+                    .axis_iter(Axis(0))
+                    .enumerate()
+                    .filter(|(idx, _)| mask[*idx] != 0)
+                    .flat_map(|(_, v)| [v[0], v[1], v[2]])
+                    .collect(),
+            )
+            .unwrap()
+        });
 
         PointCloud {
-            points: self.points.into_shape((total_points, 3)).unwrap(),
-            colors: self
-                .colors
-                .map(|colors| colors.into_shape((total_points, 3)).unwrap()),
-            normals: self
-                .normals
-                .map(|normals| normals.into_shape((total_points, 3)).unwrap())
+            points,
+            normals,
+            colors,
         }
+    }
+}
+
+impl Into<Geometry> for ImagePointCloud {
+    fn into(self) -> Geometry {
+        let pcl: PointCloud = self.into();
+        pcl.into()
     }
 }
 
@@ -222,5 +251,14 @@ mod tests {
 
         write_ply("tests/data/out-imagepcl-normals.ply", &im_pcl.into())
             .expect("Error while writing the results");
+    }
+
+    #[rstest]
+    fn should_convert_into_pointcloud(sample1: SlamTbDataset) {
+        let (cam, rgbd_image) = sample1.get_item(0).unwrap();
+        let im_pcl = ImagePointCloud::from_rgbd_image(cam, rgbd_image);
+
+        let pcl: PointCloud = im_pcl.into();
+        assert_eq!(pcl.len(), 270213);
     }
 }
