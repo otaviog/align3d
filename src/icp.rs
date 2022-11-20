@@ -49,7 +49,7 @@ impl<'a> ICP<'a> {
         if let None = self.target.normals {}
 
         let target_normals = self.target.normals.as_ref().unwrap();
-        let mut jt_j_array = Array3::<f32>::zeros((self.target.len(), 3, 3));
+        let mut jt_j_array = Array3::<f32>::zeros((self.target.len(), 6, 6));
         let mut jt_r_array = Array2::<f32>::zeros((self.target.len(), 6));
         let mut optim_transform = Transform::eye();
 
