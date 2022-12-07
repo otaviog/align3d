@@ -5,3 +5,7 @@ pub mod io;
 pub mod kdtree;
 pub mod pointcloud;
 pub mod transform;
+pub mod bounds;
+
+#[cfg(feature="viz")]
+pub mod viz;

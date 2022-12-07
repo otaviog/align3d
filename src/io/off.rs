@@ -138,9 +138,12 @@ pub fn read_off(filepath: &str) -> Result<Geometry, LoadError> {
 
 #[cfg(test)]
 mod tests {
+    use ndarray::Axis;
+
     #[test]
     fn test_read_off() {
         use super::read_off;
-        let geom = read_off("tests/data/teapot.off").expect("");
+        let geom = read_off("tests/data/teapot.off").expect("Unable to read .off file");
+        assert_eq!(geom.points.len_of(Axis(0)), 400);
     }
 }

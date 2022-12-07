@@ -112,13 +112,6 @@ mod tests {
     use rand::SeedableRng;
 
     #[test]
-    fn test_new_kdtree() {
-        let points = array![[1., 2., 3.], [2., 3., 4.], [5., 6., 7.], [8., 9., 1.]];
-
-        let tree = super::KdTree::new(&points);
-    }
-
-    #[test]
     fn test_nearest() {
         let points = array![[1., 2., 3.], [2., 3., 4.], [5., 6., 7.], [8., 9., 1.]];
         let tree = super::KdTree::new(&points);

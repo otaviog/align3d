@@ -212,7 +212,7 @@ where
                 "vertex_indices".to_string(),
                 PropertyType::List(ScalarType::UChar, ScalarType::Int),
             ));
-            let mut indice_array: Vec<DefaultElement> = indices
+            let indice_array: Vec<DefaultElement> = indices
                 .axis_iter(Axis(0))
                 .map(|face| {
                     let mut elem = DefaultElement::new();
