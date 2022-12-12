@@ -131,7 +131,7 @@ pub fn read_off(filepath: &str) -> Result<Geometry, LoadError> {
         points: vertices,
         colors: None,
         normals: None,
-        indices: Some(faces),
+        faces: Some(faces),
         texcoords: None,
     })
 }

@@ -2,10 +2,11 @@ use std::{collections::HashMap, sync::Arc};
 
 use vulkano::{
     command_buffer::{AutoCommandBufferBuilder, PrimaryAutoCommandBuffer},
+    device::Device,
     pipeline::GraphicsPipeline,
 };
 
-use super::node::{Mat4x4, Node, NodeProperties};
+use super::node::{CommandBuffersContext, Mat4x4, Node, NodeProperties};
 use crate::bounds::Box3Df;
 
 #[derive(Clone)]
@@ -32,13 +33,12 @@ impl Node for Scene {
         self.node_properties.bounding_box()
     }
 
-    fn collect_command_buffers(
-        &self,
-        builder: &mut AutoCommandBufferBuilder<PrimaryAutoCommandBuffer>,
-        pipelines: &mut HashMap<String, Arc<GraphicsPipeline>>,
-    ) {
+    fn collect_command_buffers(&self, context: &mut CommandBuffersContext) {
+        let parent_object_matrix = context.object_matrix.clone();
+        context.object_matrix = context.object_matrix * self.node_properties.transformation;
         for node in self.nodes.iter() {
-            node.collect_command_buffers(builder, pipelines);
+            node.collect_command_buffers(context);
         }
+        context.object_matrix = parent_object_matrix;
     }
 }

@@ -59,7 +59,7 @@ impl Into<Geometry> for PointCloud {
             points: self.points,
             normals: self.normals.map(|normals| normals),
             colors: self.colors.map(|colors| colors.into_owned()),
-            indices: None,
+            faces: None,
             texcoords: None,
         }
     }

@@ -1,15 +1,23 @@
+use nalgebra::zero;
 use nalgebra::ClosedAdd;
-use nalgebra::Vector3;
 use nalgebra::Scalar;
+use nalgebra::Vector3;
+use num::Float;
 use num::Zero;
 
 #[derive(Clone)]
-pub struct Box3D<T> where T: Scalar + Zero + ClosedAdd {
+pub struct Box3D<T>
+where
+    T: Scalar + Zero + ClosedAdd,
+{
     pub min: Vector3<T>,
     pub max: Vector3<T>,
 }
 
-impl<T> Box3D<T> where T: Scalar + Zero + ClosedAdd {
+impl<T> Box3D<T>
+where
+    T: Scalar + Zero + ClosedAdd,
+{
     ///
     /// # Arguments
     ///
@@ -26,7 +34,7 @@ impl<T> Box3D<T> where T: Scalar + Zero + ClosedAdd {
     pub fn empty() -> Self {
         Self {
             min: Vector3::<T>::zero(),
-            max: Vector3::<T>::zero()
+            max: Vector3::<T>::zero(),
         }
     }
 
@@ -36,3 +44,17 @@ impl<T> Box3D<T> where T: Scalar + Zero + ClosedAdd {
 }
 
 pub type Box3Df = Box3D<f32>;
+
+pub struct Sphere3Df {
+    pub center: Vector3<f32>,
+    pub radius: f32,
+}
+
+impl Sphere3Df {
+    pub fn empty() -> Self {
+        Self {
+            center: Vector3::zeros(),
+            radius: -1.0,
+        }
+    }
+}

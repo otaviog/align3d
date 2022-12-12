@@ -135,7 +135,7 @@ where
         points: point_array.unwrap(),
         colors: color_array,
         normals: normal_array,
-        indices: face_array,
+        faces: face_array,
         texcoords: None,
     })
 }
@@ -205,7 +205,7 @@ where
         ply.header.elements.add(vertex_element);
         ply.payload.insert("vertex".to_string(), vertex_array);
 
-        if let Some(indices) = &geom.indices {
+        if let Some(indices) = &geom.faces {
             let mut indice_element = ElementDef::new("face".to_string());
 
             indice_element.properties.add(PropertyDef::new(
