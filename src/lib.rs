@@ -7,8 +7,9 @@ pub mod pointcloud;
 pub mod transform;
 pub mod bounds;
 
-#[cfg(feature="viz")]
+// #[cfg(feature="viz")]
 pub mod viz;
 
 #[cfg(test)]
 pub mod unit_test;
+

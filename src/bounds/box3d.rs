@@ -1,8 +1,6 @@
-use nalgebra::zero;
 use nalgebra::ClosedAdd;
 use nalgebra::Scalar;
 use nalgebra::Vector3;
-use num::Float;
 use num::Zero;
 
 #[derive(Clone)]
@@ -44,17 +42,3 @@ where
 }
 
 pub type Box3Df = Box3D<f32>;
-
-pub struct Sphere3Df {
-    pub center: Vector3<f32>,
-    pub radius: f32,
-}
-
-impl Sphere3Df {
-    pub fn empty() -> Self {
-        Self {
-            center: Vector3::zeros(),
-            radius: -1.0,
-        }
-    }
-}

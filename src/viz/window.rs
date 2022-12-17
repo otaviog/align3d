@@ -1,6 +1,5 @@
 use std::{
     cell::{Cell, RefCell},
-    rc::Rc,
     sync::Arc,
 };
 
@@ -31,10 +30,9 @@ use winit::{
 
 use crate::bounds::Sphere3Df;
 
-use super::{manager::Manager, node::CommandBuffersContext};
+use super::{manager::Manager, node::CommandBuffersContext, controllers::{WASDVirtualCameraControl, SceneState, WindowState}};
 use super::{
     node::Node,
-    viz_camera::{SceneState, VizCameraControl, WSDVizCameraControl, WindowState},
 };
 use std::collections::HashMap;
 
@@ -255,7 +253,11 @@ impl Window {
         let mut previous_frame_end = Some(sync::now(self.device.clone()).boxed());
         let mut pipelines = HashMap::<String, Arc<GraphicsPipeline>>::new();
 
-        let mut viz_camera = WSDVizCameraControl::default();
+        let mut viz_camera = WASDVirtualCameraControl::default();
+        viz_camera.camera.eye = Vec3::new(0.0, 0.0, 1.0);
+        viz_camera.camera.view = Vec3::new(0.0, 0.0, -1.0);
+        viz_camera.camera.up = Vec3::new(0.0, 1.0, 0.0);
+        
         let mut window_state: WindowState = WindowState::new();
         window_state.window_size = [dimensions.width as f32, dimensions.height as f32];
         let mut scene_state: SceneState = SceneState::new();

@@ -192,11 +192,19 @@ impl Node for TeaPotNode {
         let memory_allocator =
             Arc::new(StandardMemoryAllocator::new_default(context.device.clone()));
 
+        let view = Matrix4::look_at_rh(
+            Point3::new(0.0, 0.0, 1.0),
+            Point3::new(0.0, 0.0, 0.0),
+            Vector3::new(0.0, 1.0, 0.0),
+        );
+        let proj = cgmath::perspective(cgmath::Rad(std::f32::consts::FRAC_PI_2), 1.0, 0.01, 100.0);
         let uniform_buffer_subbuffer = {
             let uniform_data = vs::ty::Data {
                 world: Mat4::identity().into(),
                 view: context.view_matrix.into(),
-                proj: context.projection_matrix.into(),
+                //proj: context.projection_matrix.into(),
+                //view: view.into(),
+                proj: proj.into(),
             };
 
             CpuAccessibleBuffer::from_data(
