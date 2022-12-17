@@ -18,7 +18,7 @@ impl Default for VirtualCamera {
             eye: Vec3::new(0.0, 0.0, 1.0),
             view: Vec3::new(0.0, 0.0, -1.0),
             up: Vec3::new(0.0, 1.0, 0.0),
-            ..Default::default()
+            projection: VirtualProjection::default()
         }
     }
 }

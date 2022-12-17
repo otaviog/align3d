@@ -1,12 +1,12 @@
 use std::sync::Arc;
 
-use teapot_node::TeaPotNode;
 use vulkano::memory::allocator::StandardMemoryAllocator;
 
-mod triangle_node;
-use triangle_node::TriangleNode;
+//mod triangle_node;
+//use triangle_node::TriangleNode;
 
 mod teapot_node;
+use teapot_node::TeaPotNode;
 
 fn main() {
     let mut manager = align3d::viz::Manager::default();

@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, time::Duration};
 
 use winit::event::{ElementState, MouseButton, VirtualKeyCode};
 
@@ -8,7 +8,7 @@ pub struct WindowState {
     pub window_size: [f32; 2],
     pub keyboard_state: HashMap<VirtualKeyCode, ElementState>,
     pub mouse_state: HashMap<MouseButton, ElementState>,
-    pub elapsed_time: f32,
+    pub elapsed_time: Duration,
 }
 
 impl WindowState {
@@ -17,7 +17,7 @@ impl WindowState {
             window_size: [0.0, 0.0],
             keyboard_state: HashMap::new(),
             mouse_state: HashMap::new(),
-            elapsed_time: f32::INFINITY,
+            elapsed_time: Duration::from_millis(24)
         }
     }
 }

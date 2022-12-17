@@ -38,6 +38,7 @@ impl WASDVirtualCameraControl {
         }
     }
 }
+
 impl Default for WASDVirtualCameraControl {
     fn default() -> Self {
         Self {
@@ -52,34 +53,22 @@ impl Default for WASDVirtualCameraControl {
 impl VirtualCameraControl for WASDVirtualCameraControl {
     fn key_event(&mut self, window_state: &WindowState, scene_state: &SceneState) {
         let move_increment =
-            self.velocity * scene_state.world_bounds.radius * 2.0 * window_state.elapsed_time;
+            self.velocity * scene_state.world_bounds.radius * 2.0 * window_state.elapsed_time.as_secs_f32();
 
-        match window_state.keyboard_state.get(&VirtualKeyCode::W) {
-            Some(ElementState::Pressed) => {
-                self.camera.translate_eye(move_increment);
-            }
-            _ => {}
+        if let Some(ElementState::Pressed) = window_state.keyboard_state.get(&VirtualKeyCode::W) {
+            self.camera.translate_eye(move_increment);
         }
 
-        match window_state.keyboard_state.get(&VirtualKeyCode::W) {
-            Some(ElementState::Pressed) => {
-                self.camera.translate_eye(-move_increment);
-            }
-            _ => {}
+        if let Some(ElementState::Pressed) = window_state.keyboard_state.get(&VirtualKeyCode::S) {
+            self.camera.translate_eye(-move_increment);
         }
 
-        match window_state.keyboard_state.get(&VirtualKeyCode::S) {
-            Some(ElementState::Pressed) => {
-                self.camera.translate_right(move_increment);
-            }
-            _ => {}
+        if let Some(ElementState::Pressed) = window_state.keyboard_state.get(&VirtualKeyCode::A) {
+            self.camera.translate_right(-move_increment);
         }
 
-        match window_state.keyboard_state.get(&VirtualKeyCode::D) {
-            Some(ElementState::Pressed) => {
-                self.camera.translate_right(-move_increment);
-            }
-            _ => {}
+        if let Some(ElementState::Pressed) = window_state.keyboard_state.get(&VirtualKeyCode::D) {
+            self.camera.translate_right(move_increment);
         }
     }
 

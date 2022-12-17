@@ -1,9 +1,5 @@
-use std::{
-    cell::{Cell, RefCell},
-    sync::Arc,
-};
+use std::{sync::Arc, time::Instant};
 
-use cgmath::{Vector3, Zero};
 use nalgebra_glm::Vec3;
 use vulkano::{
     command_buffer::{
@@ -30,9 +26,11 @@ use winit::{
 
 use crate::bounds::Sphere3Df;
 
-use super::{manager::Manager, node::CommandBuffersContext, controllers::{WASDVirtualCameraControl, SceneState, WindowState}};
+use super::node::Node;
 use super::{
-    node::Node,
+    controllers::{SceneState, VirtualCameraControl, WASDVirtualCameraControl, WindowState},
+    manager::Manager,
+    node::CommandBuffersContext,
 };
 use std::collections::HashMap;
 
@@ -152,7 +150,7 @@ impl Window {
                 render_pass: render_pass.clone(),
                 object_matrix: nalgebra_glm::Mat4::identity(),
                 view_matrix: view_matrix.clone(),
-                projection_matrix: projection_matrix.clone()
+                projection_matrix: projection_matrix.clone(),
             });
         builder.end_render_pass().unwrap();
 
@@ -253,23 +251,25 @@ impl Window {
         let mut previous_frame_end = Some(sync::now(self.device.clone()).boxed());
         let mut pipelines = HashMap::<String, Arc<GraphicsPipeline>>::new();
 
-        let mut viz_camera = WASDVirtualCameraControl::default();
-        viz_camera.camera.eye = Vec3::new(0.0, 0.0, 1.0);
-        viz_camera.camera.view = Vec3::new(0.0, 0.0, -1.0);
-        viz_camera.camera.up = Vec3::new(0.0, 1.0, 0.0);
-        
+        let mut camera_control = WASDVirtualCameraControl::default();
+        camera_control.camera.eye = Vec3::new(0.0, 0.0, 1.0);
+        camera_control.camera.view = Vec3::new(0.0, 0.0, -1.0);
+        camera_control.camera.up = Vec3::new(0.0, 1.0, 0.0);
+        camera_control.velocity = 100.0;
         let mut window_state: WindowState = WindowState::new();
         window_state.window_size = [dimensions.width as f32, dimensions.height as f32];
         let mut scene_state: SceneState = SceneState::new();
         scene_state.world_bounds = Sphere3Df {
-            center: nalgebra::Vector3::zero(),
+            center: nalgebra::Vector3::zeros(),
             radius: 1.0,
         };
-
+        
         let mut event_loop = self.event_loop.take();
+        let mut instant = Instant::now();
         event_loop
             .unwrap()
             .run_return(move |event, foo, control_flow| {
+                window_state.elapsed_time = instant.elapsed();
                 match event {
                     Event::WindowEvent {
                         event: WindowEvent::CloseRequested,
@@ -293,7 +293,7 @@ impl Window {
                         event: WindowEvent::CursorMoved { position, .. },
                         ..
                     } => {
-                        viz_camera.cursor_moved(
+                        camera_control.cursor_moved(
                             position.x as f64,
                             position.y as f64,
                             &window_state,
@@ -307,7 +307,7 @@ impl Window {
                         if let Some(vkeycode) = input.virtual_keycode {
                             window_state.keyboard_state.insert(vkeycode, input.state);
                         }
-                        viz_camera.key_event(&window_state, &scene_state);
+                        camera_control.key_event(&window_state, &scene_state);
                     }
                     Event::RedrawEventsCleared => {
                         // Do not draw frame when screen dimensions are zero.
@@ -384,15 +384,13 @@ impl Window {
                         // the window resizes, but it may not cause the swapchain to become out of date.
                         if suboptimal {
                             recreate_swapchain = true;
-                        }
-                        
-                        ;
+                        };
                         let command_buffer = self.get_command_buffers(
                             framebuffers[image_index as usize].clone(),
                             &mut viewport,
                             &mut pipelines,
                             render_pass.clone(),
-                            &viz_camera.viz_camera.matrix(),
+                            &camera_control.camera.matrix(),
                             &nalgebra_glm::perspective(1.0, 0.5, 1.0, 100.0),
                         );
 
@@ -433,6 +431,7 @@ impl Window {
                     }
                     _ => (),
                 }
+                instant = Instant::now();
             });
     }
 
