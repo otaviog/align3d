@@ -260,10 +260,7 @@ impl Window {
         let mut window_state: WindowState = WindowState::new();
         window_state.window_size = [dimensions.width as f32, dimensions.height as f32];
         let mut scene_state: SceneState = SceneState::new();
-        scene_state.world_bounds = Sphere3Df {
-            center: nalgebra::Vector3::zeros(),
-            radius: 1.0,
-        };
+        scene_state.world_bounds = self.scene.bounding_sphere().clone();
         
         let event_loop = self.event_loop.take();
         let mut instant = Instant::now();

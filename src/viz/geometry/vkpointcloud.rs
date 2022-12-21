@@ -14,7 +14,7 @@ use vulkano::{
             vertex_input::BuffersDefinition,
             viewport::{Viewport, ViewportState},
         },
-        GraphicsPipeline, PipelineBindPoint, Pipeline,
+        GraphicsPipeline, Pipeline, PipelineBindPoint,
     },
     render_pass::Subpass,
 };
@@ -35,6 +35,7 @@ pub struct VkPointCloud {
     pub points: Arc<CpuAccessibleBuffer<[PositionF32]>>,
     pub normals: Arc<CpuAccessibleBuffer<[PositionF32]>>,
     pub colors: Arc<CpuAccessibleBuffer<[ColorU8]>>,
+    number_of_points: usize,
 }
 
 impl VkPointCloud {
@@ -46,7 +47,7 @@ impl VkPointCloud {
             vertex_buffer: true,
             ..Default::default()
         };
-
+        let number_of_points = pointcloud.len();
         Self {
             node_properties: NodeProperties {
                 bounding_sphere: Sphere3Df::from_points(&pointcloud.points),
@@ -84,7 +85,12 @@ impl VkPointCloud {
                     .map(|v| ColorU8::new(v[0], v[1], v[2])),
             )
             .unwrap(),
+            number_of_points: number_of_points,
         }
+    }
+
+    pub fn len(&self) -> usize {
+        self.number_of_points
     }
 }
 
@@ -113,10 +119,11 @@ impl Node for VkPointCloud {
                     .vertex_input_state(
                         BuffersDefinition::new()
                             .vertex::<PositionF32>()
-                            .vertex::<NormalF32>()
-                            //.vertex::<ColorU8>(),
+                            .vertex::<NormalF32>(), //.vertex::<ColorU8>(),
                     )
-                    .input_assembly_state(InputAssemblyState::new())
+                    .input_assembly_state(InputAssemblyState::new().topology(
+                        vulkano::pipeline::graphics::input_assembly::PrimitiveTopology::PointList,
+                    ))
                     .vertex_shader(vs.entry_point("main").unwrap(), ())
                     .viewport_state(ViewportState::viewport_fixed_scissor_irrelevant([
                         Viewport {
@@ -181,7 +188,8 @@ impl Node for VkPointCloud {
                 0,
                 descriptor_set,
             )
-            .draw(3 as u32, 1, 0, 0)
+            .draw(self.len() as u32, 1, 0, 0)
+            //.draw(3 as u32, 1, 0, 0)
             .unwrap();
     }
 }
