@@ -77,7 +77,7 @@ impl VirtualCameraControl for WASDVirtualCameraControl {
         x: f64,
         y: f64,
         window_state: &WindowState,
-        scene_state: &SceneState,
+        _: &SceneState,
     ) {
         if let Some(ElementState::Pressed) = window_state.mouse_state.get(&MouseButton::Left) {
             let current_positon = Vec2::new(x as f32, y as f32);

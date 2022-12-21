@@ -14,4 +14,4 @@ pub use virtual_camera::VirtualCamera;
 mod virtual_projection;
 pub use virtual_projection::VirtualProjection;
 
-mod controllers;
+pub mod controllers;

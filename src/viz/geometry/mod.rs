@@ -1,5 +1,5 @@
 mod datatypes;
-pub use datatypes::{Array2f32, Array3f32, Array3u8};
+pub use datatypes::{Array2f32, PositionF32, ColorU8};
 
 mod vkpointcloud;
 pub use vkpointcloud::VkPointCloud;

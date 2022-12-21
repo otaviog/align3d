@@ -177,10 +177,10 @@ mod test {
         };
         let camera = VirtualCameraSphericalBuilder::fit(&sphere, std::f32::consts::PI / 2.0)
             .azimuth(4.0)
-            .elevation(1.0)
-            .build();
+            .elevation(1.0);
+        //let camera = camera.build();
 
-        camera.matrix();
-        camera.projection.matrix();
+        //camera.matrix();
+        //camera.projection.matrix();
     }
 }

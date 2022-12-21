@@ -19,7 +19,7 @@ use vulkano::{
 use vulkano_win::VkSurfaceBuild;
 use winit::{
     event::{Event, WindowEvent},
-    event_loop::{ControlFlow, EventLoop, EventLoopWindowTarget},
+    event_loop::{ControlFlow, EventLoop},
     platform::run_return::EventLoopExtRunReturn,
     window::{Window as WWindow, WindowBuilder},
 };
@@ -95,6 +95,7 @@ impl Window {
         render_pass: Arc<RenderPass>,
         view_matrix: &nalgebra_glm::Mat4,
         projection_matrix: &nalgebra_glm::Mat4,
+        window_state: &WindowState
     ) -> PrimaryAutoCommandBuffer {
         // In order to draw, we have to build a *command buffer*. The command buffer object holds
         // the list of commands that are going to be executed.
@@ -151,7 +152,7 @@ impl Window {
                 object_matrix: nalgebra_glm::Mat4::identity(),
                 view_matrix: view_matrix.clone(),
                 projection_matrix: projection_matrix.clone(),
-            });
+            }, window_state);
         builder.end_render_pass().unwrap();
 
         // Finish building the command buffer by calling `build`.
@@ -264,11 +265,11 @@ impl Window {
             radius: 1.0,
         };
         
-        let mut event_loop = self.event_loop.take();
+        let event_loop = self.event_loop.take();
         let mut instant = Instant::now();
         event_loop
             .unwrap()
-            .run_return(move |event, foo, control_flow| {
+            .run_return(move |event, _, control_flow| {
                 window_state.elapsed_time = instant.elapsed();
                 match event {
                     Event::WindowEvent {
@@ -392,6 +393,7 @@ impl Window {
                             render_pass.clone(),
                             &camera_control.camera.matrix(),
                             &nalgebra_glm::perspective(1.0, 0.5, 1.0, 100.0),
+                            &window_state
                         );
 
                         let future = previous_frame_end
@@ -434,26 +436,4 @@ impl Window {
                 instant = Instant::now();
             });
     }
-
-    fn test(
-        &self,
-        event: Event<()>,
-        foo: EventLoopWindowTarget<()>,
-        control_flow: &mut ControlFlow,
-    ) {
-        let window = self
-            .surface
-            .object()
-            .unwrap()
-            .downcast_ref::<WWindow>()
-            .unwrap();
-        let mut viewport = Viewport {
-            origin: [0.0, 0.0],
-            dimensions: [4 as f32, 5 as f32],
-            depth_range: 0.0..1.0,
-        };
-        //let command_buffer = self.test2(&mut viewport);
-    }
-
-    fn test2(&self, viewport: Viewport) {}
 }

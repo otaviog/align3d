@@ -1,11 +1,11 @@
 use std::sync::Arc;
 
 use align3d::{
-    bounds::Box3Df,
+    bounds::{Box3Df, Sphere3Df},
     viz::node::{Mat4x4, Node, NodeProperties},
-    viz::{geometry::Array3f32, node::CommandBuffersContext},
+    viz::{geometry::PositionF32, node::CommandBuffersContext, controllers::WindowState},
 };
-use cgmath::{Matrix4, Point3, Vector3};
+use cgmath::{Matrix4, Point3, Vector3, Zero};
 use nalgebra_glm::Mat4;
 use vulkano::{
     buffer::{BufferUsage, CpuAccessibleBuffer},
@@ -27,16 +27,21 @@ use vulkano::{
 
 pub struct TeaPotNode {
     node_properties: NodeProperties,
-    vertex_buffer: Arc<CpuAccessibleBuffer<[Array3f32]>>,
+    vertex_buffer: Arc<CpuAccessibleBuffer<[PositionF32]>>,
 }
 
 impl TeaPotNode {
     pub fn new(memory_allocator: &(impl MemoryAllocator + ?Sized)) -> Self {
         let vertices = [
-            Array3f32::new(-0.5, -0.25, 0.0),
-            Array3f32::new(0.0, 0.5, 0.0),
-            Array3f32::new(0.25, -0.1, 0.0),
+            // Array3f32::new(-0.5, -0.25, 0.0),
+            // Array3f32::new(0.0, 0.5, 0.0),
+            // Array3f32::new(0.25, -0.1, 0.0),
+            PositionF32::new(-1.0, -1.0, 0.0),
+            PositionF32::new(0.0, 1.0, 0.0),
+            PositionF32::new(1.0, -1.0, 0.0),
         ];
+
+        
         let vertex_buffer = CpuAccessibleBuffer::from_iter(
             memory_allocator,
             BufferUsage {
@@ -48,8 +53,14 @@ impl TeaPotNode {
         )
         .unwrap();
 
-        TeaPotNode {
-            node_properties: Default::default(),
+        Self {
+            node_properties: NodeProperties { 
+                bounding_sphere: Sphere3Df {
+                    center: nalgebra::Vector3::zero(),
+                    radius: 0.5
+                },
+                ..Default::default()
+            },
             vertex_buffer: vertex_buffer,
         }
     }
@@ -79,11 +90,11 @@ impl Node for TeaPotNode {
         self.node_properties.transformation()
     }
 
-    fn bounding_box(&self) -> &Box3Df {
-        self.node_properties.bounding_box()
+    fn bounding_sphere(&self) -> &Sphere3Df {
+        self.node_properties.bounding_sphere()
     }
-
-    fn collect_command_buffers(&self, context: &mut CommandBuffersContext) {
+    
+    fn collect_command_buffers(&self, context: &mut CommandBuffersContext, window_state: &WindowState) {
         let pipeline = context
             .pipelines
             .entry("Triangle".to_string())
@@ -92,13 +103,13 @@ impl Node for TeaPotNode {
                 let fs = fs::load(context.device.clone()).unwrap();
                 GraphicsPipeline::start()
                     .render_pass(Subpass::from(context.render_pass.clone(), 0).unwrap())
-                    .vertex_input_state(BuffersDefinition::new().vertex::<Array3f32>())
+                    .vertex_input_state(BuffersDefinition::new().vertex::<PositionF32>())
                     .input_assembly_state(InputAssemblyState::new())
                     .vertex_shader(vs.entry_point("main").unwrap(), ())
                     .viewport_state(ViewportState::viewport_fixed_scissor_irrelevant([
                         Viewport {
                             origin: [0.0, 0.0],
-                            dimensions: [640.0, 480.0],
+                            dimensions: window_state.window_size,
                             depth_range: 0.0..1.0,
                         },
                     ]))
