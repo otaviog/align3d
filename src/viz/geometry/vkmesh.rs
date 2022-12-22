@@ -25,12 +25,12 @@ use crate::{
     viz::{
         controllers::WindowState,
         node::{CommandBuffersContext, Mat4x4, Node, NodeProperties},
-    },
+    }, io::Geometry,
 };
 
 use super::datatypes::{ColorU8, NormalF32, PositionF32};
 
-pub struct VkPointCloud {
+pub struct VkMesh {
     node_properties: NodeProperties,
     pub points: Arc<CpuAccessibleBuffer<[PositionF32]>>,
     pub normals: Arc<CpuAccessibleBuffer<[PositionF32]>>,
@@ -38,26 +38,26 @@ pub struct VkPointCloud {
     number_of_points: usize,
 }
 
-impl VkPointCloud {
-    pub fn from_pointcloud(
+impl VkMesh {
+    pub fn from_geometry(
         memory_allocator: &(impl MemoryAllocator + ?Sized),
-        pointcloud: PointCloud,
+        geometry: Geometry,
     ) -> Self {
         let buffer_usage = BufferUsage {
             vertex_buffer: true,
             ..Default::default()
         };
-        let number_of_points = pointcloud.len();
+        let number_of_points = geometry.len();
         Self {
             node_properties: NodeProperties {
-                bounding_sphere: Sphere3Df::from_points(&pointcloud.points),
+                bounding_sphere: Sphere3Df::from_points(&geometry.points),
                 ..Default::default()
             },
             points: CpuAccessibleBuffer::from_iter(
                 memory_allocator,
                 buffer_usage,
                 false,
-                pointcloud
+                geometry
                     .points
                     .axis_iter(Axis(0))
                     .map(|v| PositionF32::new(v[0], v[1], v[2])),
@@ -94,7 +94,7 @@ impl VkPointCloud {
     }
 }
 
-impl Node for VkPointCloud {
+impl Node for VkMesh {
     fn transformation(&self) -> &Mat4x4 {
         self.node_properties.transformation()
     }

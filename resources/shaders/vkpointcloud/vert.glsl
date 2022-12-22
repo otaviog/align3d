@@ -18,5 +18,5 @@ void main() {
     // v_normal = transpose(inverse(mat3(worldview))) * normal;
     gl_Position = uniforms.proj * worldview * vec4(position, 1.0);
     //v_color = vec3(float(rgb.x), float(rgb.y), float(rgb.z)); 
-    v_color = vec3(0.0, 0.0, 1.0);
+    v_color = vec3(0.0, 0.0, 0.0);
 }
