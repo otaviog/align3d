@@ -7,7 +7,9 @@ use vulkano::{
         PrimaryAutoCommandBuffer, RenderPassBeginInfo, SubpassContents,
     },
     device::{Device, Queue},
-    image::{view::ImageView, ImageUsage, SwapchainImage},
+    format::Format,
+    image::{view::ImageView, AttachmentImage, ImageUsage, SwapchainImage},
+    memory::allocator::StandardMemoryAllocator,
     pipeline::{graphics::viewport::Viewport, GraphicsPipeline},
     render_pass::{Framebuffer, FramebufferCreateInfo, RenderPass},
     swapchain::{
@@ -24,14 +26,12 @@ use winit::{
     window::{Window as WWindow, WindowBuilder},
 };
 
-use crate::bounds::Sphere3Df;
-
-use super::node::Node;
 use super::{
-    controllers::{SceneState, VirtualCameraControl, WASDVirtualCameraControl, WindowState},
+    controllers::{FrameStepInfo, SceneState, VirtualCameraControl, WASDVirtualCameraControl},
     manager::Manager,
     node::CommandBuffersContext,
 };
+use super::{node::Node, virtual_camera::VirtualCameraSphericalBuilder};
 use std::collections::HashMap;
 
 pub struct Window {
@@ -44,6 +44,7 @@ pub struct Window {
 }
 
 fn window_size_dependent_setup(
+    memory_allocator: &StandardMemoryAllocator,
     images: &[Arc<SwapchainImage>],
     render_pass: Arc<RenderPass>,
     viewport: &mut Viewport,
@@ -51,6 +52,10 @@ fn window_size_dependent_setup(
     let dimensions = images[0].swapchain().image_extent();
     viewport.dimensions = [dimensions[0] as f32, dimensions[1] as f32];
 
+    let depth_buffer = ImageView::new_default(
+        AttachmentImage::transient(memory_allocator, dimensions, Format::D16_UNORM).unwrap(),
+    )
+    .unwrap();
     images
         .iter()
         .map(|image| {
@@ -58,7 +63,7 @@ fn window_size_dependent_setup(
             Framebuffer::new(
                 render_pass.clone(),
                 FramebufferCreateInfo {
-                    attachments: vec![view],
+                    attachments: vec![view, depth_buffer.clone()],
                     ..Default::default()
                 },
             )
@@ -95,7 +100,7 @@ impl Window {
         render_pass: Arc<RenderPass>,
         view_matrix: &nalgebra_glm::Mat4,
         projection_matrix: &nalgebra_glm::Mat4,
-        window_state: &WindowState
+        window_state: &FrameStepInfo,
     ) -> PrimaryAutoCommandBuffer {
         // In order to draw, we have to build a *command buffer*. The command buffer object holds
         // the list of commands that are going to be executed.
@@ -106,11 +111,6 @@ impl Window {
         //
         // Note that we have to pass a queue family when we create the command buffer. The command
         // buffer will only be executable on that given queue family.
-
-        // let command_buffer_allocator = StandardCommandBufferAllocator::new(
-        //     self.manager.device.clone(),
-        //     Default::default(),
-        // );
 
         let mut builder = AutoCommandBufferBuilder::primary(
             &self.command_buffer_allocator,
@@ -128,7 +128,7 @@ impl Window {
                     //
                     // Only attachments that have `LoadOp::Clear` are provided with clear
                     // values, any others should use `ClearValue::None` as the clear value.
-                    clear_values: vec![Some([0.0, 0.0, 1.0, 1.0].into())],
+                    clear_values: vec![Some([0.0, 0.0, 1.0, 1.0].into()), Some(1f32.into())],
                     ..RenderPassBeginInfo::framebuffer(framebuffer.clone())
                 },
                 // The contents of the first (and only) subpass. This can be either
@@ -143,16 +143,26 @@ impl Window {
             // Since we used an `EmptyPipeline` object, the objects have to be `()`.
             .set_viewport(0, [viewport.clone()]);
 
-        self.scene
-            .collect_command_buffers(&mut CommandBuffersContext {
-                device: self.device.clone(),
-                builder: &mut builder,
-                pipelines: pipelines,
-                render_pass: render_pass.clone(),
-                object_matrix: nalgebra_glm::Mat4::identity(),
-                view_matrix: view_matrix.clone(),
-                projection_matrix: projection_matrix.clone(),
-            }, window_state);
+        self.scene.collect_command_buffers(
+            //&mut CommandBuffersContext {
+            //    device: self.device.clone(),
+            //    builder: &mut builder,
+            //    pipelines: pipelines,
+            //    render_pass: render_pass.clone(),
+            //    object_matrix: nalgebra_glm::Mat4::identity(),
+            //    view_matrix: view_matrix.clone(),
+            //    projection_matrix: projection_matrix.clone(),
+            //},
+            &mut &mut CommandBuffersContext::new(
+                self.device.clone(),
+                &mut builder,
+                pipelines,
+                render_pass.clone(),
+                view_matrix.clone(),
+                projection_matrix.clone(),
+            ),
+            window_state,
+        );
         builder.end_render_pass().unwrap();
 
         // Finish building the command buffer by calling `build`.
@@ -233,35 +243,53 @@ impl Window {
                     // of each pixel in the color attachment. We could use a larger value (multisampling)
                     // for antialiasing. An example of this can be found in msaa-renderpass.rs.
                     samples: 1,
+                },
+                depth: {
+                    load: Clear,
+                    store: DontCare,
+                    format: Format::D16_UNORM,
+                    samples: 1,
                 }
             },
             pass: {
                 // We use the attachment named `color` as the one and only color attachment.
                 color: [color],
                 // No depth-stencil attachment is indicated with empty brackets.
-                depth_stencil: {}
+                depth_stencil: {depth}
             }
         )
         .unwrap();
 
-        let mut framebuffers =
-            window_size_dependent_setup(&images, render_pass.clone(), &mut viewport);
+        let memory_allocator = StandardMemoryAllocator::new_default(self.device.clone());
+        let mut framebuffers = window_size_dependent_setup(
+            &memory_allocator,
+            &images,
+            render_pass.clone(),
+            &mut viewport,
+        );
 
         let mut recreate_swapchain = false;
 
         let mut previous_frame_end = Some(sync::now(self.device.clone()).boxed());
         let mut pipelines = HashMap::<String, Arc<GraphicsPipeline>>::new();
 
-        let mut camera_control = WASDVirtualCameraControl::default();
-        camera_control.camera.eye = Vec3::new(0.0, 0.0, 1.0);
-        camera_control.camera.view = Vec3::new(0.0, 0.0, -1.0);
-        camera_control.camera.up = Vec3::new(0.0, 1.0, 0.0);
-        camera_control.velocity = 100.0;
-        let mut window_state: WindowState = WindowState::new();
-        window_state.window_size = [dimensions.width as f32, dimensions.height as f32];
-        let mut scene_state: SceneState = SceneState::new();
-        scene_state.world_bounds = self.scene.bounding_sphere().clone();
-        
+        let scene_sphere = self.scene.bounding_sphere().clone();
+
+        let mut camera_control = WASDVirtualCameraControl::new(
+            VirtualCameraSphericalBuilder::fit(&scene_sphere, std::f32::consts::FRAC_PI_2)
+                .near_plane(0.05)
+                .build(),
+            0.05,
+        );
+
+        let mut window_state: FrameStepInfo = FrameStepInfo {
+            viewport_size: [dimensions.width as f32, dimensions.height as f32],
+            ..Default::default()
+        };
+        let scene_state: SceneState = SceneState {
+            world_bounds: self.scene.bounding_sphere().clone(),
+        };
+
         let event_loop = self.event_loop.take();
         let mut instant = Instant::now();
         event_loop
@@ -321,7 +349,7 @@ impl Window {
                             return;
                         }
 
-                        window_state.window_size =
+                        window_state.viewport_size =
                             [dimensions.width as f32, dimensions.height as f32];
 
                         // It is important to call this function from time to time, otherwise resources will keep
@@ -353,6 +381,7 @@ impl Window {
                             // Because framebuffers contains an Arc on the old swapchain, we need to
                             // recreate framebuffers as well.
                             framebuffers = window_size_dependent_setup(
+                                &memory_allocator,
                                 &new_images,
                                 render_pass.clone(),
                                 &mut viewport,
@@ -389,8 +418,8 @@ impl Window {
                             &mut pipelines,
                             render_pass.clone(),
                             &camera_control.camera.matrix(),
-                            &nalgebra_glm::perspective(1.0, 0.5, 1.0, 100.0),
-                            &window_state
+                            &camera_control.projection_matrix(),
+                            &window_state,
                         );
 
                         let future = previous_frame_end

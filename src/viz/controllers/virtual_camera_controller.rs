@@ -3,15 +3,15 @@ use winit::event::{ElementState, MouseButton, VirtualKeyCode};
 
 use crate::viz::{virtual_camera::VirtualCameraSphericalBuilder, VirtualCamera};
 
-use super::{SceneState, WindowState};
+use super::{FrameStepInfo, SceneState};
 
 pub trait VirtualCameraControl {
-    fn key_event(&mut self, window_state: &WindowState, scene_bounds: &SceneState);
+    fn key_event(&mut self, window_state: &FrameStepInfo, scene_bounds: &SceneState);
     fn cursor_moved(
         &mut self,
         x: f64,
         y: f64,
-        window_state: &WindowState,
+        window_state: &FrameStepInfo,
         scene_bounds: &SceneState,
     );
     fn view_matrix(&self) -> Mat4;
@@ -26,13 +26,16 @@ pub struct WASDVirtualCameraControl {
 }
 
 impl WASDVirtualCameraControl {
-    pub fn fit_sphere_in_frustum(
-        camera_builder: VirtualCameraSphericalBuilder,
-        move_velocity: f32,
-    ) -> Self {
-        let move_velocity = move_velocity * camera_builder.sphere.radius;
+    /// Creates a new camera controller
+    ///
+    /// # Arguments
+    ///
+    /// * `virtual_camera`: Camera.
+    /// * `move_velocity`: The percentage of movement in relation to the 
+    /// world's bound per second.
+    pub fn new(virtual_camera: VirtualCamera, move_velocity: f32) -> Self {
         Self {
-            camera: camera_builder.build(),
+            camera: virtual_camera,
             velocity: move_velocity,
             ..Default::default()
         }
@@ -51,9 +54,11 @@ impl Default for WASDVirtualCameraControl {
 }
 
 impl VirtualCameraControl for WASDVirtualCameraControl {
-    fn key_event(&mut self, window_state: &WindowState, scene_state: &SceneState) {
-        let move_increment =
-            self.velocity * scene_state.world_bounds.radius * 2.0 * window_state.elapsed_time.as_secs_f32();
+    fn key_event(&mut self, window_state: &FrameStepInfo, scene_state: &SceneState) {
+        let move_increment = self.velocity
+            * scene_state.world_bounds.radius
+            * 2.0;
+            //* window_state.elapsed_time.as_secs_f32();
 
         if let Some(ElementState::Pressed) = window_state.keyboard_state.get(&VirtualKeyCode::W) {
             self.camera.translate_eye(move_increment);
@@ -72,18 +77,12 @@ impl VirtualCameraControl for WASDVirtualCameraControl {
         }
     }
 
-    fn cursor_moved(
-        &mut self,
-        x: f64,
-        y: f64,
-        window_state: &WindowState,
-        _: &SceneState,
-    ) {
+    fn cursor_moved(&mut self, x: f64, y: f64, window_state: &FrameStepInfo, _: &SceneState) {
         if let Some(ElementState::Pressed) = window_state.mouse_state.get(&MouseButton::Left) {
             let current_positon = Vec2::new(x as f32, y as f32);
             let mut difference = self.cursor_last_position - current_positon;
-            difference[0] /= window_state.window_size[0] * self.rotation_sensitivity[0];
-            difference[1] /= window_state.window_size[0] * self.rotation_sensitivity[1];
+            difference[0] /= window_state.viewport_size[0] * self.rotation_sensitivity[0];
+            difference[1] /= window_state.viewport_size[0] * self.rotation_sensitivity[1];
             self.camera.rotate_up_axis(difference[0]);
             self.camera.rotate_right_axis(difference[1]);
             self.cursor_last_position = current_positon;
@@ -109,14 +108,14 @@ mod test {
 
     #[test]
     pub fn test_should_instantiate_camera_controller() {
-        let controller = WASDVirtualCameraControl::fit_sphere_in_frustum(
+        let controller = WASDVirtualCameraControl::new(
             VirtualCameraSphericalBuilder::fit(
                 &Sphere3Df {
                     center: Vector3::new(2.0, 3.0, 4.0),
                     radius: 3.0,
                 },
                 std::f32::consts::PI / 2.0,
-            ),
+            ).build(),
             0.05,
         );
 

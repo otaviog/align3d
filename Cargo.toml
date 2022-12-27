@@ -25,7 +25,7 @@ path = "src/bin/main.rs"
 # ]
 
 [dependencies]
-ndarray = { version = "0.15.3", features = ["approx"] }
+ndarray = { version = "0.15.3", features = ["approx", "rayon"] }
 ndarray-rand = "0.14.0"
 nshare = { version = "0.9.0", features = ["ndarray", "nalgebra"] }
 rand = "0.8.5"
@@ -52,14 +52,24 @@ cgmath = { version = "0.18.0", optional = false }
 rstest = "0.15.0"
 test-temp-file = "0.1.2"
 tempfile = "3.3.0"
+criterion = "0.4"
 
 [[test]]
 name = "viz-point_cloud"
-path = "tests/viz/test_viz_point_cloud.rs"
+path = "tests/viz/test_point_cloud.rs"
 harness = false
 features = "viz"
 
 [[test]]
 name = "viz-window"
 path = "tests/viz/test_window.rs"
+harness = false
+
+[[test]]
+name = "icp"
+path = "tests/test_icp.rs"
+harness = false
+
+[[bench]]
+name = "mesh"
 harness = false

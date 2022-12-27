@@ -8,7 +8,7 @@ pub struct Geometry {
     pub colors: Option<Array2<u8>>,
     /// Per vertices normals. Shape is (Nx3)
     pub normals: Option<Array2<f32>>,
-    /// The indices to conect vertices that make faces in the geometry. 
+    /// The indices to conect vertices that make faces in the geometry.
     /// Shape is (Nx3), we always convert to triangles.
     pub faces: Option<Array2<usize>>,
     /// The texture coordinates.
@@ -16,24 +16,14 @@ pub struct Geometry {
 }
 
 impl Geometry {
-//    pub fn compute_normals(&mut self) {
-//        let normals = self.normals;
-//        if let normals = Some(self.normals) {
-//            
-//        }
-//
-//        for normals 
-//    }
-
+    
+    /// Number of vertices.
     pub fn len_vertices(&self) -> usize {
         self.points.nrows()
     }
 
+    /// Number of faces. Zero if `faces` is None.
     pub fn len_faces(&self) -> usize {
-        //let faces = &self.faces;
-        //self.faces.take().nrows() //map(|f| f.nrows()).unwrap()
-        // (&self.faces).map(|faces| { faces.nrows() } ).or(Some(0 as usize)).unwrap()
-
-        0
+        self.faces.as_ref().map_or(0, |faces| faces.nrows())
     }
 }

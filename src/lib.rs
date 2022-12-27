@@ -1,11 +1,12 @@
 pub mod camera;
-//pub mod icp;
+pub mod icp;
 pub mod imagepointcloud;
 pub mod io;
 pub mod kdtree;
 pub mod pointcloud;
 pub mod transform;
 pub mod bounds;
+pub mod mesh;
 
 // #[cfg(feature="viz")]
 pub mod viz;

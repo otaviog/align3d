@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use ndarray::Axis;
+use ndarray::{Array, Axis};
 use vulkano::{
     buffer::{BufferUsage, CpuAccessibleBuffer},
     descriptor_set::{
@@ -10,7 +10,7 @@ use vulkano::{
     pipeline::{
         graphics::{
             depth_stencil::DepthStencilState,
-            input_assembly::InputAssemblyState,
+            input_assembly::{InputAssemblyState, PrimitiveTopology},
             vertex_input::BuffersDefinition,
             viewport::{Viewport, ViewportState},
         },
@@ -21,41 +21,53 @@ use vulkano::{
 
 use crate::{
     bounds::Sphere3Df,
-    pointcloud::PointCloud,
+    io::Geometry,
     viz::{
-        controllers::WindowState,
+        controllers::FrameStepInfo,
         node::{CommandBuffersContext, Mat4x4, Node, NodeProperties},
-    }, io::Geometry,
+    },
 };
 
 use super::datatypes::{ColorU8, NormalF32, PositionF32};
 
+/// Triangular mesh in GPU.
 pub struct VkMesh {
-    node_properties: NodeProperties,
+    /// Vertex points.
     pub points: Arc<CpuAccessibleBuffer<[PositionF32]>>,
-    pub normals: Arc<CpuAccessibleBuffer<[PositionF32]>>,
-    pub colors: Arc<CpuAccessibleBuffer<[ColorU8]>>,
-    number_of_points: usize,
+    // Indices.
+    pub indices: Arc<CpuAccessibleBuffer<[u32]>>,
+    /// Vertex normals.
+    pub normals: Option<Arc<CpuAccessibleBuffer<[PositionF32]>>>,
+    /// RGB colors.
+    pub colors: Option<Arc<CpuAccessibleBuffer<[ColorU8]>>>,
+    bounding_sphere: Sphere3Df,
+    number_of_vertex: usize,
+    number_of_faces: usize,
 }
 
 impl VkMesh {
+    /// Constructs from a geometry structure. The structure must
+    /// contain some faces.
+    ///
+    /// # Arguments
+    ///
+    /// * `memory_allocator` - Vulkan's memory allocator.
+    /// * `geometry` - Target geometry.
     pub fn from_geometry(
         memory_allocator: &(impl MemoryAllocator + ?Sized),
-        geometry: Geometry,
-    ) -> Self {
-        let buffer_usage = BufferUsage {
+        geometry: &Geometry,
+    ) -> Arc<Self> {
+        let vertex_buffer_usage = BufferUsage {
             vertex_buffer: true,
             ..Default::default()
         };
-        let number_of_points = geometry.len();
-        Self {
-            node_properties: NodeProperties {
-                bounding_sphere: Sphere3Df::from_points(&geometry.points),
-                ..Default::default()
-            },
+
+        let number_of_points = geometry.len_vertices();
+        let number_of_faces = geometry.len_faces();
+        Arc::new(Self {
             points: CpuAccessibleBuffer::from_iter(
                 memory_allocator,
-                buffer_usage,
+                vertex_buffer_usage,
                 false,
                 geometry
                     .points
@@ -63,38 +75,113 @@ impl VkMesh {
                     .map(|v| PositionF32::new(v[0], v[1], v[2])),
             )
             .unwrap(),
-            normals: CpuAccessibleBuffer::from_iter(
+            indices: CpuAccessibleBuffer::from_iter(
                 memory_allocator,
-                buffer_usage,
+                BufferUsage {
+                    index_buffer: true,
+                    ..Default::default()
+                },
                 false,
-                pointcloud
-                    .normals
-                    .unwrap()
-                    .axis_iter(Axis(0))
-                    .map(|v| PositionF32::new(v[0], v[1], v[2])),
+                Array::from_iter(geometry.faces.as_ref().unwrap().iter().cloned())
+                    .iter()
+                    .rev()
+                    .map(|v| *v as u32),
             )
             .unwrap(),
-            colors: CpuAccessibleBuffer::from_iter(
-                memory_allocator,
-                buffer_usage,
-                false,
-                pointcloud
-                    .colors
-                    .unwrap()
-                    .axis_iter(Axis(0))
-                    .map(|v| ColorU8::new(v[0], v[1], v[2])),
-            )
-            .unwrap(),
-            number_of_points: number_of_points,
-        }
+            normals: Some(
+                CpuAccessibleBuffer::from_iter(
+                    memory_allocator,
+                    vertex_buffer_usage,
+                    false,
+                    geometry
+                        .normals
+                        .as_ref()
+                        .unwrap()
+                        .axis_iter(Axis(0))
+                        .map(|v| PositionF32::new(v[0], v[1], v[2])),
+                )
+                .unwrap(),
+            ),
+            colors: Some(
+                CpuAccessibleBuffer::from_iter(
+                    memory_allocator,
+                    vertex_buffer_usage,
+                    false,
+                    geometry
+                        .colors
+                        .as_ref()
+                        .unwrap()
+                        .axis_iter(Axis(0))
+                        .map(|v| ColorU8::new(v[0], v[1], v[2])),
+                )
+                .unwrap(),
+            ),
+            bounding_sphere: Sphere3Df::from_points(&geometry.points),
+            number_of_vertex: number_of_points,
+            number_of_faces: number_of_faces,
+        })
     }
 
-    pub fn len(&self) -> usize {
-        self.number_of_points
+    /// Number of vertices.
+    pub fn len_vertex(&self) -> usize {
+        self.number_of_vertex
+    }
+
+    /// Number of faces.
+    pub fn len_face(&self) -> usize {
+        self.number_of_faces
+    }
+
+    /// Bounding sphere of its points.
+    pub fn bounding_sphere(&self) -> &Sphere3Df {
+        &self.bounding_sphere
     }
 }
 
-impl Node for VkMesh {
+/// A rendering node for VkMeshes.
+pub struct VkMeshNode {
+    node_properties: NodeProperties,
+    /// Mesh instance.
+    pub mesh: Arc<VkMesh>,
+}
+
+impl VkMeshNode {
+    /// Creates a new node with a mesh.
+    ///
+    /// # Arguments
+    ///
+    /// * `mesh`: The mesh buffer instance.
+    pub fn new(mesh: Arc<VkMesh>) -> Arc<Self> {
+        Arc::new(Self {
+            node_properties: NodeProperties {
+                bounding_sphere: mesh.bounding_sphere().clone(),
+                ..Default::default()
+            },
+            mesh: mesh.clone(),
+        })
+    }
+}
+
+mod vs {
+    vulkano_shaders::shader! {
+        ty: "vertex",
+        path: "resources/shaders/vkmesh/mesh.vert",
+        types_meta: {
+            use bytemuck::{Pod, Zeroable};
+
+            #[derive(Clone, Copy, Zeroable, Pod)]
+        },
+    }
+}
+
+mod fs {
+    vulkano_shaders::shader! {
+        ty: "fragment",
+        path: "resources/shaders/vkmesh/mesh.frag"
+    }
+}
+
+impl Node for VkMeshNode {
     fn transformation(&self) -> &Mat4x4 {
         self.node_properties.transformation()
     }
@@ -106,11 +193,11 @@ impl Node for VkMesh {
     fn collect_command_buffers(
         &self,
         context: &mut CommandBuffersContext,
-        window_state: &WindowState,
+        frame_info: &FrameStepInfo,
     ) {
         let pipeline = context
             .pipelines
-            .entry("VkPointCloud".to_string())
+            .entry("VkMesh".to_string())
             .or_insert_with(|| {
                 let vs = vs::load(context.device.clone()).unwrap();
                 let fs = fs::load(context.device.clone()).unwrap();
@@ -122,14 +209,13 @@ impl Node for VkMesh {
                             .vertex::<NormalF32>(), //.vertex::<ColorU8>(),
                     )
                     .input_assembly_state(
-                        InputAssemblyState::new() //.topology(
-                        //vulkano::pipeline::graphics::input_assembly::PrimitiveTopology::PointList)
+                        InputAssemblyState::new().topology(PrimitiveTopology::TriangleList),
                     )
                     .vertex_shader(vs.entry_point("main").unwrap(), ())
                     .viewport_state(ViewportState::viewport_fixed_scissor_irrelevant([
                         Viewport {
                             origin: [0.0, 0.0],
-                            dimensions: window_state.window_size,
+                            dimensions: frame_info.viewport_size,
                             depth_range: 0.0..1.0,
                         },
                     ]))
@@ -141,14 +227,12 @@ impl Node for VkMesh {
         let memory_allocator =
             Arc::new(StandardMemoryAllocator::new_default(context.device.clone()));
 
-        let proj = cgmath::perspective(cgmath::Rad(std::f32::consts::FRAC_PI_2), 1.0, 0.01, 100.0);
         let uniform_buffer_subbuffer = {
             let uniform_data = vs::ty::Data {
-                world: Mat4x4::identity().into(),
-                view: context.view_matrix.into(),
-                //proj: context.projection_matrix.into(),
-                //view: view.into(),
-                proj: proj.into(),
+                worldview: context.view_matrix.into(),
+                worldview_normals: context.view_normals_matrix.into(),
+                projection_worldview: (context.projection_matrix * context.view_matrix).into(),
+                _dummy0: [0; 12],
             };
 
             CpuAccessibleBuffer::from_data(
@@ -178,9 +262,9 @@ impl Node for VkMesh {
             .bind_vertex_buffers(
                 0,
                 (
-                    self.points.clone(),
-                    self.normals.clone(),
-                    //self.colors.clone(),
+                    self.mesh.points.clone(),
+                    self.mesh.normals.as_ref().unwrap().clone(),
+                    self.mesh.colors.as_ref().unwrap().clone(),
                 ),
             )
             .bind_descriptor_sets(
@@ -189,35 +273,15 @@ impl Node for VkMesh {
                 0,
                 descriptor_set,
             )
-            .draw(self.len() as u32, 1, 0, 0)
-            //.draw(3 as u32, 1, 0, 0)
+            .bind_index_buffer(self.mesh.indices.clone())
+            .draw_indexed((self.mesh.len_face() * 3) as u32, 1, 0, 0, 0)
             .unwrap();
-    }
-}
-
-mod vs {
-    vulkano_shaders::shader! {
-        ty: "vertex",
-        path: "resources/shaders/vkpointcloud/vert.glsl",
-        types_meta: {
-            use bytemuck::{Pod, Zeroable};
-
-            #[derive(Clone, Copy, Zeroable, Pod)]
-        },
-    }
-}
-
-mod fs {
-    vulkano_shaders::shader! {
-        ty: "fragment",
-        path: "resources/shaders/vkpointcloud/frag.glsl"
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::pointcloud::PointCloud;
-    use crate::unit_test::sample_teapot_pointcloud;
+    use crate::{unit_test::sample_teapot_geometry, viz::OffscreenRenderer};
     use rstest::*;
     use vulkano::memory::allocator::StandardMemoryAllocator;
 
@@ -231,8 +295,11 @@ mod tests {
     }
 
     #[rstest]
-    fn test_creation(vk_manager: Manager, sample_teapot_pointcloud: PointCloud) {
+    fn test_creation(mut vk_manager: Manager, sample_teapot_geometry: Geometry) {
         let mem_alloc = StandardMemoryAllocator::new_default(vk_manager.device.clone());
-        VkPointCloud::from_pointcloud(&mem_alloc, sample_teapot_pointcloud);
+        let mut render = OffscreenRenderer::new(&mut vk_manager, 640, 480);
+
+        let node = VkMeshNode::new(VkMesh::from_geometry(&mem_alloc, &sample_teapot_geometry));
+        render.render(node);
     }
 }

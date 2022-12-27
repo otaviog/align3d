@@ -1,6 +1,6 @@
-use super::kdtree::KdTree;
-use super::pointcloud::PointCloud;
-use super::transform::Transform;
+use crate::kdtree::KdTree;
+use crate::pointcloud::PointCloud;
+use crate::transform::Transform;
 use nalgebra::{Cholesky, Vector6};
 use ndarray::prelude::s;
 use ndarray::{Array2, Array3, Axis};

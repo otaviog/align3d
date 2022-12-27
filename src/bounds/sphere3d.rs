@@ -33,6 +33,26 @@ impl Sphere3Df {
         }
     }
 
+    pub fn from_point_iter<I>(point_iter: I) -> Self
+    where
+        I: Iterator<Item = Vector3<f32>> + Clone
+    {
+        let mut count = 0;
+        let center = point_iter.clone().fold(Vector3::zeros(), |sum, p| {
+            count += 1;
+            sum + p
+        });
+        let center = center / count as f32;
+        Self {
+            center: center,
+            radius: point_iter
+                .map(|p| center.dot(&p))
+                .reduce(f32::max)
+                .unwrap()
+                .sqrt(),
+        }
+    }
+
     pub fn is_empty(&self) -> bool {
         self.radius < 0.0
     }

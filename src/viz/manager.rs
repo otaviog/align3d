@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use vulkano::{
     device::{
-        physical::{PhysicalDeviceType, PhysicalDevice}, Device, DeviceCreateInfo, DeviceExtensions, QueueCreateInfo, Queue,
+        physical::{PhysicalDeviceType, PhysicalDevice}, Device, DeviceCreateInfo, DeviceExtensions, QueueCreateInfo, Queue, Features,
     },
     instance::{Instance, InstanceCreateInfo},
     VulkanLibrary, memory::allocator::StandardMemoryAllocator,
@@ -61,9 +61,6 @@ impl Manager {
                 PhysicalDeviceType::IntegratedGpu => 1,
                 PhysicalDeviceType::VirtualGpu => 2,
                 PhysicalDeviceType::Cpu => 3,
-                // Note that there exists `PhysicalDeviceType::Other`, however,
-                // `PhysicalDeviceType` is a non-exhaustive enum. Thus, one should
-                // match wildcard `_` to catch all unknown device types.
                 _ => 4,
             })
             .expect("no device available");
@@ -76,6 +73,10 @@ impl Manager {
                     ..Default::default()
                 }],
                 enabled_extensions: physical_device_extensions,
+                enabled_features: Features {
+                    geometry_shader: true,
+                    ..Default::default()
+                },
                 ..Default::default()
             },
         )

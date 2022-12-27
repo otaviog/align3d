@@ -8,4 +8,6 @@ A crate for aligning 3D data and other stuff related with point clouds and SLAM.
 * [ ] `impl` and `dyn` differance 
 * [ ] use `impl Foo + ?Sized`
 * [ ] How to make a macro `vertex_impl!`
-* [ ] 
+* [ ] Learn vulkan
+* [ ] Better builder
+* [ ] Option and borrowing (vkMesh)

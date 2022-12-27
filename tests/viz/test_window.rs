@@ -1,20 +1,14 @@
-use std::sync::Arc;
+use align3d::viz::{
+    geometry::{VkMesh, VkMeshNode},
+    Manager, Window,
+};
 
-use vulkano::memory::allocator::StandardMemoryAllocator;
-
-//mod triangle_node;
-//use triangle_node::TriangleNode;
-
-mod teapot_node;
-use teapot_node::TeaPotNode;
+mod test_data;
+use test_data::sample_teapot;
 
 fn main() {
-    let mut manager = align3d::viz::Manager::default();
+    let mut manager = Manager::default();
+    let geometry = VkMesh::from_geometry(&manager.memory_allocator, &sample_teapot());
 
-    let memory_allocator = StandardMemoryAllocator::new_default(manager.device.clone());
-
-    let mut window =
-        align3d::viz::Window::create(&mut manager, Arc::new(TeaPotNode::new(&memory_allocator)));
-
-    window.show();
+    Window::create(&mut manager, VkMeshNode::new(geometry)).show();
 }

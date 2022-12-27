@@ -14,4 +14,10 @@ pub use virtual_camera::VirtualCamera;
 mod virtual_projection;
 pub use virtual_projection::VirtualProjection;
 
+mod offscreen_render;
+pub use offscreen_render::OffscreenRenderer;
+
 pub mod controllers;
+
+#[cfg(test)]
+pub mod unit_test;

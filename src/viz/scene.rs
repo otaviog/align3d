@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use super::{
-    controllers::WindowState,
+    controllers::FrameStepInfo,
     node::{CommandBuffersContext, Mat4x4, Node, NodeProperties},
 };
 use crate::bounds::Sphere3Df;
@@ -33,13 +33,24 @@ impl Node for Scene {
     fn collect_command_buffers(
         &self,
         context: &mut CommandBuffersContext,
-        window_state: &WindowState,
+        window_state: &FrameStepInfo,
     ) {
-        let parent_object_matrix = context.object_matrix.clone();
-        context.object_matrix = context.object_matrix * self.node_properties.transformation;
+        // Save the view matrices.
+        let saved_view_matrix = context.view_matrix.clone();
+        let saved_view_normals_matrix = context.view_normals_matrix.clone();
+
+        // Transform with this parent node transformation.
+        context.view_matrix = context.view_matrix * self.node_properties.transformation;
+        context.view_normals_matrix =
+            nalgebra_glm::inverse_transpose(context.view_matrix.fixed_slice::<3, 3>(3, 3).into());
+
+        // Traverse subnodes:
         for node in self.nodes.iter() {
             node.collect_command_buffers(context, window_state);
         }
-        context.object_matrix = parent_object_matrix;
+
+        // Resets the matrices to the originals:
+        context.view_normals_matrix = saved_view_normals_matrix;
+        context.view_matrix = saved_view_matrix;
     }
 }

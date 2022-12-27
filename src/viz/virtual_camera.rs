@@ -5,10 +5,15 @@ use crate::bounds::Sphere3Df;
 
 use super::{virtual_projection::PerspectiveVirtualProjectionBuilder, VirtualProjection};
 
+/// Virtual camera to move around in the visualization.
 pub struct VirtualCamera {
+    /// Camera position point.
     pub eye: Vec3,
+    /// Viewing vector. Always normalized.
     pub view: Vec3,
+    /// Up vector. Always normalized.
     pub up: Vec3,
+    /// Projection parameters.
     pub projection: VirtualProjection,
 }
 
@@ -18,7 +23,7 @@ impl Default for VirtualCamera {
             eye: Vec3::new(0.0, 0.0, 1.0),
             view: Vec3::new(0.0, 0.0, -1.0),
             up: Vec3::new(0.0, 1.0, 0.0),
-            projection: VirtualProjection::default()
+            projection: VirtualProjection::default(),
         }
     }
 }
@@ -63,26 +68,29 @@ impl VirtualCamera {
 
 pub struct VirtualCameraSphericalBuilder {
     pub sphere: Sphere3Df,
-    elevation_: f32,
-    azimuth_: f32,
-    distance_: f32,
-    fov_y_: f32,
-    aspect_ratio_: f32,
-    near_plane_distance_: f32,
-    far_plane_distance_: f32,
+    elevation: f32,
+    azimuth: f32,
+    distance: f32,
+    fov_y: f32,
+    aspect_ratio: f32,
+    near_plane_distance: f32,
+    far_plane_distance: f32,
 }
 
 impl Default for VirtualCameraSphericalBuilder {
     fn default() -> Self {
         Self {
-            sphere: Sphere3Df { center: Vector3::zeros(), radius: 1.0 },
-            elevation_: 0.0,
-            azimuth_: 0.0,
-            distance_: 1.0,
-            fov_y_: 45.0,
-            aspect_ratio_: 1.0,
-            near_plane_distance_: 1.0,
-            far_plane_distance_: 10.0,
+            sphere: Sphere3Df {
+                center: Vector3::zeros(),
+                radius: 1.0,
+            },
+            elevation: 0.0,
+            azimuth: 0.0,
+            distance: 1.0,
+            fov_y: 45.0,
+            aspect_ratio: 1.0,
+            near_plane_distance: 1.0,
+            far_plane_distance: 10.0,
         }
     }
 }
@@ -99,46 +107,56 @@ impl VirtualCameraSphericalBuilder {
 
         Self {
             sphere: sphere.clone(),
-            distance_: distance,
-            fov_y_: fov_y,
-            near_plane_distance_: near,
+            distance,
+            fov_y,
+            near_plane_distance: near,
             ..Default::default()
         }
     }
 
-    pub fn elevation(&'_ mut self, value: f32) -> &'_ mut Self {
-        self.elevation_ = value;
+    pub fn elevation(mut self, value: f32) -> Self {
+        self.elevation = value;
         self
     }
 
-    pub fn azimuth(&'_ mut self, value: f32) -> &'_ mut Self {
-        self.azimuth_ = value;
+    pub fn azimuth(mut self, value: f32) -> Self {
+        self.azimuth = value;
         self
     }
 
-    pub fn distance(&'_ mut self, value: f32) -> &'_ mut Self {
-        self.distance_ = value;
+    pub fn distance(mut self, value: f32) -> Self {
+        self.distance = value;
         self
     }
 
-    pub fn fov_y(&'_ mut self, value: f32) -> &'_ mut Self {
-        self.fov_y_ = value;
+    pub fn fov_y(mut self, value: f32) -> Self {
+        self.fov_y = value;
         self
     }
 
-    pub fn aspect_ratio(&'_ mut self, value: f32) -> &'_ mut Self {
-        self.aspect_ratio_ = value;
+    pub fn aspect_ratio(mut self, value: f32) -> Self {
+        self.aspect_ratio = value;
+        self
+    }
+
+    pub fn near_plane(mut self, value: f32) -> Self {
+        self.near_plane_distance = value;
+        self
+    }
+
+    pub fn far_plane(mut self, value: f32) -> Self {
+        self.far_plane_distance = value;
         self
     }
 
     pub fn build(self) -> VirtualCamera {
-        let theta = self.elevation_;
-        let phi = self.azimuth_ + std::f32::consts::PI * 1.5;
+        let theta = self.elevation;
+        let phi = self.azimuth + std::f32::consts::PI * 1.5;
 
         let mut position = Vec3::new(
-            phi.cos() * self.distance_ * theta.cos(),
-            theta.sin() * self.distance_,
-            -phi.sin() * self.distance_ * theta.cos(),
+            phi.cos() * self.distance * theta.cos(),
+            theta.sin() * self.distance,
+            -phi.sin() * self.distance * theta.cos(),
         );
         position += &self.sphere.center;
 
@@ -151,16 +169,15 @@ impl VirtualCameraSphericalBuilder {
             view: view,
             up: up,
             projection: PerspectiveVirtualProjectionBuilder {
-                fov_y: self.fov_y_,
-                aspect_ratio: self.aspect_ratio_,
-                near_plane_distance: self.near_plane_distance_,
-                far_plane_distance: self.far_plane_distance_,
+                fov_y: self.fov_y,
+                aspect_ratio: self.aspect_ratio,
+                near_plane_distance: self.near_plane_distance,
+                far_plane_distance: self.far_plane_distance,
             }
             .build(),
         }
     }
 }
-
 
 #[cfg(test)]
 mod test {
