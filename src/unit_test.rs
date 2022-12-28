@@ -1,9 +1,10 @@
 use ndarray::{Array2, Axis};
+use nshare::ToNdarray2;
 use rstest::*;
 
-use crate::pointcloud::PointCloud;
 use crate::io::{read_off, Geometry};
 use crate::mesh::compute_normals;
+use crate::pointcloud::PointCloud;
 
 #[fixture]
 pub fn sample_teapot_geometry() -> Geometry {

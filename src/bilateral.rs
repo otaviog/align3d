@@ -1,18 +1,30 @@
 use ndarray::{Array2, Array4, Axis};
-use num::clamp;
-use std::{cmp::{max, min}, mem::swap};
+use num::{clamp, ToPrimitive};
+use std::{
+    cmp::{max, min},
+    mem::swap,
+};
 
-pub struct BilateralGrid {
+pub struct BilateralGrid<Luma> {
     pub grid: Array4<f64>,
     sigma_space: f64,
     sigma_color: f64,
-    color_min: u16,
+    color_min: Luma,
     space_pad: usize,
-    color_pad: usize
+    color_pad: usize,
 }
 
-impl BilateralGrid {
-    pub fn from_image(image: &Array2<u16>, sigma_space: f64, sigma_color: f64) -> Self {
+impl<Luma> BilateralGrid<Luma>
+where
+    Luma: num::Bounded
+        + Ord
+        + Copy
+        + std::ops::Sub
+        + ToPrimitive
+        + std::convert::From<<Luma as std::ops::Sub>::Output>
+        + num::NumCast,
+{
+    pub fn from_image(image: &Array2<Luma>, sigma_space: f64, sigma_color: f64) -> Self {
         let space_pad = 2;
         let color_pad = 2;
 
@@ -22,16 +34,19 @@ impl BilateralGrid {
         let grid_width = ((image_width - 1) as f64 / sigma_space) as usize + 1 + 2 * space_pad;
 
         let (color_min, color_max) = {
-            let mut mi = std::u16::MAX;
-            let mut ma = std::u16::MIN;
+            let mut mi = Luma::max_value();
+            let mut ma = Luma::min_value();
             image.iter().for_each(|v| {
                 mi = min(mi, *v);
                 ma = max(ma, *v);
             });
             (mi, ma)
         };
-        let grid_depth =
-            ((color_max - color_min) as f64 / sigma_color) as usize + 1 + 2 * color_pad;
+
+        let grid_depth = {
+            let diff: Luma = (color_max - color_min).into();
+            (diff.to_f64().unwrap() / sigma_color) as usize + 1 + 2 * color_pad
+        };
 
         let mut grid = Array4::<f64>::zeros((grid_height, grid_width, grid_depth, 2));
         for row in 0..image_height {
@@ -41,8 +56,11 @@ impl BilateralGrid {
                 let grid_col = (col as f64 / sigma_space + 0.5) as usize + space_pad;
 
                 let color = image[(row, col)];
-                let channel = ((color - color_min) as f64 / sigma_color + 0.5) as usize + color_pad;
-                grid[(grid_row, grid_col, channel, 0)] += color as f64;
+                let channel = {
+                    let diff: Luma = (color - color_min).into();
+                    (diff.to_f64().unwrap() / sigma_color + 0.5) as usize + color_pad
+                };
+                grid[(grid_row, grid_col, channel, 0)] += color.to_f64().unwrap();
                 grid[(grid_row, grid_col, channel, 1)] += 1.0;
             }
         }
@@ -53,21 +71,43 @@ impl BilateralGrid {
             sigma_space: sigma_space,
             color_min: color_min,
             space_pad: space_pad,
-            color_pad: color_pad
+            color_pad: color_pad,
         }
     }
 
-    pub fn slice(&self, image: &Array2<u16>, dst_image: &mut Array2<u16>) {
+    pub fn normalize(&mut self) {
+        let dim = self.dim();
+        self.grid
+            .view_mut()
+            .into_shape((dim.0 * dim.1 * dim.2, 2))
+            .unwrap()
+            .axis_iter_mut(Axis(0))
+            .for_each(|mut color_count| {
+                let count = color_count[1];
+                if count > 0.0 {
+                    color_count[0] /= count;
+                    color_count[1] = 1.0;
+                }
+            });
+    }
+
+    pub fn slice(&self, image: &Array2<Luma>, dst_image: &mut Array2<Luma>) {
         let (image_height, image_width) = image.dim();
 
         for row in 0..image_height {
             for col in 0..image_width {
                 let color = image[(row, col)];
-                dst_image[(row, col)] = self.trilinear(
-                    row as f64 / self.sigma_space + self.space_pad as f64,
-                    col as f64 / self.sigma_space + self.space_pad as f64,
-                    (color - self.color_min) as f64 / self.sigma_color + self.color_pad as f64,
-                ) as u16;
+                unsafe {
+                    let trilinear = self.trilinear(
+                        row as f64 / self.sigma_space + self.space_pad as f64,
+                        col as f64 / self.sigma_space + self.space_pad as f64,
+                        {
+                            let diff: Luma = (color - self.color_min).into();
+                            diff.to_f64().unwrap() / self.sigma_color + self.color_pad as f64
+                        },
+                    );
+                    dst_image[(row, col)] = num::cast::cast(trilinear).unwrap();
+                }
             }
         }
     }
@@ -99,36 +139,63 @@ impl BilateralGrid {
             + y_alpha         * (1.0 - x_alpha) * z_alpha         *  self.grid[(yy_index, x_index , zz_index, 0)]
             + y_alpha         * x_alpha         * z_alpha         *  self.grid[(yy_index, xx_index, zz_index, 0)]
         };
-
         value
     }
- 
+
     pub fn dim(&self) -> (usize, usize, usize, usize) {
         self.grid.dim()
     }
 }
 
-pub fn bilateral_filter(
-    image: &Array2<u16>,
+/// Bilateral filter using Bilateral Grid.
+///
+/// Based on the code in https://gist.github.com/ginrou/02e945562607fad170a1.
+/// 
+/// # Arguments:
+/// 
+/// * `image`: 
+/// * `sigma_space`: 
+/// * `sigma_color`:
+/// * `dst_image`:
+pub fn bilateral_filter<Luma>(
+    image: &Array2<Luma>,
     sigma_space: f64,
     sigma_color: f64,
-    dst_image: &mut Array2<u16>,
-) {
-    
+    dst_image: &mut Array2<Luma>,
+) where
+    Luma: num::Bounded
+        + Ord
+        + Copy
+        + std::ops::Sub
+        + ToPrimitive
+        + std::convert::From<<Luma as std::ops::Sub>::Output>
+        + num::NumCast,
+{
     let mut grid = BilateralGrid::from_image(image, sigma_space, sigma_color);
 
-    {
-    let mut data_ptr = grid.grid.as_mut_ptr();
+    convolution(&mut grid);
+    grid.normalize();
 
+    grid.slice(&image, dst_image);
+}
+
+fn convolution<Luma>(grid: &mut BilateralGrid<Luma>)
+where
+    Luma: num::Bounded
+        + Ord
+        + Copy
+        + std::ops::Sub
+        + ToPrimitive
+        + std::convert::From<<Luma as std::ops::Sub>::Output>
+        + num::NumCast,
+{
+    let mut data_ptr = grid.grid.as_mut_ptr();
     let mut buffer = Array4::zeros(grid.dim());
     let mut buffer_ptr: *mut f64 = buffer.as_mut_ptr();
-
     let (grid_height, grid_width, grid_depth, _) = grid.dim();
-
     let row_stride = grid.grid.stride_of(Axis(0));
     let col_stride = grid.grid.stride_of(Axis(1));
     let channel_stride = grid.grid.stride_of(Axis(2));
-
     for plane_offset in &[row_stride, col_stride, channel_stride] {
         let plane_offset = *plane_offset;
         for _ in 0..2 {
@@ -176,19 +243,4 @@ pub fn bilateral_filter(
             }
         }
     }
-    }
-    let dim = grid.dim();
-    grid.grid.view_mut()
-        .into_shape((dim.0*dim.1*dim.2, 2))
-        .unwrap()
-        .axis_iter_mut(Axis(0))
-        .for_each(|mut color_count| {
-            let count = color_count[1];
-            if count > 0.0 {
-                color_count[0] /= count;
-                color_count[1] = 1.0;
-            }
-        });
-
-    grid.slice(&image, dst_image);
 }
