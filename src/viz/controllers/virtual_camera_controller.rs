@@ -1,7 +1,7 @@
 use nalgebra_glm::{Mat4, Vec2};
 use winit::event::{ElementState, MouseButton, VirtualKeyCode};
 
-use crate::viz::{virtual_camera::VirtualCameraSphericalBuilder, VirtualCamera};
+use crate::viz::VirtualCamera;
 
 use super::{FrameStepInfo, SceneState};
 
@@ -31,7 +31,7 @@ impl WASDVirtualCameraControl {
     /// # Arguments
     ///
     /// * `virtual_camera`: Camera.
-    /// * `move_velocity`: The percentage of movement in relation to the 
+    /// * `move_velocity`: The percentage of movement in relation to the
     /// world's bound per second.
     pub fn new(virtual_camera: VirtualCamera, move_velocity: f32) -> Self {
         Self {
@@ -55,10 +55,8 @@ impl Default for WASDVirtualCameraControl {
 
 impl VirtualCameraControl for WASDVirtualCameraControl {
     fn key_event(&mut self, window_state: &FrameStepInfo, scene_state: &SceneState) {
-        let move_increment = self.velocity
-            * scene_state.world_bounds.radius
-            * 2.0;
-            //* window_state.elapsed_time.as_secs_f32();
+        let move_increment = self.velocity * scene_state.world_bounds.radius * 2.0;
+        //* window_state.elapsed_time.as_secs_f32();
 
         if let Some(ElementState::Pressed) = window_state.keyboard_state.get(&VirtualKeyCode::W) {
             self.camera.translate_eye(move_increment);
@@ -115,7 +113,8 @@ mod test {
                     radius: 3.0,
                 },
                 std::f32::consts::PI / 2.0,
-            ).build(),
+            )
+            .build(),
             0.05,
         );
 

@@ -1,6 +1,5 @@
 use std::{sync::Arc, time::Instant};
 
-use nalgebra_glm::Vec3;
 use vulkano::{
     command_buffer::{
         allocator::StandardCommandBufferAllocator, AutoCommandBufferBuilder, CommandBufferUsage,

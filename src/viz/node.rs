@@ -1,9 +1,8 @@
 use std::{collections::HashMap, sync::Arc};
 
 use crate::bounds::Sphere3Df;
-use nalgebra_glm::{self, inverse, inverse_transpose, Mat3};
+use nalgebra_glm::{self, Mat3};
 use vulkano::{
-    buffer::view,
     command_buffer::{AutoCommandBufferBuilder, PrimaryAutoCommandBuffer},
     device::Device,
     pipeline::GraphicsPipeline,
