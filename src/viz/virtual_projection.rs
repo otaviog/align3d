@@ -67,33 +67,33 @@ impl VirtualProjection {
 pub struct PerspectiveVirtualProjectionBuilder {
     pub fov_y: f32,
     pub aspect_ratio: f32,
-    pub near_plane_distance: f32,
-    pub far_plane_distance: f32,
+    pub near_plane: f32,
+    pub far_plane: f32,
 }
 
 impl PerspectiveVirtualProjectionBuilder {
-    pub fn set_fov_y(&'_ mut self, value: f32) -> &'_ mut Self {
+    pub fn fov_y(&'_ mut self, value: f32) -> &'_ mut Self {
         self.fov_y = value;
         self
     }
 
-    pub fn set_aspect_ratio(&'_ mut self, value: f32) -> &'_ mut Self {
+    pub fn aspect_ratio(&'_ mut self, value: f32) -> &'_ mut Self {
         self.aspect_ratio = value;
         self
     }
 
-    pub fn set_near_plane_distance(&'_ mut self, value: f32) -> &'_ mut Self {
-        self.near_plane_distance = value;
+    pub fn near_plane(&'_ mut self, value: f32) -> &'_ mut Self {
+        self.near_plane = value;
         self
     }
 
-    pub fn set_far_plane_distance(&'_ mut self, value: f32) -> &'_ mut Self {
-        self.far_plane_distance = value;
+    pub fn far_plane(&'_ mut self, value: f32) -> &'_ mut Self {
+        self.far_plane = value;
         self
     }
 
     pub fn build(self) -> VirtualProjection {
-        let top = (self.fov_y / 2.0).tan() * self.near_plane_distance;
+        let top = (self.fov_y / 2.0).tan() * self.near_plane;
         let right = top * self.aspect_ratio;
 
         VirtualProjection::new(
@@ -101,8 +101,8 @@ impl PerspectiveVirtualProjectionBuilder {
             right,
             -top,
             top,
-            self.near_plane_distance,
-            self.far_plane_distance,
+            self.near_plane,
+            self.far_plane,
         )
     }
 }

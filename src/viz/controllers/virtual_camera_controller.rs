@@ -76,17 +76,18 @@ impl VirtualCameraControl for WASDVirtualCameraControl {
     }
 
     fn cursor_moved(&mut self, x: f64, y: f64, window_state: &FrameStepInfo, _: &SceneState) {
+        let current_positon = Vec2::new(x as f32, y as f32);
         if let Some(ElementState::Pressed) = window_state.mouse_state.get(&MouseButton::Left) {
-            let current_positon = Vec2::new(x as f32, y as f32);
             let mut difference = self.cursor_last_position - current_positon;
             difference[0] /= window_state.viewport_size[0] * self.rotation_sensitivity[0];
             difference[1] /= window_state.viewport_size[0] * self.rotation_sensitivity[1];
+            
+            self.camera.rotate_right_axis(-difference[1]);
             self.camera.rotate_up_axis(difference[0]);
-            self.camera.rotate_right_axis(difference[1]);
-            self.cursor_last_position = current_positon;
         }
-    }
 
+        self.cursor_last_position = current_positon;
+    }
     fn view_matrix(&self) -> Mat4 {
         self.camera.matrix()
     }

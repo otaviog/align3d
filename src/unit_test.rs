@@ -35,3 +35,18 @@ pub fn sample_teapot_pointcloud() -> PointCloud {
 
     PointCloud::from_geometry(geometry)
 }
+
+#[fixture]
+pub fn bloei_luma16() -> Array2<u16> {
+    let mut image = image::io::Reader::open("tests/data/images/bloei.jpg")
+        .unwrap()
+        .decode()
+        .unwrap()
+        .into_luma16()
+        .into_ndarray2();
+
+    image.iter_mut().for_each(|v| {
+        *v /= std::u16::MAX / 5000;
+    });
+    image
+}

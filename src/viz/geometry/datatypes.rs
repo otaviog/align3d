@@ -52,7 +52,20 @@ impl_vertex!(ColorU8, rgb);
 impl ColorU8 {
     pub fn new(r: u8, g: u8, b: u8) -> Self {
         Self {
-            rgb: (r as u32) << 16 | (g as u32) << 8 | (b as u32),
+            rgb: ((r as u32) << 16) | ((g as u32) << 8) | (b as u32),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::ColorU8;
+
+    #[test]
+    fn color_should_create_int_color() {
+        let color = ColorU8::new(255, 155, 55);
+        assert_eq!((color.rgb >> 16) & 0xff, 255);
+        assert_eq!((color.rgb >> 8) & 0xff, 155);
+        assert_eq!(color.rgb & 0xff, 55);
     }
 }

@@ -19,9 +19,10 @@ layout(location = 3) out float gs_radius;
 void main() {
   gs_position = position;
   gs_normal = normal;
-  gs_color = vec3(float(rgb & 0xff000000 >> 24) / 255.0,
-                  float(rgb & 0x00ff0000 >> 16) / 255.0,
-                  float(rgb & 0x0000ff00 >> 8) / 255.0);
-  //gs_color = vec3(0.0, 1.0, 0.0);
   gs_radius = 0.005;
+
+  float r = float((rgb >> 16) & 0xff);
+  float g = float((rgb >> 8) & 0xff);
+  float b = float(rgb & 0xff);
+  gs_color = vec3(b, g, r) / 255.0;
 }

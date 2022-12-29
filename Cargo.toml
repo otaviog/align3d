@@ -71,5 +71,9 @@ path = "tests/test_icp.rs"
 harness = false
 
 [[bench]]
-name = "mesh"
+name = "bench_mesh"
+harness = false
+
+[[bench]]
+name = "bench_bilateral"
 harness = false

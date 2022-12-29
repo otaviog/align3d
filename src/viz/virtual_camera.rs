@@ -41,7 +41,7 @@ impl VirtualCamera {
         )
         .normalize();
 
-        let right_vec = self.view.cross(&self.up);
+        let right_vec = self.view.cross(&Vector3::new(0.0, 1.0, 0.0));
         self.up = right_vec.cross(&self.view).normalize();
     }
 
@@ -171,8 +171,8 @@ impl VirtualCameraSphericalBuilder {
             projection: PerspectiveVirtualProjectionBuilder {
                 fov_y: self.fov_y,
                 aspect_ratio: self.aspect_ratio,
-                near_plane_distance: self.near_plane_distance,
-                far_plane_distance: self.far_plane_distance,
+                near_plane: self.near_plane_distance,
+                far_plane: self.far_plane_distance,
             }
             .build(),
         }
