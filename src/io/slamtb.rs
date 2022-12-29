@@ -1,4 +1,3 @@
-use serde_derive::Deserialize;
 use std::path::{Path, PathBuf};
 
 use super::{
@@ -20,38 +19,42 @@ pub struct SlamTbDataset {
     base_dir: PathBuf,
 }
 
-#[derive(Deserialize, Debug)]
-struct KCam {
-    matrix: Vec<Vec<f64>>,
-    undist_coeff: Vec<f32>,
-    image_size: (i32, i32),
-}
+mod json {
+    use serde_derive::Deserialize;
+    #[derive(Deserialize, Debug)]
+    pub struct KCam {
+        pub matrix: Vec<Vec<f64>>,
+        #[serde(rename = "undist_coeff")]
+        pub _undist_coeff: Vec<f32>,
+        pub image_size: (i32, i32),
+    }
 
-#[derive(Deserialize, Debug)]
-struct RTCam {
-    matrix: Vec<Vec<f32>>,
-}
+    #[derive(Deserialize, Debug)]
+    pub struct RTCam {
+        pub matrix: Vec<Vec<f32>>,
+    }
 
-#[derive(Deserialize, Debug)]
-struct Info {
-    kcam: KCam,
-    depth_scale: f64,
-    depth_bias: f64,
-    depth_max: f64,
-    rt_cam: RTCam,
-    timestamp: usize,
-}
+    #[derive(Deserialize, Debug)]
+    pub struct Info {
+        pub kcam: KCam,
+        pub depth_scale: f64,
+        pub depth_bias: f64,
+        pub depth_max: f64,
+        pub rt_cam: RTCam,
+        pub timestamp: usize,
+    }
 
-#[derive(Deserialize, Debug)]
-struct Frame {
-    info: Info,
-    depth_image: String,
-    rgb_image: String,
-}
+    #[derive(Deserialize, Debug)]
+    pub struct Frame {
+        pub info: Info,
+        pub depth_image: String,
+        pub rgb_image: String,
+    }
 
-#[derive(Deserialize, Debug)]
-struct Document {
-    root: Vec<Frame>,
+    #[derive(Deserialize, Debug)]
+    pub struct Document {
+        pub root: Vec<Frame>,
+    }
 }
 
 impl SlamTbDataset {
@@ -60,7 +63,7 @@ impl SlamTbDataset {
             Path::new(base_dir).join("frames.json"),
         )?);
         serde_json::from_reader(buffer)
-            .map(|doc: Document| {
+            .map(|doc: json::Document| {
                 let mut cameras = Vec::new();
                 let mut rgb_images = Vec::new();
                 let mut depth_images = Vec::new();
@@ -106,6 +109,10 @@ impl SlamTbDataset {
 impl RGBDDataset for SlamTbDataset {
     fn len(&self) -> usize {
         self.rgb_images.len().min(self.depth_images.len())
+    }
+
+    fn is_empty(&self) -> bool {
+        self.len() == 0
     }
 
     fn get_item(&self, index: usize) -> Result<(Camera, RGBDImage), DatasetError> {

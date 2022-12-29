@@ -29,7 +29,7 @@ impl Sphere3Df {
 
         Self {
             center: Vector3::new(center[0], center[1], center[2]),
-            radius: radius,
+            radius,
         }
     }
 
@@ -44,7 +44,7 @@ impl Sphere3Df {
         });
         let center = center / count as f32;
         Self {
-            center: center,
+            center,
             radius: point_iter
                 .map(|p| center.dot(&p))
                 .reduce(f32::max)

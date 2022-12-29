@@ -14,7 +14,7 @@ pub struct FrameStepInfo {
 impl FrameStepInfo {
     pub fn new(viewport_size: [f32; 2]) -> Self {
         Self {
-            viewport_size: viewport_size,
+            viewport_size,
             ..Default::default()
         }
     }
@@ -35,8 +35,8 @@ pub struct SceneState {
     pub world_bounds: Sphere3Df,
 }
 
-impl SceneState {
-    pub fn new() -> Self {
+impl Default for SceneState {
+    fn default() -> Self {
         Self {
             world_bounds: Sphere3Df::empty(),
         }

@@ -84,10 +84,10 @@ impl Manager {
         let memory_allocator = StandardMemoryAllocator::new_default(device.clone());
         
         Self {
-            library: library.clone(),
+            library,
             instance,
-            physical_device: physical_device.clone(),
-            device: device.clone(),
+            physical_device,
+            device,
             queues: Box::new(queues),
             memory_allocator
         }

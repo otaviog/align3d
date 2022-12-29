@@ -9,10 +9,10 @@ pub mod node;
 pub mod scene;
 
 mod virtual_camera;
-pub use virtual_camera::VirtualCamera;
+pub use virtual_camera::{VirtualCamera, VirtualCameraSphericalBuilder};
 
 mod virtual_projection;
-pub use virtual_projection::VirtualProjection;
+pub use virtual_projection::{VirtualProjection, PerspectiveVirtualProjectionBuilder};
 
 mod offscreen_render;
 pub use offscreen_render::OffscreenRenderer;

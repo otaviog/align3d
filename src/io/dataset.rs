@@ -31,5 +31,6 @@ pub struct RGBDDatasetItem {
 
 pub trait RGBDDataset {
     fn len(&self) -> usize;
+    fn is_empty(&self) -> bool;
     fn get_item(&self, index: usize) -> Result<(Camera, RGBDImage), DatasetError>;
 }

@@ -29,6 +29,10 @@ impl PointCloud {
     pub fn len(&self) -> usize {
         self.points.len_of(Axis(0))
     }
+
+    pub fn is_empty(&self) -> bool {
+        self.points.is_empty()
+    }
 }
 
 //impl<Idx> std::ops::Index<Idx> for PointCloud
@@ -47,18 +51,18 @@ impl std::ops::Mul<&PointCloud> for &Transform {
             normals: rhs
                 .normals
                 .as_ref()
-                .map(|normals| &self.ortho_rotation() * &normals),
+                .map(|normal| &self.ortho_rotation() * normal),
             colors: rhs.colors.clone(),
         }
     }
 }
 
-impl Into<Geometry> for PointCloud {
-    fn into(self) -> Geometry {
+impl From<PointCloud> for Geometry {
+    fn from(pcl: PointCloud) -> Geometry {
         Geometry {
-            points: self.points,
-            normals: self.normals.map(|normals| normals),
-            colors: self.colors.map(|colors| colors.into_owned()),
+            points: pcl.points,
+            normals: pcl.normals,
+            colors: pcl.colors.map(|colors| colors.into_owned()),
             faces: None,
             texcoords: None,
         }

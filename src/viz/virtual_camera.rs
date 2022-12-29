@@ -40,7 +40,7 @@ impl VirtualCamera {
             &self.view,
         )
         .normalize();
-
+        
         let right_vec = self.view.cross(&Vector3::new(0.0, 1.0, 0.0));
         self.up = right_vec.cross(&self.view).normalize();
     }
@@ -106,7 +106,7 @@ impl VirtualCameraSphericalBuilder {
         let near = distance - sphere.radius;
 
         Self {
-            sphere: sphere.clone(),
+            sphere: *sphere,
             distance,
             fov_y,
             near_plane_distance: near,
@@ -160,14 +160,14 @@ impl VirtualCameraSphericalBuilder {
         );
         position += &self.sphere.center;
 
-        let view = (&self.sphere.center - &position).normalize();
+        let view = (self.sphere.center - position).normalize();
         let right = view.cross(&Vec3::new(0.0, 1.0, 0.0)).normalize();
         let up = right.cross(&view).normalize();
 
         VirtualCamera {
             eye: position,
-            view: view,
-            up: up,
+            view,
+            up,
             projection: PerspectiveVirtualProjectionBuilder {
                 fov_y: self.fov_y,
                 aspect_ratio: self.aspect_ratio,

@@ -84,12 +84,16 @@ impl VkPointCloud {
                     .map(|v| ColorU8::new(v[2], v[1], v[0])),
             )
             .unwrap(),
-            number_of_points: number_of_points,
+            number_of_points,
         })
     }
 
     pub fn len(&self) -> usize {
         self.number_of_points
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.number_of_points == 0
     }
 }
 

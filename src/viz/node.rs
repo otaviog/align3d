@@ -37,13 +37,13 @@ impl<'a> CommandBuffersContext<'a> {
             nalgebra_glm::inverse_transpose(view_matrix.fixed_slice::<3, 3>(0, 0).into());
 
         Self {
-            device: device,
-            builder: builder,
-            pipelines: pipelines,
-            render_pass: render_pass,
-            view_matrix: view_matrix,
-            projection_matrix: projection_matrix,
-            view_normals_matrix: view_normals_matrix,
+            device,
+            builder,
+            pipelines,
+            render_pass,
+            view_matrix,
+            projection_matrix,
+            view_normals_matrix,
         }
     }
 }

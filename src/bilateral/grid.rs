@@ -74,11 +74,11 @@ where
 
         Self {
             data: grid,
-            sigma_color: sigma_color,
-            sigma_space: sigma_space,
-            color_min: color_min,
-            space_pad: space_pad,
-            color_pad: color_pad,
+            sigma_color,
+            sigma_space,
+            color_min,
+            space_pad,
+            color_pad,
         }
     }
 
@@ -104,16 +104,18 @@ where
         for row in 0..image_height {
             for col in 0..image_width {
                 let color = image[(row, col)];
+                
+                let trilinear = self.trilinear(
+                    row as f64 / self.sigma_space + self.space_pad as f64,
+                    col as f64 / self.sigma_space + self.space_pad as f64,
+                    {
+                        let diff: I = (color - self.color_min).into();
+                        diff.to_f64().unwrap() / self.sigma_color + self.color_pad as f64
+                    },
+                );
+
                 unsafe {
-                    let trilinear = self.trilinear(
-                        row as f64 / self.sigma_space + self.space_pad as f64,
-                        col as f64 / self.sigma_space + self.space_pad as f64,
-                        {
-                            let diff: I = (color - self.color_min).into();
-                            diff.to_f64().unwrap() / self.sigma_color + self.color_pad as f64
-                        },
-                    );
-                    dst_image[(row, col)] = num::cast::cast(trilinear).unwrap();
+                    dst_image[(row, col)] = num::cast::cast(trilinear).unwrap_unchecked();
                 }
             }
         }

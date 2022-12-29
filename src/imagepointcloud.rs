@@ -147,16 +147,21 @@ impl ImagePointCloud {
 use crate::io::Geometry;
 use crate::pointcloud::PointCloud;
 
-impl Into<PointCloud> for ImagePointCloud {
-    fn into(self) -> PointCloud {
-        let num_total_points = self.width() * self.height();
+impl From<&ImagePointCloud> for PointCloud {
+    fn from(image_pcl: &ImagePointCloud) -> PointCloud {
+        let num_total_points = image_pcl.width() * image_pcl.height();
 
-        let mask = self.mask.into_shape((num_total_points,)).unwrap();
+        let mask = image_pcl
+            .mask
+            .view()
+            .into_shape((num_total_points,))
+            .unwrap();
         let num_valid_points = mask.iter().map(|x| *x as usize).sum();
 
         // TODO: Improve mask and make a generic function/macro.
-        let v: Vec<f32> = self
+        let v: Vec<f32> = image_pcl
             .points
+            .view()
             .into_shape((num_total_points, 3))
             .unwrap()
             .axis_iter(Axis(0))
@@ -166,10 +171,11 @@ impl Into<PointCloud> for ImagePointCloud {
             .collect();
         let points = Array2::from_shape_vec((num_valid_points, 3), v).unwrap();
 
-        let normals = self.normals.map(|normals| {
+        let normals = image_pcl.normals.as_ref().map(|normals| {
             Array2::from_shape_vec(
                 (num_valid_points, 3),
                 normals
+                    .view()
                     .into_shape((num_total_points, 3))
                     .unwrap()
                     .axis_iter(Axis(0))
@@ -181,10 +187,11 @@ impl Into<PointCloud> for ImagePointCloud {
             .unwrap()
         });
 
-        let colors = self.colors.map(|colors| {
+        let colors = image_pcl.colors.as_ref().map(|colors| {
             ArcArray2::from_shape_vec(
                 (num_valid_points, 3),
                 colors
+                    .view()
                     .into_shape((num_total_points, 3))
                     .unwrap()
                     .axis_iter(Axis(0))
@@ -204,9 +211,9 @@ impl Into<PointCloud> for ImagePointCloud {
     }
 }
 
-impl Into<Geometry> for ImagePointCloud {
-    fn into(self) -> Geometry {
-        let pcl: PointCloud = self.into();
+impl From<&ImagePointCloud> for Geometry {
+    fn from(image_pcl: &ImagePointCloud) -> Geometry {
+        let pcl = PointCloud::from(image_pcl);
         pcl.into()
     }
 }
@@ -232,7 +239,7 @@ mod tests {
         assert_eq!(480, im_pcl.height());
         assert_eq!(640, im_pcl.width());
 
-        write_ply("tests/data/out-backproj.ply", &im_pcl.into())
+        write_ply("tests/data/out-backproj.ply", &Geometry::from(&im_pcl))
             .expect("Error while writing results");
     }
 
@@ -249,8 +256,11 @@ mod tests {
             assert_eq!(640, normals.shape()[1]);
         }
 
-        write_ply("tests/data/out-imagepcl-normals.ply", &im_pcl.into())
-            .expect("Error while writing the results");
+        write_ply(
+            "tests/data/out-imagepcl-normals.ply",
+            &Geometry::from(&im_pcl),
+        )
+        .expect("Error while writing the results");
     }
 
     #[rstest]
@@ -258,7 +268,7 @@ mod tests {
         let (cam, rgbd_image) = sample1.get_item(0).unwrap();
         let im_pcl = ImagePointCloud::from_rgbd_image(cam, rgbd_image);
 
-        let pcl: PointCloud = im_pcl.into();
+        let pcl = PointCloud::from(&im_pcl);
         assert_eq!(pcl.len(), 270213);
     }
 }

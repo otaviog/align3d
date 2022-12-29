@@ -36,7 +36,7 @@ pub struct OffscreenRenderer {
     command_buffer_allocator: StandardCommandBufferAllocator,
 }
 
-/// Render result image. This class holds a GPU buffer accessible from CPU 
+/// Render result image. This class holds a GPU buffer accessible from CPU
 /// which can be mapped or converted into image.
 pub struct RenderImage {
     image_buffer: Arc<CpuAccessibleBuffer<[u8]>>,
@@ -53,7 +53,7 @@ impl OffscreenRenderer {
     /// * `width`: Output image width.
     /// * `height`: Output image height.
     pub fn new(manager: &mut Manager, width: usize, height: usize) -> Self {
-        let queue = manager.queues.next().unwrap().clone();
+        let queue = manager.queues.next().unwrap();
         let memory_allocator = StandardMemoryAllocator::new_default(manager.device.clone());
         let (render_pass, framebuffer_image, framebuffer) = {
             let render_pass = vulkano::single_pass_renderpass!(
@@ -99,16 +99,16 @@ impl OffscreenRenderer {
         Self {
             device: manager.device.clone(),
             pipelines: HashMap::<String, Arc<GraphicsPipeline>>::new(),
-            render_pass: render_pass,
-            queue: queue,
-            framebuffer: framebuffer,
-            framebuffer_image: framebuffer_image,
+            render_pass,
+            queue,
+            framebuffer,
+            framebuffer_image,
             viewport: Viewport {
                 origin: [0.0, 0.0],
                 dimensions: [width as f32, height as f32],
                 depth_range: 0.0..1.0,
             },
-            memory_allocator: memory_allocator,
+            memory_allocator,
             command_buffer_allocator: StandardCommandBufferAllocator::new(
                 manager.device.clone(),
                 Default::default(),
@@ -117,20 +117,20 @@ impl OffscreenRenderer {
     }
 
     /// Draws the scene into a image
-    /// 
+    ///
     /// # Arguments
-    /// 
+    ///
     /// * `scene`: Target scene
-    /// 
+    ///
     /// # Returns
-    /// 
-    /// * A RenderImage object that contains a Vulkan buffer that can 
+    ///
+    /// * A RenderImage object that contains a Vulkan buffer that can
     /// be transformed or copied into an image.
-    /// 
+    ///
     /// # Examples
-    /// 
+    ///
     /// ```
-    /// 
+    ///
     /// ```
     pub fn render(&mut self, scene: Arc<dyn Node>) -> RenderImage {
         let mut builder = AutoCommandBufferBuilder::primary(
@@ -196,7 +196,7 @@ impl OffscreenRenderer {
         future.wait(None).unwrap();
 
         RenderImage {
-            image_buffer: image_buffer,
+            image_buffer,
             width: width as u32,
             height: height as u32,
         }
@@ -211,18 +211,18 @@ impl RenderImage {
         RgbaImage::from_fn(self.width, self.height, |x, y| {
             let offset = (y * self.height + x) as usize;
             Rgba::<u8>([
-                image_buffer[offset + 0],
-                image_buffer[offset + 0],
-                image_buffer[offset + 0],
-                image_buffer[offset + 0],
+                image_buffer[offset],
+                image_buffer[offset + 1],
+                image_buffer[offset + 2],
+                image_buffer[offset + 3],
             ])
         })
     }
 
     /// Maps without copying the buffer into an image.
-    /// 
+    ///
     /// # Arguments
-    /// 
+    ///
     /// * `f`: Function that uses the image.
     pub fn map<F>(&self, f: F)
     where
@@ -237,7 +237,7 @@ impl RenderImage {
 mod tests {
     use rstest::rstest;
 
-    use crate::viz::{Manager, geometry::sample_nodes::teapot_node};
+    use crate::viz::{geometry::sample_nodes::teapot_node, Manager};
 
     use super::OffscreenRenderer;
     use crate::viz::unit_test::vk_manager;
@@ -249,7 +249,7 @@ mod tests {
         let image = renderer.render(teapot_node(&vk_manager));
         assert_eq!(image.width, 1024);
         assert_eq!(image.height, 768);
-        
+
         let owned_image = image.to_image();
         assert_eq!(owned_image.width(), 1024);
         assert_eq!(owned_image.height(), 768);
@@ -258,6 +258,5 @@ mod tests {
             assert_eq!(image.width(), 1024);
             assert_eq!(image.height(), 768);
         })
-
     }
 }

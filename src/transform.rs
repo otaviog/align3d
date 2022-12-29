@@ -57,7 +57,7 @@ impl Transform {
 
     pub fn transform(&self, mut rhs: Array2<f32>) -> Array2<f32> {
         for mut point in rhs.axis_iter_mut(Axis(0)) {
-            let v = self.0 * &Vector3::new(point[0], point[1], point[2]);
+            let v = self.0 * Vector3::new(point[0], point[1], point[2]);
             point[0] = v[0];
             point[1] = v[1];
             point[2] = v[2];
@@ -68,7 +68,7 @@ impl Transform {
 
     pub fn ortho_rotation(&self) -> Rotation {
         Rotation(
-            self.0.rotation.to_rotation_matrix().clone()
+            self.0.rotation.to_rotation_matrix()
         )
     }
 }

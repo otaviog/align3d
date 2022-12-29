@@ -4,7 +4,7 @@ use align3d::viz::{
 };
 
 mod test_data;
-use test_data::{sample_rgbd_pointcloud};
+use test_data::sample_rgbd_pointcloud;
 
 fn main() {
     let mut manager = Manager::default();

@@ -79,9 +79,9 @@ impl Window {
             .unwrap();
 
         Self {
-            surface: surface.clone(),
+            surface,
             device: manager.device.clone(),
-            queue: manager.queues.next().unwrap().clone(),
+            queue: manager.queues.next().unwrap(),
             event_loop: Some(event_loop),
             scene: scene.clone(),
             command_buffer_allocator: StandardCommandBufferAllocator::new(
@@ -128,7 +128,7 @@ impl Window {
                     // Only attachments that have `LoadOp::Clear` are provided with clear
                     // values, any others should use `ClearValue::None` as the clear value.
                     clear_values: vec![Some([0.0, 0.0, 1.0, 1.0].into()), Some(1f32.into())],
-                    ..RenderPassBeginInfo::framebuffer(framebuffer.clone())
+                    ..RenderPassBeginInfo::framebuffer(framebuffer)
                 },
                 // The contents of the first (and only) subpass. This can be either
                 // `Inline` or `SecondaryCommandBuffers`. The latter is a bit more advanced
@@ -152,13 +152,13 @@ impl Window {
             //    view_matrix: view_matrix.clone(),
             //    projection_matrix: projection_matrix.clone(),
             //},
-            &mut &mut CommandBuffersContext::new(
+            &mut CommandBuffersContext::new(
                 self.device.clone(),
                 &mut builder,
                 pipelines,
-                render_pass.clone(),
-                view_matrix.clone(),
-                projection_matrix.clone(),
+                render_pass,
+                *view_matrix,
+                *projection_matrix,
             ),
             window_state,
         );
@@ -272,10 +272,10 @@ impl Window {
         let mut previous_frame_end = Some(sync::now(self.device.clone()).boxed());
         let mut pipelines = HashMap::<String, Arc<GraphicsPipeline>>::new();
 
-        let scene_sphere = self.scene.bounding_sphere().clone();
+        let scene_sphere = self.scene.bounding_sphere();
 
         let mut camera_control = WASDVirtualCameraControl::new(
-            VirtualCameraSphericalBuilder::fit(&scene_sphere, std::f32::consts::FRAC_PI_2)
+            VirtualCameraSphericalBuilder::fit(scene_sphere, std::f32::consts::FRAC_PI_2)
                 .near_plane(0.05)
                 .build(),
             0.05,
@@ -286,7 +286,7 @@ impl Window {
             ..Default::default()
         };
         let scene_state: SceneState = SceneState {
-            world_bounds: self.scene.bounding_sphere().clone(),
+            world_bounds: *self.scene.bounding_sphere(),
         };
 
         let event_loop = self.event_loop.take();

@@ -48,5 +48,5 @@ pub fn sample_rgbd_pointcloud() -> PointCloud {
 
     let mut point_cloud = ImagePointCloud::from_rgbd_image(item.0, item.1);
     point_cloud.compute_normals();
-    point_cloud.into()
+    PointCloud::from(&point_cloud)
 }

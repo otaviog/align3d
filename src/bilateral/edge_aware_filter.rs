@@ -44,8 +44,8 @@ where
     pub fn new(sigma_space: f64, sigma_color: f64) -> Self {
         Self {
             result: None,
-            sigma_space: sigma_space,
-            sigma_color: sigma_color,
+            sigma_space,
+            sigma_color,
         }
     }
 
@@ -123,13 +123,13 @@ where
         I: num::Zero,
     {
         // Should allocate ou reallocate a new result image.
-        if {
-            if let Some(result) = self.result.as_ref() {
-                image.shape() != result.shape()
-            } else {
-                true
-            }
-        } {
+        let reallocate = if let Some(result) = self.result.as_ref() {
+            image.shape() != result.shape()
+        } else {
+            true
+        };
+
+        if reallocate {
             self.result = Some(Array2::<I>::zeros(image.dim()));
         }
 
@@ -137,7 +137,7 @@ where
         BilateralFilter::convolution(&mut grid);
 
         grid.normalize();
-        grid.slice(&image, self.result.as_mut().unwrap());
+        grid.slice(image, self.result.as_mut().unwrap());
         self.result.as_ref().unwrap()
     }
 }

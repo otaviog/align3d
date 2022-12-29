@@ -24,8 +24,8 @@ impl VirtualProjection {
             far_right: (right / near) * far,
             far_top: (top / near) * far,
             far_bottom: (bottom / near) * far,
-            near: near,
-            far: far,
+            near,
+            far,
         }
     }
 }
@@ -96,13 +96,6 @@ impl PerspectiveVirtualProjectionBuilder {
         let top = (self.fov_y / 2.0).tan() * self.near_plane;
         let right = top * self.aspect_ratio;
 
-        VirtualProjection::new(
-            -right,
-            right,
-            -top,
-            top,
-            self.near_plane,
-            self.far_plane,
-        )
+        VirtualProjection::new(-right, right, -top, top, self.near_plane, self.far_plane)
     }
 }

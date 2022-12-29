@@ -27,7 +27,7 @@ impl KdTree {
             if indices.len() < 10 {
                 return KdNode::Leaf {
                     points: points.select(ndarray::Axis(0), &indices),
-                    indices: indices,
+                    indices,
                 };
             }
 
@@ -43,12 +43,12 @@ impl KdTree {
                 middle_value: points[[indices[mid], k]],
                 left: Rc::new(rec(
                     points,
-                    indices[0..mid].iter().copied().collect(),
+                    indices[0..mid].to_vec(),
                     depth + 1,
                 )),
                 right: Rc::new(rec(
                     points,
-                    indices[mid..].iter().copied().collect(),
+                    indices[mid..].to_vec(),
                     depth + 1,
                 )),
             }
@@ -66,7 +66,7 @@ impl KdTree {
         let mut nearest = Array1::from_elem((queries_shape[0],), 0);
 
         for (point_idx, point) in queries.rows().into_iter().enumerate() {
-            let mut curr_node = &self.root;
+            let mut curr_node = self.root.clone();
             let mut depth = 0;
 
             loop {
@@ -77,7 +77,7 @@ impl KdTree {
                         right,
                     } => {
                         let v = point[depth % point_dim];
-                        curr_node = if v < *mid { &left } else { &right };
+                        curr_node = if v < *mid { left.clone() } else { right.clone() };
                         depth += 1;
                     }
                     KdNode::Leaf {

@@ -118,7 +118,7 @@ impl VkMesh {
             ),
             bounding_sphere: Sphere3Df::from_points(&geometry.points),
             number_of_vertex: number_of_points,
-            number_of_faces: number_of_faces,
+            number_of_faces,
         })
     }
 
@@ -154,7 +154,7 @@ impl VkMeshNode {
     pub fn new(mesh: Arc<VkMesh>) -> Arc<Self> {
         Arc::new(Self {
             node_properties: NodeProperties {
-                bounding_sphere: mesh.bounding_sphere().clone(),
+                bounding_sphere: *mesh.bounding_sphere(),
                 ..Default::default()
             },
             mesh: mesh.clone(),

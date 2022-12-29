@@ -49,9 +49,10 @@ impl<'a> ICP<'a> {
         if let None = self.target.normals {}
 
         let target_normals = self.target.normals.as_ref().unwrap();
-        let mut jt_j_array = Array3::<f32>::zeros((self.target.len(), 3, 3));
-        let mut jt_r_array = Array2::<f32>::zeros((self.target.len(), 6));
         let mut optim_transform = Transform::eye();
+
+        let mut jt_j_array = Array3::<f32>::zeros((self.target.len(), 6, 6));
+        let mut jt_r_array = Array2::<f32>::zeros((self.target.len(), 6));
 
         for _ in 0..self.params.max_iterations {
             let curr_source_points = &optim_transform * &source.points;
@@ -61,7 +62,7 @@ impl<'a> ICP<'a> {
                 let target_normal = &target_normals.slice(s![idx, ..]).into_nalgebra();
                 let source_point = source_point.into_nalgebra();
 
-                let twist = source_point.cross(&target_normal);
+                let twist = source_point.cross(target_normal);
                 let jacobian = [
                     target_normal[0],
                     target_normal[1],
@@ -81,13 +82,14 @@ impl<'a> ICP<'a> {
                     }
                 }
             }
-            let jt_j = jt_j_array.sum_axis(Axis(0));
+            let jt_j = jt_j_array
+                .sum_axis(Axis(0))
+                .into_nalgebra()
+                .fixed_slice::<6, 6>(0, 0)
+                .into_owned();
             let jt_r = jt_r_array.sum_axis(Axis(0));
 
-            let update = Cholesky::new(jt_j.into_nalgebra())
-                .unwrap()
-                .solve(&jt_r.into_nalgebra());
-            // let up2 = Vector6::from_row_slice(update.rows(0, 6));
+            let update = Cholesky::new(jt_j).unwrap().solve(&jt_r.into_nalgebra());
             let update = Vector6::new(
                 update[0], update[1], update[2], update[3], update[4], update[5],
             );
@@ -105,7 +107,9 @@ mod tests {
     use rstest::*;
 
     use crate::{
-        imagepointcloud::ImagePointCloud, io::{dataset::RGBDDataset, write_ply}, pointcloud::PointCloud,
+        imagepointcloud::ImagePointCloud,
+        io::{dataset::RGBDDataset, write_ply},
+        pointcloud::PointCloud,
     };
 
     #[fixture]
@@ -115,17 +119,14 @@ mod tests {
         let dataset = SlamTbDataset::load("tests/data/rgbd/sample1").unwrap();
 
         let (cam1, rgbd_image1) = dataset.get_item(0).unwrap();
-        let (cam2, rgbd_image2) = dataset.get_item(0).unwrap();
+        let (cam2, rgbd_image2) = dataset.get_item(3).unwrap();
         let mut source = ImagePointCloud::from_rgbd_image(cam1, rgbd_image1);
         let mut target = ImagePointCloud::from_rgbd_image(cam2, rgbd_image2);
 
         source.compute_normals();
         target.compute_normals();
 
-        (
-            source.into(),
-            target.into()
-        )
+        (PointCloud::from(&source), PointCloud::from(&target))
     }
 
     #[rstest]
@@ -135,7 +136,8 @@ mod tests {
         let transform = ICP::new(ICPParams::default(), &target_pcl).align(&source_pcl);
 
         let aligned_source_pcl = &transform * &source_pcl;
-        write_ply("tests/data/out-icp1.ply", &aligned_source_pcl.into()).expect("Unable to write result");
+        write_ply("tests/data/out-icp1.ply", &aligned_source_pcl.into())
+            .expect("Unable to write result");
     }
 }
 
