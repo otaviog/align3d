@@ -27,6 +27,7 @@ use crate::{
     viz::{
         controllers::FrameStepInfo,
         node::{CommandBuffersContext, Node, NodeProperties},
+        Manager,
     },
 };
 
@@ -98,7 +99,7 @@ impl VkPointCloud {
 }
 
 pub struct VkPointCloudNode {
-    node_properties: NodeProperties,
+    pub properties: NodeProperties,
     point_cloud: Arc<VkPointCloud>,
 }
 
@@ -107,7 +108,7 @@ impl VkPointCloudNode {
         let points = point_cloud.points.read().unwrap();
 
         Arc::new(Self {
-            node_properties: NodeProperties {
+            properties: NodeProperties {
                 bounding_sphere: Sphere3Df::from_point_iter(
                     points
                         .iter()
@@ -116,6 +117,20 @@ impl VkPointCloudNode {
                 ..Default::default()
             },
             point_cloud: point_cloud.clone(),
+        })
+    }
+
+    pub fn load(manager: &Manager, point_cloud: &PointCloud) -> Arc<Self> {
+        Self::new(VkPointCloud::from_pointcloud(
+            &manager.memory_allocator,
+            &point_cloud,
+        ))
+    }
+
+    pub fn new_node(&self) -> Arc<Self> {
+        Arc::new(Self {
+            properties: self.properties,
+            point_cloud: self.point_cloud.clone(),
         })
     }
 }
@@ -152,12 +167,12 @@ mod fs {
 }
 
 impl Node for VkPointCloudNode {
-    fn transformation(&self) -> &Mat4x4 {
-        self.node_properties.transformation()
+    fn properties(&self) -> &NodeProperties {
+        &self.properties
     }
 
-    fn bounding_sphere(&self) -> &crate::bounds::Sphere3Df {
-        self.node_properties.bounding_sphere()
+    fn properties_mut(&mut self) -> &mut NodeProperties {
+        &mut self.properties
     }
 
     fn collect_command_buffers(

@@ -9,6 +9,9 @@ pub mod mesh;
 pub mod pointcloud;
 pub mod transform;
 
+mod memory;
+pub use memory::{Array1Recycle, Array2Recycle};
+
 // #[cfg(feature="viz")]
 pub mod viz;
 

@@ -1,2 +1,2 @@
 mod unordered_icp;
-pub use unordered_icp::ICP;
+pub use unordered_icp::{ICP, ICPParams};

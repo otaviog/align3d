@@ -13,6 +13,32 @@ use super::controllers::FrameStepInfo;
 
 pub type Mat4x4 = nalgebra_glm::Mat4x4;
 
+#[derive(Clone, Copy)]
+pub struct NodeProperties {
+    pub transformation: Mat4x4,
+    pub bounding_sphere: Sphere3Df,
+}
+
+impl Default for NodeProperties {
+    fn default() -> Self {
+        Self {
+            transformation: Mat4x4::identity(),
+            bounding_sphere: Sphere3Df::empty(),
+        }
+    }
+}
+
+impl NodeProperties {
+    pub fn transformation(&mut self, value: Mat4x4) -> &mut Self {
+        self.transformation = value;
+        self
+    }
+
+    pub fn bounding_sphere(&mut self, value: Sphere3Df) -> &mut Self {
+        self.bounding_sphere = value;
+        self
+    }
+}
 pub struct CommandBuffersContext<'a> {
     pub device: Arc<Device>,
     pub builder: &'a mut AutoCommandBufferBuilder<PrimaryAutoCommandBuffer>,
@@ -49,38 +75,16 @@ impl<'a> CommandBuffersContext<'a> {
 }
 
 pub trait Node {
-    fn transformation(&self) -> &Mat4x4;
-    fn bounding_sphere(&self) -> &Sphere3Df;
+    /// .
+    fn properties_mut(&mut self) -> &mut NodeProperties;
+
+    fn properties(&self) -> &NodeProperties;
+
     fn collect_command_buffers(
         &self,
         context: &mut CommandBuffersContext,
         window_state: &FrameStepInfo,
     );
-}
-
-#[derive(Clone)]
-pub struct NodeProperties {
-    pub transformation: Mat4x4,
-    pub bounding_sphere: Sphere3Df,
-}
-
-impl Default for NodeProperties {
-    fn default() -> Self {
-        Self {
-            transformation: Mat4x4::identity(),
-            bounding_sphere: Sphere3Df::empty(),
-        }
-    }
-}
-
-impl NodeProperties {
-    pub fn transformation(&self) -> &Mat4x4 {
-        &self.transformation
-    }
-
-    pub fn bounding_sphere(&self) -> &Sphere3Df {
-        &self.bounding_sphere
-    }
 }
 
 #[cfg(test)]
@@ -90,6 +94,6 @@ mod tests {
     #[test]
     fn test_basic_behavior() {
         let node = NodeProperties::default();
-        assert!(node.bounding_sphere().is_empty());
+        assert!(node.bounding_sphere.is_empty());
     }
 }

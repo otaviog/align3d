@@ -187,6 +187,7 @@ mod test {
 
     use super::VirtualCameraSphericalBuilder;
 
+    #[test]
     pub fn test_should_fit_view_bounds() {
         let sphere = Sphere3Df {
             center: Vector3::new(2.0, 3.0, 4.0),

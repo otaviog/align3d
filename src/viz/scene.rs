@@ -1,10 +1,9 @@
-use std::sync::Arc;
+use std::{sync::Arc};
 
 use super::{
     controllers::FrameStepInfo,
-    node::{CommandBuffersContext, Mat4x4, Node, NodeProperties},
+    node::{CommandBuffersContext, Node, NodeProperties},
 };
-use crate::bounds::Sphere3Df;
 
 #[derive(Clone, Default)]
 pub struct Scene {
@@ -12,13 +11,28 @@ pub struct Scene {
     pub nodes: Vec<Arc<dyn Node>>,
 }
 
+impl Scene {
+    pub fn add(&mut self, node: Arc<dyn Node>) -> &mut Self {
+        self.nodes.push(node);
+        self
+    }
+}
+
+impl Scene {
+    pub fn new() -> Arc<Self> {
+        Arc::new(Self {
+            node_properties: Default::default(),
+            nodes: Default::default()
+        })
+    }
+}
 impl Node for Scene {
-    fn transformation(&self) -> &Mat4x4 {
-        self.node_properties.transformation()
+    fn properties(&self) -> &NodeProperties {
+        &self.node_properties
     }
 
-    fn bounding_sphere(&self) -> &Sphere3Df {
-        self.node_properties.bounding_sphere()
+    fn properties_mut(&mut self) -> &mut NodeProperties {
+        &mut self.node_properties
     }
 
     fn collect_command_buffers(
@@ -33,7 +47,7 @@ impl Node for Scene {
         // Transform with this parent node transformation.
         context.view_matrix *= self.node_properties.transformation;
         context.view_normals_matrix =
-            nalgebra_glm::inverse_transpose(context.view_matrix.fixed_slice::<3, 3>(3, 3).into());
+            nalgebra_glm::inverse_transpose(context.view_matrix.fixed_slice::<3, 3>(0, 0).into());
 
         // Traverse subnodes:
         for node in self.nodes.iter() {

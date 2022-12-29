@@ -182,12 +182,12 @@ mod fs {
 }
 
 impl Node for VkMeshNode {
-    fn transformation(&self) -> &Mat4x4 {
-        self.node_properties.transformation()
+    fn properties(&self) -> &NodeProperties {
+        &self.node_properties
     }
 
-    fn bounding_sphere(&self) -> &crate::bounds::Sphere3Df {
-        self.node_properties.bounding_sphere()
+    fn properties_mut(&mut self) -> &mut NodeProperties {
+        &mut self.node_properties
     }
 
     fn collect_command_buffers(

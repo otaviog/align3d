@@ -47,13 +47,13 @@ winit = { version = "0.27.5", optional = false }
 bytemuck = { version = "1.12.3", optional = false }
 
 # align3d-derive = { version = "0.1.0", path = "align3d-derive" }
-cgmath = { version = "0.18.0", optional = false }
 
 [dev-dependencies]
 rstest = "0.15.0"
 test-temp-file = "0.1.2"
 tempfile = "3.3.0"
 criterion = "0.4"
+pprof = { version = "0.11", features = ["flamegraph", "criterion"] }
 
 [[test]]
 name = "viz-point_cloud"
@@ -77,4 +77,8 @@ harness = false
 
 [[bench]]
 name = "bench_bilateral"
+harness = false
+
+[[bench]]
+name = "bench_kdtree"
 harness = false

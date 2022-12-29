@@ -1,3 +1,4 @@
+use crate::Array1Recycle;
 use crate::kdtree::KdTree;
 use crate::pointcloud::PointCloud;
 use crate::transform::Transform;
@@ -56,7 +57,7 @@ impl<'a> ICP<'a> {
 
         for _ in 0..self.params.max_iterations {
             let curr_source_points = &optim_transform * &source.points;
-            let nearest = self.kdtree.nearest(&curr_source_points);
+            let nearest = self.kdtree.nearest(&curr_source_points, Array1Recycle::Empty);
 
             for (idx, source_point) in source.points.rows().into_iter().enumerate() {
                 let target_normal = &target_normals.slice(s![idx, ..]).into_nalgebra();

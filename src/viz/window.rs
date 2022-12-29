@@ -77,7 +77,7 @@ impl Window {
         let surface = WindowBuilder::new()
             .build_vk_surface(&event_loop, manager.instance.clone())
             .unwrap();
-
+        
         Self {
             surface,
             device: manager.device.clone(),
@@ -272,10 +272,10 @@ impl Window {
         let mut previous_frame_end = Some(sync::now(self.device.clone()).boxed());
         let mut pipelines = HashMap::<String, Arc<GraphicsPipeline>>::new();
 
-        let scene_sphere = self.scene.bounding_sphere();
+        let scene_sphere = self.scene.properties().bounding_sphere;
 
         let mut camera_control = WASDVirtualCameraControl::new(
-            VirtualCameraSphericalBuilder::fit(scene_sphere, std::f32::consts::FRAC_PI_2)
+            VirtualCameraSphericalBuilder::fit(&scene_sphere, std::f32::consts::FRAC_PI_2)
                 .near_plane(0.05)
                 .build(),
             0.05,
@@ -286,7 +286,7 @@ impl Window {
             ..Default::default()
         };
         let scene_state: SceneState = SceneState {
-            world_bounds: *self.scene.bounding_sphere(),
+            world_bounds: scene_sphere,
         };
 
         let event_loop = self.event_loop.take();

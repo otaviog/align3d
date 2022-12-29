@@ -1,7 +1,9 @@
-use std::mem::swap;
+use std::{marker::PhantomData, mem::swap};
 
 use ndarray::{Array2, Array4, Axis};
 use num::ToPrimitive;
+
+use crate::memory::Array2Recycle;
 
 use super::BilateralGrid;
 
@@ -9,7 +11,7 @@ use super::BilateralGrid;
 ///
 /// Based on the code in https://gist.github.com/ginrou/02e945562607fad170a1.
 pub struct BilateralFilter<I> {
-    pub result: Option<Array2<I>>,
+    _phantom: PhantomData<I>,
     /// The space (XY) down sample factor.
     pub sigma_space: f64,
     /// The intensity down sample factor.
@@ -43,7 +45,7 @@ where
 {
     pub fn new(sigma_space: f64, sigma_color: f64) -> Self {
         Self {
-            result: None,
+            _phantom: PhantomData::default(),
             sigma_space,
             sigma_color,
         }
@@ -118,26 +120,17 @@ where
     /// # Returns:
     ///
     /// * The filtered image.
-    pub fn filter(&mut self, image: &Array2<I>) -> &Array2<I>
+    pub fn filter(&self, image: &Array2<I>, result: Array2Recycle<I>) -> Array2<I>
     where
         I: num::Zero,
     {
-        // Should allocate ou reallocate a new result image.
-        let reallocate = if let Some(result) = self.result.as_ref() {
-            image.shape() != result.shape()
-        } else {
-            true
-        };
-
-        if reallocate {
-            self.result = Some(Array2::<I>::zeros(image.dim()));
-        }
+        let mut result = result.get(image.dim());
 
         let mut grid = BilateralGrid::from_image(image, self.sigma_space, self.sigma_color);
         BilateralFilter::convolution(&mut grid);
 
         grid.normalize();
-        grid.slice(image, self.result.as_mut().unwrap());
-        self.result.as_ref().unwrap()
+        grid.slice(image, &mut result);
+        result
     }
 }
