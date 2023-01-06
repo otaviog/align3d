@@ -82,3 +82,7 @@ harness = false
 [[bench]]
 name = "bench_kdtree"
 harness = false
+
+[[bench]]
+name = "bench_icp"
+harness = false

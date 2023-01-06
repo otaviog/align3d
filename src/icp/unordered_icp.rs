@@ -1,10 +1,10 @@
-use crate::Array1Recycle;
 use crate::kdtree::KdTree;
 use crate::pointcloud::PointCloud;
 use crate::transform::Transform;
-use nalgebra::{Cholesky, Vector6};
-use ndarray::prelude::s;
-use ndarray::{Array2, Array3, Axis};
+use crate::Array1Recycle;
+use nalgebra::{Cholesky, Vector3, Vector6};
+use ndarray::parallel::prelude::*;
+use ndarray::{Array, Array2, Array3, Axis};
 use nshare::ToNalgebra;
 
 pub struct ICPParams {
@@ -57,32 +57,60 @@ impl<'target_lt> ICP<'target_lt> {
 
         for _ in 0..self.params.max_iterations {
             let curr_source_points = &optim_transform * &source.points;
-            let nearest = self.kdtree.nearest(&curr_source_points, Array1Recycle::Empty);
+            let nearest = self
+                .kdtree
+                .nearest::<3>(&curr_source_points, Array1Recycle::Empty);
 
-            for (idx, source_point) in source.points.rows().into_iter().enumerate() {
-                let target_normal = &target_normals.slice(s![idx, ..]).into_nalgebra();
-                let source_point = source_point.into_nalgebra();
+            let a = Array::linspace(0., 63., 64).into_shape((4, 16)).unwrap();
+            let mut sums = Vec::new();
+            a.axis_iter(Axis(0))
+                .into_par_iter()
+                .map(|row| row.sum())
+                .collect_into_vec(&mut sums);
+            source
+                .points
+                .axis_iter(Axis(0))
+                .enumerate()
+                .for_each(|(idx, source_point)| {
+                    let source_point =
+                        Vector3::new(source_point[0], source_point[1], source_point[2]);
+                    let (target_point, target_normal) = {
+                        let row_point = self.target.points.row(idx);
+                        let row_normal = target_normals.row(idx);
 
-                let twist = source_point.cross(target_normal);
-                let jacobian = [
-                    target_normal[0],
-                    target_normal[1],
-                    target_normal[2],
-                    twist[0],
-                    twist[1],
-                    twist[2],
-                ];
+                        (
+                            Vector3::new(row_point[0], row_point[1], row_point[2]),
+                            Vector3::new(row_normal[0], row_normal[1], row_normal[2]),
+                        )
+                    };
 
-                let residual = 0.0f32;
-                let nearest_idx = nearest[idx];
-                jt_r_array[[nearest_idx, 0]] += jacobian[0] * residual * self.params.weight;
-                for i in 0..6 {
-                    for j in 0..6 {
-                        jt_j_array[[nearest_idx, i, j]] =
-                            jacobian[i] * self.params.weight * jacobian[j];
+                    let twist = source_point.cross(&target_normal);
+                    let jacobian = [
+                        target_normal[0],
+                        target_normal[1],
+                        target_normal[2],
+                        twist[0],
+                        twist[1],
+                        twist[2],
+                    ];
+
+                    let residual = (target_point - source_point).dot(&target_normal);
+                    let nearest_idx = nearest[idx];
+                    let mut jt_r_row = jt_r_array.row_mut(nearest_idx);
+
+                    let residual = residual * self.params.weight;
+                    for i in 0..6 {
+                        jt_r_row[i] = jacobian[i] * residual;
                     }
-                }
-            }
+
+                    for i in 0..6 {
+                        for j in 0..6 {
+                            jt_j_array[[nearest_idx, i, j]] =
+                                jacobian[i] * self.params.weight * jacobian[j];
+                        }
+                    }
+                });
+
             let jt_j = jt_j_array
                 .sum_axis(Axis(0))
                 .into_nalgebra()
@@ -96,6 +124,10 @@ impl<'target_lt> ICP<'target_lt> {
             );
 
             optim_transform = &Transform::from_se3_exp(&update) * &optim_transform;
+
+            // Resets the Jacobians for the next iteration.
+            jt_r_array.fill(0.0);
+            jt_j_array.fill(0.0);
         }
 
         optim_transform

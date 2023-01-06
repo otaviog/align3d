@@ -1,4 +1,4 @@
-use align3d::bilateral::{BilateralFilter, BilateralGrid};
+use align3d::{bilateral::{BilateralFilter, BilateralGrid}, Array2Recycle};
 
 use criterion::{criterion_group, criterion_main, Criterion};
 use nshare::ToNdarray2;
@@ -32,7 +32,7 @@ fn criterion_benchmark(c: &mut Criterion) {
     });
     c.bench_function("bilateral filter", |b| {
         b.iter(|| {
-            BilateralFilter::<u16>::default().filter(&bloei_luma16);
+            BilateralFilter::<u16>::default().filter(&bloei_luma16, Array2Recycle::Empty);
         });
     });
 }

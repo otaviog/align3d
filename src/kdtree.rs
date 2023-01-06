@@ -1,3 +1,4 @@
+use nalgebra::Vector3;
 use ndarray::prelude::*;
 
 use std::cmp::min;
@@ -54,7 +55,11 @@ impl KdTree {
         }
     }
 
-    pub fn nearest(&self, queries: &Array2<f32>, nearest: Array1Recycle) -> Array1<usize> {
+    pub fn nearest<const DIM: usize>(
+        &self,
+        queries: &Array2<f32>,
+        nearest: Array1Recycle,
+    ) -> Array1<usize> {
         let queries_shape = queries.shape();
         let point_dim = queries_shape[1];
         //let mut nearest = Array1::from_elem((queries_shape[0],), 0);
@@ -83,16 +88,13 @@ impl KdTree {
                         points: leaf_points,
                         indices: leaf_indices,
                     } => {
-                        let diff = leaf_points - &point;
-                        let v = diff
-                            .rows()
-                            .into_iter()
-                            .map(|x| x.dot(&x).sqrt())
-                            .enumerate()
-                            .min_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(Ordering::Equal))
-                            .map(|(idx, _)| idx);
+                        let v = if DIM == 3 {
+                            smallest_diff3(leaf_points, point)
+                        } else {
+                            smallest_diff(leaf_points, point)
+                        };
 
-                        nearest[point_idx] = leaf_indices[v.unwrap_or(0)];
+                        nearest[point_idx] = leaf_indices[v];
                         break;
                     }
                 }
@@ -101,6 +103,40 @@ impl KdTree {
 
         nearest
     }
+}
+
+fn smallest_diff(
+    leaf_points: &ArrayBase<ndarray::OwnedRepr<f32>, Dim<[usize; 2]>>,
+    point: ArrayBase<ndarray::ViewRepr<&f32>, Dim<[usize; 1]>>,
+) -> usize {
+    let diff = leaf_points - &point;
+    let v = diff
+        .rows()
+        .into_iter()
+        .map(|x| x.dot(&x))
+        .enumerate()
+        .min_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(Ordering::Equal))
+        .map(|(idx, _)| idx);
+    v.unwrap_or(0)
+}
+
+fn smallest_diff3(
+    leaf_points: &ArrayBase<ndarray::OwnedRepr<f32>, Dim<[usize; 2]>>,
+    point: ArrayBase<ndarray::ViewRepr<&f32>, Dim<[usize; 1]>>,
+) -> usize {
+    let point = Vector3::new(point[0], point[1], point[2]);
+
+    let mut min_dist = std::f32::INFINITY;
+    let mut min_idx = 0;
+    for (i, leaf_point) in leaf_points.axis_iter(Axis(0)).enumerate() {
+        let leaf_point = Vector3::new(leaf_point[0], leaf_point[1], leaf_point[2]);
+        let prod = leaf_point.dot(&point);
+        if prod < min_dist {
+            min_dist = prod;
+            min_idx = i;
+        }
+    }
+    min_idx
 }
 
 #[cfg(test)]
@@ -127,7 +163,7 @@ mod tests {
             [2.2, 3.1, 4.2]
         ];
 
-        let found = tree.nearest(&queries, crate::Array1Recycle::Empty);
+        let found = tree.nearest::<3>(&queries, crate::Array1Recycle::Empty);
         assert_eq!(found, array![3, 2, 0, 1]);
     }
 
@@ -152,7 +188,7 @@ mod tests {
 
         let tree = KdTree::new(&randomized_points);
 
-        let found_indices = tree.nearest(&ordered_points, Array1Recycle::Empty);
+        let found_indices = tree.nearest::<3>(&ordered_points, Array1Recycle::Empty);
         assert_eq!(Array::from_vec(random_indices), found_indices);
     }
 
@@ -183,7 +219,7 @@ mod tests {
         for _ in 0..M {
             let start = Instant::now();
             let mut result = Array1Recycle::Empty;
-            result = Array1Recycle::Recycle(tree.nearest(&ordered_points, result));
+            result = Array1Recycle::Recycle(tree.nearest::<3>(&ordered_points, result));
             sum_millis += start.elapsed().as_millis();
         }
 
