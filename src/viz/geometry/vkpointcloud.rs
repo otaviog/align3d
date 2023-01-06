@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use nalgebra::Vector3;
-use nalgebra_glm::{Mat3x3, Mat4x4};
+use nalgebra_glm::{Mat3x3};
 use ndarray::Axis;
 use vulkano::{
     buffer::{BufferUsage, CpuAccessibleBuffer},

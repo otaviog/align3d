@@ -31,14 +31,14 @@ impl ICPParams {
     }
 }
 
-pub struct ICP<'a> {
+pub struct ICP<'target_lt> {
     pub params: ICPParams,
-    target: &'a PointCloud,
+    target: &'target_lt PointCloud,
     kdtree: KdTree,
 }
 
-impl<'a> ICP<'a> {
-    pub fn new(params: ICPParams, target: &'a PointCloud) -> Self {
+impl<'target_lt> ICP<'target_lt> {
+    pub fn new(params: ICPParams, target: &'target_lt PointCloud) -> Self {
         Self {
             params,
             target,

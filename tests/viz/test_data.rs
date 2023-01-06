@@ -1,5 +1,4 @@
-use std::ops::Deref;
-
+use align3d::Array2Recycle;
 use align3d::bilateral::BilateralFilter;
 use align3d::imagepointcloud::ImagePointCloud;
 use align3d::io::dataset::RGBDDataset;
@@ -41,9 +40,8 @@ pub fn sample_rgbd_pointcloud() -> PointCloud {
     let mut item = dataset.get_item(0).unwrap();
 
     item.1.depth = {
-        let mut filter = BilateralFilter::default();
-        filter.filter(&item.1.depth);
-        filter.result.unwrap()
+        let filter = BilateralFilter::default();
+        filter.filter(&item.1.depth, Array2Recycle::Empty)
     };
 
     let mut point_cloud = ImagePointCloud::from_rgbd_image(item.0, item.1);

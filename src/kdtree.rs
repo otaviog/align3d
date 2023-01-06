@@ -116,7 +116,7 @@ mod tests {
     use crate::Array1Recycle;
 
     #[test]
-    fn test_nearest() {
+    fn should_find_nearest_points() {
         let points = array![[1., 2., 3.], [2., 3., 4.], [5., 6., 7.], [8., 9., 1.]];
         let tree = KdTree::new(&points);
 
@@ -132,7 +132,7 @@ mod tests {
     }
 
     #[test]
-    fn test_big_search() {
+    fn should_find_nearest_points_big() {
         let ordered_points =
             Array::from_shape_vec((500, 3), (0..500 * 3).map(|x| x as f32).collect()).unwrap();
 
@@ -177,7 +177,6 @@ mod tests {
         };
 
         let tree = KdTree::new(&randomized_points);
-        
 
         let mut sum_millis = 0;
         const M: usize = 10;
