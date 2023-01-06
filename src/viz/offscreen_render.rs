@@ -1,4 +1,4 @@
-use std::{collections::HashMap, sync::Arc};
+use std::{collections::HashMap, sync::Arc, rc::Rc, cell::RefCell};
 
 use image::{ImageBuffer, Rgba, RgbaImage};
 use vulkano::{
@@ -132,7 +132,7 @@ impl OffscreenRenderer {
     /// ```
     ///
     /// ```
-    pub fn render(&mut self, scene: Arc<dyn Node>) -> RenderImage {
+    pub fn render(&mut self, scene: Rc<RefCell<dyn Node>>) -> RenderImage {
         let mut builder = AutoCommandBufferBuilder::primary(
             &self.command_buffer_allocator,
             self.queue.queue_family_index(),
@@ -150,7 +150,7 @@ impl OffscreenRenderer {
             .unwrap()
             .set_viewport(0, [self.viewport.clone()]);
 
-        scene.collect_command_buffers(
+        scene.borrow().collect_command_buffers(
             &mut CommandBuffersContext {
                 device: self.device.clone(),
                 builder: &mut builder,

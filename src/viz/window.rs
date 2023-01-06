@@ -1,4 +1,4 @@
-use std::{sync::Arc, time::Instant};
+use std::{sync::Arc, time::Instant, cell::RefCell, rc::Rc};
 
 use vulkano::{
     command_buffer::{
@@ -38,7 +38,7 @@ pub struct Window {
     event_loop: Option<EventLoop<()>>,
     device: Arc<Device>,
     queue: Arc<Queue>,
-    scene: Arc<dyn Node>,
+    scene: Rc<RefCell<dyn Node>>,
     command_buffer_allocator: StandardCommandBufferAllocator,
 }
 
@@ -72,7 +72,7 @@ fn window_size_dependent_setup(
 }
 
 impl Window {
-    pub fn create(manager: &mut Manager, scene: Arc<dyn Node>) -> Self {
+    pub fn create(manager: &mut Manager, scene: Rc<RefCell<dyn Node>>) -> Self {
         let event_loop = EventLoop::new();
         let surface = WindowBuilder::new()
             .build_vk_surface(&event_loop, manager.instance.clone())
@@ -142,16 +142,7 @@ impl Window {
             // Since we used an `EmptyPipeline` object, the objects have to be `()`.
             .set_viewport(0, [viewport.clone()]);
 
-        self.scene.collect_command_buffers(
-            //&mut CommandBuffersContext {
-            //    device: self.device.clone(),
-            //    builder: &mut builder,
-            //    pipelines: pipelines,
-            //    render_pass: render_pass.clone(),
-            //    object_matrix: nalgebra_glm::Mat4::identity(),
-            //    view_matrix: view_matrix.clone(),
-            //    projection_matrix: projection_matrix.clone(),
-            //},
+        (*self.scene).borrow().collect_command_buffers(
             &mut CommandBuffersContext::new(
                 self.device.clone(),
                 &mut builder,
@@ -272,7 +263,7 @@ impl Window {
         let mut previous_frame_end = Some(sync::now(self.device.clone()).boxed());
         let mut pipelines = HashMap::<String, Arc<GraphicsPipeline>>::new();
 
-        let scene_sphere = self.scene.properties().bounding_sphere;
+        let scene_sphere = (self.scene).borrow().properties().bounding_sphere;
 
         let mut camera_control = WASDVirtualCameraControl::new(
             VirtualCameraSphericalBuilder::fit(&scene_sphere, std::f32::consts::FRAC_PI_2)

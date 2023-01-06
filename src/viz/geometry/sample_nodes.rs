@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{rc::Rc, cell::RefCell};
 
 use ndarray::{Array2, Axis};
 
@@ -6,7 +6,7 @@ use crate::{io::read_off, mesh::compute_normals, viz::Manager};
 
 use super::{VkMeshNode, VkMesh};
 
-pub fn teapot_node(manager: &Manager) -> Arc<VkMeshNode> {
+pub fn teapot_node(manager: &Manager) -> Rc<RefCell<VkMeshNode>> {
     let geometry = {
         let mut geometry = read_off("tests/data/teapot.off").unwrap();
 

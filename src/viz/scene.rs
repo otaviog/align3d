@@ -1,4 +1,4 @@
-use std::{sync::Arc};
+use std::{sync::Arc, rc::Rc, cell::RefCell};
 
 use super::{
     controllers::FrameStepInfo,
@@ -8,11 +8,11 @@ use super::{
 #[derive(Clone, Default)]
 pub struct Scene {
     node_properties: NodeProperties,
-    pub nodes: Vec<Arc<dyn Node>>,
+    pub nodes: Vec<Rc<RefCell<dyn Node>>>,
 }
 
 impl Scene {
-    pub fn add(&mut self, node: Arc<dyn Node>) -> &mut Self {
+    pub fn add(&mut self, node: Rc<RefCell<dyn Node>>) -> &mut Self {
         self.nodes.push(node);
         self
     }
@@ -51,7 +51,7 @@ impl Node for Scene {
 
         // Traverse subnodes:
         for node in self.nodes.iter() {
-            node.collect_command_buffers(context, window_state);
+            node.borrow().collect_command_buffers(context, window_state);
         }
 
         // Resets the matrices to the originals:

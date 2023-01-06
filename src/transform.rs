@@ -98,6 +98,12 @@ impl ops::Mul<&Transform> for &Transform {
     }
 }
 
+impl From<Transform> for Matrix4<f32> {
+    fn from(transform: Transform) -> Self {
+        transform.0.into()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::Transform;

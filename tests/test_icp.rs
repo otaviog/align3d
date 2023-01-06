@@ -1,12 +1,13 @@
-use std::{borrow::BorrowMut, sync::Arc};
+use std::{cell::RefCell, rc::Rc};
 
 use align3d::{
     icp::{ICPParams, ICP},
     imagepointcloud::ImagePointCloud,
     io::{dataset::RGBDDataset, slamtb::SlamTbDataset},
     pointcloud::PointCloud,
-    viz::{geometry::VkPointCloudNode, scene::Scene, Manager, Window, node::Mat4x4},
+    viz::{geometry::VkPointCloudNode, scene::Scene, Manager, Window},
 };
+use nalgebra::Matrix4;
 
 pub fn main() {
     let dataset = SlamTbDataset::load("tests/data/rgbd/sample1").unwrap();
@@ -32,12 +33,12 @@ pub fn main() {
         },
         &pcl0,
     );
-    // let result = icp.align(&pcl1);
+    let result = icp.align(&pcl1);
 
     let mut manager = Manager::default();
     let node0 = VkPointCloudNode::load(&manager, &pcl0);
-    let node00 = node0.new_node();
-    //node00.properties.transformation = Mat4x4::identity();
+    let node00 = node0.borrow().new_node();
+    node00.borrow_mut().properties.transformation = Matrix4::from(result);
 
     let mut scene = Scene::default();
     scene
@@ -45,6 +46,6 @@ pub fn main() {
         .add(node0)
         .add(node00);
 
-    let mut window = Window::create(&mut manager, Arc::new(scene));
+    let mut window = Window::create(&mut manager, Rc::new(RefCell::new(scene)));
     window.show();
 }

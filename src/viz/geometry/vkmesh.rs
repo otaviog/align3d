@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{sync::Arc, cell::RefCell, rc::Rc};
 
 use ndarray::{Array, Axis};
 use vulkano::{
@@ -24,7 +24,7 @@ use crate::{
     io::Geometry,
     viz::{
         controllers::FrameStepInfo,
-        node::{CommandBuffersContext, Mat4x4, Node, NodeProperties},
+        node::{CommandBuffersContext, Node, NodeProperties},
     },
 };
 
@@ -151,14 +151,14 @@ impl VkMeshNode {
     /// # Arguments
     ///
     /// * `mesh`: The mesh buffer instance.
-    pub fn new(mesh: Arc<VkMesh>) -> Arc<Self> {
-        Arc::new(Self {
+    pub fn new(mesh: Arc<VkMesh>) -> Rc<RefCell<Self>> {
+        Rc::new(RefCell::new(Self {
             node_properties: NodeProperties {
                 bounding_sphere: *mesh.bounding_sphere(),
                 ..Default::default()
             },
             mesh: mesh.clone(),
-        })
+        }))
     }
 }
 
