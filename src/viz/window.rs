@@ -1,4 +1,4 @@
-use std::{sync::Arc, time::Instant, cell::RefCell, rc::Rc};
+use std::{cell::RefCell, rc::Rc, sync::Arc, time::Instant};
 
 use vulkano::{
     command_buffer::{
@@ -77,7 +77,7 @@ impl Window {
         let surface = WindowBuilder::new()
             .build_vk_surface(&event_loop, manager.instance.clone())
             .unwrap();
-        
+
         Self {
             surface,
             device: manager.device.clone(),
@@ -101,45 +101,24 @@ impl Window {
         projection_matrix: &nalgebra_glm::Mat4,
         window_state: &FrameStepInfo,
     ) -> PrimaryAutoCommandBuffer {
-        // In order to draw, we have to build a *command buffer*. The command buffer object holds
-        // the list of commands that are going to be executed.
-        //
-        // Building a command buffer is an expensive operation (usually a few hundred
-        // microseconds), but it is known to be a hot path in the driver and is expected to be
-        // optimized.
-        //
-        // Note that we have to pass a queue family when we create the command buffer. The command
-        // buffer will only be executable on that given queue family.
-
+        // Builds the command buffer
         let mut builder = AutoCommandBufferBuilder::primary(
             &self.command_buffer_allocator,
             self.queue.queue_family_index(),
             CommandBufferUsage::OneTimeSubmit,
         )
         .unwrap();
+
+        // Render pass
         builder
-            // Before we can draw, we have to *enter a render pass*.
             .begin_render_pass(
                 RenderPassBeginInfo {
-                    // A list of values to clear the attachments with. This list contains
-                    // one item for each attachment in the render pass. In this case,
-                    // there is only one attachment, and we clear it with a blue color.
-                    //
-                    // Only attachments that have `LoadOp::Clear` are provided with clear
-                    // values, any others should use `ClearValue::None` as the clear value.
                     clear_values: vec![Some([0.0, 0.0, 1.0, 1.0].into()), Some(1f32.into())],
                     ..RenderPassBeginInfo::framebuffer(framebuffer)
                 },
-                // The contents of the first (and only) subpass. This can be either
-                // `Inline` or `SecondaryCommandBuffers`. The latter is a bit more advanced
-                // and is not covered here.
                 SubpassContents::Inline,
             )
             .unwrap()
-            // We are now inside the first subpass of the render pass. We add a draw command.
-            //
-            // The last two parameters contain the list of resources to pass to the shaders.
-            // Since we used an `EmptyPipeline` object, the objects have to be `()`.
             .set_viewport(0, [viewport.clone()]);
 
         (*self.scene).borrow().collect_command_buffers(
@@ -216,22 +195,10 @@ impl Window {
         let render_pass = vulkano::single_pass_renderpass!(
             self.device.clone(),
             attachments: {
-                // `color` is a custom name we give to the first and only attachment.
                 color: {
-                    // `load: Clear` means that we ask the GPU to clear the content of this
-                    // attachment at the start of the drawing.
                     load: Clear,
-                    // `store: Store` means that we ask the GPU to store the output of the draw
-                    // in the actual image. We could also ask it to discard the result.
                     store: Store,
-                    // `format: <ty>` indicates the type of the format of the image. This has to
-                    // be one of the types of the `vulkano::format` module (or alternatively one
-                    // of your structs that implements the `FormatDesc` trait). Here we use the
-                    // same format as the swapchain.
                     format: swapchain.image_format(),
-                    // `samples: 1` means that we ask the GPU to use one sample to determine the value
-                    // of each pixel in the color attachment. We could use a larger value (multisampling)
-                    // for antialiasing. An example of this can be found in msaa-renderpass.rs.
                     samples: 1,
                 },
                 depth: {
@@ -242,9 +209,7 @@ impl Window {
                 }
             },
             pass: {
-                // We use the attachment named `color` as the one and only color attachment.
                 color: [color],
-                // No depth-stencil attachment is indicated with empty brackets.
                 depth_stencil: {depth}
             }
         )
@@ -342,17 +307,11 @@ impl Window {
                         window_state.viewport_size =
                             [dimensions.width as f32, dimensions.height as f32];
 
-                        // It is important to call this function from time to time, otherwise resources will keep
-                        // accumulating and you will eventually reach an out of memory error.
-                        // Calling this function polls various fences in order to determine what the GPU has
-                        // already processed, and frees the resources that are no longer needed.
+                        // Clean up resources from the previous frame.
                         previous_frame_end.as_mut().unwrap().cleanup_finished();
 
-                        // Whenever the window resizes we need to recreate everything dependent on the window size.
-                        // In this example that includes the swapchain, the framebuffers and the dynamic state viewport.
+                        // Swap chain recreation
                         if recreate_swapchain {
-                            // Use the new dimensions of the window.
-
                             let (new_swapchain, new_images) =
                                 match swapchain.recreate(SwapchainCreateInfo {
                                     image_extent: dimensions.into(),
@@ -379,13 +338,6 @@ impl Window {
                             recreate_swapchain = false;
                         }
 
-                        // Before we can draw on the output, we have to *acquire* an image from the swapchain. If
-                        // no image is available (which happens if you submit draw commands too quickly), then the
-                        // function will block.
-                        // This operation returns the index of the image that we are allowed to draw upon.
-                        //
-                        // This function can block if no image is available. The parameter is an optional timeout
-                        // after which the function call will return an error.
                         let (image_index, suboptimal, acquire_future) =
                             match acquire_next_image(swapchain.clone(), None) {
                                 Ok(r) => r,
@@ -396,9 +348,6 @@ impl Window {
                                 Err(e) => panic!("Failed to acquire next image: {:?}", e),
                             };
 
-                        // acquire_next_image can be successful, but suboptimal. This means that the swapchain image
-                        // will still work, but it may not display correctly. With some drivers this can be when
-                        // the window resizes, but it may not cause the swapchain to become out of date.
                         if suboptimal {
                             recreate_swapchain = true;
                         };
@@ -418,12 +367,6 @@ impl Window {
                             .join(acquire_future)
                             .then_execute(self.queue.clone(), command_buffer)
                             .unwrap()
-                            // The color output is now expected to contain our triangle. But in order to show it on
-                            // the screen, we have to *present* the image by calling `present`.
-                            //
-                            // This function does not actually present the image immediately. Instead it submits a
-                            // present command at the end of the queue. This means that it will only be presented once
-                            // the GPU has finished executing the command buffer that draws the triangle.
                             .then_swapchain_present(
                                 self.queue.clone(),
                                 SwapchainPresentInfo::swapchain_image_index(
@@ -443,7 +386,6 @@ impl Window {
                             }
                             Err(e) => {
                                 panic!("Failed to flush future: {:?}", e);
-                                // previous_frame_end = Some(sync::now(device.clone()).boxed());
                             }
                         }
                     }
