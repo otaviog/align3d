@@ -75,6 +75,7 @@ mod tests {
         }
 
         r = Array1Recycle::Recycle(r.get(1000));
-        r = Array1Recycle::Recycle(r.get(2000));
+        let rr = r.get(2000);
+        assert_eq!(rr.dim(), 2000);
     }
 }

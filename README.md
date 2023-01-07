@@ -10,4 +10,6 @@ A crate for aligning 3D data and other stuff related with point clouds and SLAM.
 * [ ] How to make a macro `vertex_impl!`
 * [ ] Learn vulkan
 * [ ] Better builder
-* [ ] Option and borrowing (vkMesh)
+* [x] Option and borrowing (vkMesh)
+* [ ] Why from and into don't compile sometimes
+* [ ] When make a builder

@@ -1,7 +1,7 @@
 use std::{cell::RefCell, rc::Rc};
 
 use align3d::{
-    icp::{ICPParams, ICP},
+    icp::{ICPParams, ImageICP},
     imagepointcloud::ImagePointCloud,
     io::{dataset::RGBDDataset, slamtb::SlamTbDataset},
     pointcloud::PointCloud,
@@ -9,40 +9,42 @@ use align3d::{
 };
 use nalgebra::Matrix4;
 
-pub fn main() {
+fn main() {
     let dataset = SlamTbDataset::load("tests/data/rgbd/sample1").unwrap();
-    let item = dataset.get_item(0).unwrap();
 
-    let pcl0: PointCloud = {
+    let (cam, pcl0) = {
+        let item = dataset.get_item(0).unwrap();
         let mut pcl = ImagePointCloud::from_rgbd_image(&item.0, item.1);
         pcl.compute_normals();
-        PointCloud::from(&pcl)
+        (item.0, pcl)
     };
 
-    let item = dataset.get_item(5).unwrap();
-    let pcl1: PointCloud = {
+    let pcl1 = {
+        let item = dataset.get_item(14).unwrap();
         let mut pcl = ImagePointCloud::from_rgbd_image(&item.0, item.1);
         pcl.compute_normals();
-        PointCloud::from(&pcl)
+        pcl
     };
 
-    let icp = ICP::new(
+    let icp = ImageICP::new(
         ICPParams {
             max_iterations: 10,
             weight: 0.01,
         },
+        cam,
         &pcl0,
     );
     let result = icp.align(&pcl1);
 
     let mut manager = Manager::default();
-    let node0 = VkPointCloudNode::load(&manager, &pcl0);
+    let node0 = VkPointCloudNode::load(&manager, 
+        &PointCloud::from(&pcl0));
     let node00 = node0.borrow().new_node();
     node00.borrow_mut().properties.transformation = Matrix4::from(result);
 
     let mut scene = Scene::default();
     scene
-        .add(VkPointCloudNode::load(&manager, &pcl1))
+        .add(VkPointCloudNode::load(&manager, &PointCloud::from(&pcl1)))
         .add(node0)
         .add(node00);
 

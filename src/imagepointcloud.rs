@@ -1,17 +1,23 @@
 use super::camera::Camera;
 use super::io::rgbdimage::RGBDImage;
 
-use ndarray::{ArcArray2, Array2, Array3, Axis};
+use nalgebra::Vector3;
+use ndarray::iter::AxisIter;
+use ndarray::{ArcArray2, Array2, Array3, ArrayView2, Axis};
+
+use crate::io::Geometry;
+use crate::pointcloud::PointCloud;
 
 pub struct ImagePointCloud {
     pub points: Array3<f32>,
     pub mask: Array2<u8>,
     pub normals: Option<Array3<f32>>,
     pub colors: Option<Array3<u8>>,
+    valid_points: usize,
 }
 
 impl ImagePointCloud {
-    pub fn from_rgbd_image(camera: Camera, rgbd_image: RGBDImage) -> Self {
+    pub fn from_rgbd_image(camera: &Camera, rgbd_image: RGBDImage) -> Self {
         // TODO produce a warning or return an error
 
         let (width, height) = (rgbd_image.width(), rgbd_image.height());
@@ -19,6 +25,7 @@ impl ImagePointCloud {
         let mut points = Array3::zeros((height, width, 3));
         let mut mask = Array2::<u8>::zeros((height, width));
         let mut colors = Array3::<u8>::zeros((height, width, 3));
+        let mut valid_points = 0;
 
         for x in 0..width {
             for y in 0..height {
@@ -30,6 +37,7 @@ impl ImagePointCloud {
                     points[[y, x, 1]] = point3d[1];
                     points[[y, x, 2]] = point3d[2];
                     mask[[y, x]] = 1;
+                    valid_points += 1;
                 }
 
                 colors[[y, x, 0]] = rgbd_image.color[[0, y, x]];
@@ -43,6 +51,7 @@ impl ImagePointCloud {
             mask,
             normals: None,
             colors: Some(colors),
+            valid_points,
         }
     }
 
@@ -54,10 +63,14 @@ impl ImagePointCloud {
         self.points.shape()[0]
     }
 
+    pub fn valid_points_count(&self) -> usize {
+        self.valid_points
+    }
+
     pub fn get_point(&self, row: usize, col: usize) -> Option<nalgebra::Vector3<f32>> {
         if col < self.width() && row < self.height() && self.mask[(row as usize, col as usize)] == 1
         {
-            Some(nalgebra::Vector3::<f32>::new(
+            Some(Vector3::new(
                 self.points[(row, col, 0)],
                 self.points[(row, col, 1)],
                 self.points[(row, col, 2)],
@@ -144,8 +157,53 @@ impl ImagePointCloud {
     }
 }
 
-use crate::io::Geometry;
-use crate::pointcloud::PointCloud;
+pub struct PointView<'a> {
+    points: ArrayView2<'a, f32>,
+    mask: ArrayView2<'a, u8>,
+}
+
+pub struct PointViewIterator<'a> {
+    iter: std::iter::Zip<
+        AxisIter<'a, f32, ndarray::Dim<[usize; 1]>>,
+        AxisIter<'a, u8, ndarray::Dim<[usize; 1]>>,
+    >,
+}
+
+impl<'a> PointView<'a> {
+    pub fn iter(&'a self) -> PointViewIterator<'a> {
+        PointViewIterator {
+            iter: self
+                .points
+                .axis_iter(Axis(0))
+                .zip(self.mask.axis_iter(Axis(0))),
+        }
+    }
+}
+
+impl<'a> Iterator for PointViewIterator<'a> {
+    type Item = Vector3<f32>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        loop {
+            let (v, m) = self.iter.next()?;
+            if m[0] > 0 {
+                return Some(Vector3::new(v[0], v[1], v[2]));
+            };
+        }
+    }
+}
+
+impl ImagePointCloud {
+    pub fn point_view<'a>(&'a self) -> PointView<'a> {
+        let total_points = self.width() * self.height();
+        let points = self.points.view().into_shape((total_points, 3)).unwrap();
+        let mask = self.mask.view().into_shape((total_points, 1)).unwrap();
+        PointView {
+            points: points,
+            mask: mask,
+        }
+    }
+}
 
 impl From<&ImagePointCloud> for PointCloud {
     fn from(image_pcl: &ImagePointCloud) -> PointCloud {
@@ -234,7 +292,7 @@ mod tests {
         use crate::io::write_ply;
 
         let (cam, rgbd_image) = sample1.get_item(0).unwrap();
-        let im_pcl = ImagePointCloud::from_rgbd_image(cam, rgbd_image);
+        let im_pcl = ImagePointCloud::from_rgbd_image(&cam, rgbd_image);
 
         assert_eq!(480, im_pcl.height());
         assert_eq!(640, im_pcl.width());
@@ -247,7 +305,7 @@ mod tests {
     fn should_compute_normals(sample1: SlamTbDataset) {
         let (cam, rgbd_image) = sample1.get_item(0).unwrap();
 
-        let mut im_pcl = ImagePointCloud::from_rgbd_image(cam, rgbd_image);
+        let mut im_pcl = ImagePointCloud::from_rgbd_image(&cam, rgbd_image);
         im_pcl.compute_normals();
 
         {
@@ -266,7 +324,7 @@ mod tests {
     #[rstest]
     fn should_convert_into_pointcloud(sample1: SlamTbDataset) {
         let (cam, rgbd_image) = sample1.get_item(0).unwrap();
-        let im_pcl = ImagePointCloud::from_rgbd_image(cam, rgbd_image);
+        let im_pcl = ImagePointCloud::from_rgbd_image(&cam, rgbd_image);
 
         let pcl = PointCloud::from(&im_pcl);
         assert_eq!(pcl.len(), 270213);

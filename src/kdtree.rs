@@ -216,9 +216,9 @@ mod tests {
 
         let mut sum_millis = 0;
         const M: usize = 10;
+        let mut result = Array1Recycle::Empty;
         for _ in 0..M {
             let start = Instant::now();
-            let mut result = Array1Recycle::Empty;
             result = Array1Recycle::Recycle(tree.nearest::<3>(&ordered_points, result));
             sum_millis += start.elapsed().as_millis();
         }

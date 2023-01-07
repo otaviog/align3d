@@ -3,33 +3,9 @@ use crate::pointcloud::PointCloud;
 use crate::transform::Transform;
 use crate::Array1Recycle;
 use nalgebra::{Cholesky, Vector3, Vector6};
-use ndarray::parallel::prelude::*;
-use ndarray::{Array, Array2, Array3, Axis};
+use ndarray::{Array2, Array3, Axis};
 use nshare::ToNalgebra;
-
-pub struct ICPParams {
-    pub max_iterations: usize,
-    pub weight: f32,
-}
-
-impl ICPParams {
-    pub fn default() -> Self {
-        Self {
-            max_iterations: 15,
-            weight: 0.5,
-        }
-    }
-
-    pub fn max_iterations(&'_ mut self, value: usize) -> &'_ mut ICPParams {
-        self.max_iterations = value;
-        self
-    }
-
-    pub fn weight(&'_ mut self, value: f32) -> &'_ mut ICPParams {
-        self.weight = value;
-        self
-    }
-}
+use super::icp_params::ICPParams;
 
 pub struct ICP<'target_lt> {
     pub params: ICPParams,
@@ -47,7 +23,9 @@ impl<'target_lt> ICP<'target_lt> {
     }
 
     pub fn align(&self, source: &PointCloud) -> Transform {
-        if let None = self.target.normals {}
+        if let None = self.target.normals {
+            return Transform::eye();
+        }
 
         let target_normals = self.target.normals.as_ref().unwrap();
         let mut optim_transform = Transform::eye();
@@ -56,19 +34,12 @@ impl<'target_lt> ICP<'target_lt> {
         let mut jt_r_array = Array2::<f32>::zeros((self.target.len(), 6));
 
         for _ in 0..self.params.max_iterations {
-            let curr_source_points = &optim_transform * &source.points;
+            let current_source_points = &optim_transform * &source.points;
             let nearest = self
                 .kdtree
-                .nearest::<3>(&curr_source_points, Array1Recycle::Empty);
+                .nearest::<3>(&current_source_points, Array1Recycle::Empty);
 
-            let a = Array::linspace(0., 63., 64).into_shape((4, 16)).unwrap();
-            let mut sums = Vec::new();
-            a.axis_iter(Axis(0))
-                .into_par_iter()
-                .map(|row| row.sum())
-                .collect_into_vec(&mut sums);
-            source
-                .points
+            current_source_points
                 .axis_iter(Axis(0))
                 .enumerate()
                 .for_each(|(idx, source_point)| {
@@ -153,8 +124,8 @@ mod tests {
 
         let (cam1, rgbd_image1) = dataset.get_item(0).unwrap();
         let (cam2, rgbd_image2) = dataset.get_item(3).unwrap();
-        let mut source = ImagePointCloud::from_rgbd_image(cam1, rgbd_image1);
-        let mut target = ImagePointCloud::from_rgbd_image(cam2, rgbd_image2);
+        let mut source = ImagePointCloud::from_rgbd_image(&cam1, rgbd_image1);
+        let mut target = ImagePointCloud::from_rgbd_image(&cam2, rgbd_image2);
 
         source.compute_normals();
         target.compute_normals();
@@ -174,26 +145,4 @@ mod tests {
     }
 }
 
-// pub fn compute_jacobian(normal, source_point, target_normal, weight)  scalar_t jacobian[6];
-//     jacobian[0] = normal[0];
-//     jacobian[1] = normal[1];
-//     jacobian[2] = normal[2];
-//
-//     const Vector<scalar_t, 3> rot_twist = Tsrc_point.cross(normal);
-//     jacobian[3] = rot_twist[0];
-//     jacobian[4] = rot_twist[1];
-//     jacobian[5] = rot_twist[2];
-//
-//     for (int k = 0; k < 6; ++k) {
-//       Jtr_partial[k] += jacobian[k] * residual * weight;
-//     }
-//
-// #pragma unroll
-//     for (int krow = 0; krow < 6; ++krow) {
-// #pragma unroll
-//       for (int kcol = 0; kcol < 6; ++kcol) {
-//         JtJ_partial[krow][kcol] += jacobian[kcol] * weight * jacobian[krow];
-//       }
-//     }
-//
-// }
+

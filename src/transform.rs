@@ -90,6 +90,14 @@ impl ops::Mul<&ndarray::Array2<f32>> for &Transform {
     }
 }
 
+impl ops::Mul<&Vector3<f32>> for &Transform {
+    type Output = Vector3<f32>;
+
+    fn mul(self, rhs: &Vector3<f32>) -> Self::Output {
+        self.0 * rhs
+    }
+}
+
 impl ops::Mul<&Transform> for &Transform {
     type Output = Transform;
 

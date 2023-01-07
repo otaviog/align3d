@@ -2,9 +2,14 @@ use ndarray::{Array2, Axis};
 use nshare::ToNdarray2;
 use rstest::*;
 
+use crate::bilateral::BilateralFilter;
+use crate::camera::Camera;
+use crate::imagepointcloud::ImagePointCloud;
+use crate::io::dataset::RGBDDataset;
 use crate::io::{read_off, Geometry};
 use crate::mesh::compute_normals;
 use crate::pointcloud::PointCloud;
+use crate::Array2Recycle;
 
 #[fixture]
 pub fn sample_teapot_geometry() -> Geometry {
@@ -49,4 +54,39 @@ pub fn bloei_luma16() -> Array2<u16> {
         *v /= std::u16::MAX / 5000;
     });
     image
+}
+
+pub struct TestRGBDDataset {
+    dataset: Box<dyn RGBDDataset>,
+}
+
+impl TestRGBDDataset {
+    pub fn get_item(&self, index: usize) -> Result<(Camera, ImagePointCloud), crate::io::dataset::DatasetError> {
+        let (cam, mut rgbd_image) = self.dataset.get_item(index)?;
+        rgbd_image.depth = {
+            let filter = BilateralFilter::default();
+            filter.filter(&rgbd_image.depth, Array2Recycle::Empty)
+        };
+        let mut pcl = ImagePointCloud::from_rgbd_image(&cam, rgbd_image);
+        pcl.compute_normals();
+
+        Ok((cam, pcl))
+    }
+
+    pub fn len(&self) -> usize {
+        self.dataset.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.dataset.is_empty()
+    }
+}
+
+#[fixture]
+pub fn sample_rgbd_dataset1() -> TestRGBDDataset {
+    use crate::io::slamtb::SlamTbDataset;
+
+    TestRGBDDataset {
+        dataset: Box::new(SlamTbDataset::load("tests/data/rgbd/sample1").unwrap()),
+    }
 }
