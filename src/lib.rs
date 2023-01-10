@@ -8,6 +8,7 @@ pub mod kdtree;
 pub mod mesh;
 pub mod pointcloud;
 pub mod transform;
+pub mod sampling;
 
 mod memory;
 pub use memory::{Array1Recycle, Array2Recycle};

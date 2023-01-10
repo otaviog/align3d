@@ -2,6 +2,7 @@ use super::camera::Camera;
 use super::io::rgbdimage::RGBDImage;
 
 use ndarray::{ArcArray2, Array2, Array3, Axis};
+use vulkano::image::sys::Image;
 
 pub struct ImagePointCloud {
     pub points: Array3<f32>,
@@ -217,6 +218,8 @@ impl From<&ImagePointCloud> for Geometry {
         pcl.into()
     }
 }
+
+
 
 #[cfg(test)]
 mod tests {
