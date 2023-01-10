@@ -71,6 +71,11 @@ name = "icp"
 path = "tests/test_icp.rs"
 harness = false
 
+[[test]]
+name = "rgbd_image_icp"
+path = "tests/test_rgbd_image_icp.rs"
+harness = false
+
 [[bench]]
 name = "bench_mesh"
 harness = false
