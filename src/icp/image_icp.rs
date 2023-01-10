@@ -70,6 +70,7 @@ impl<'target_lt> ImageICP<'target_lt> {
         }
 
         let target_normals = self.target.normals.as_ref().unwrap();
+        // let target_intensity = self.target.features.as_ref().unwrap();
         let mut optim_transform = Transform::eye();
 
         let mut jt_r_array = Array2::<f32>::zeros((self.target.valid_points_count(), 6));
@@ -80,7 +81,8 @@ impl<'target_lt> ImageICP<'target_lt> {
         };
         for _ in 0..self.params.max_iterations {
             source
-                .point_view().iter()
+                .point_view()
+                .iter()
                 .enumerate()
                 .for_each(|(point_idx, point)| {
                     let proj_point = &optim_transform * &point;
@@ -104,6 +106,8 @@ impl<'target_lt> ImageICP<'target_lt> {
                             row_accessor[i] = jt_j[i];
                         }
 
+                        // let tgt_int = target_intensity[[y, x, 0]];
+                        // 
                         // let project_grad = self.camera.project_grad(
                         //     proj_point
                         // );
@@ -138,13 +142,13 @@ mod tests {
     use super::ImageICP;
     use crate::{
         icp::icp_params::ICPParams,
-        unit_test::{sample_rgbd_dataset1, TestRGBDDataset},
+        unit_test::{sample_imrgbd_dataset1, TestRGBDDataset},
     };
 
     #[rstest]
-    fn test_icp(sample_rgbd_dataset1: TestRGBDDataset) {
-        let (cam, pcl0) = sample_rgbd_dataset1.get_item(0).unwrap();
-        let (_, pcl1) = sample_rgbd_dataset1.get_item(5).unwrap();
+    fn test_icp(sample_imrgbd_dataset1: TestRGBDDataset) {
+        let (cam, pcl0) = sample_imrgbd_dataset1.get_item(0).unwrap();
+        let (_, pcl1) = sample_imrgbd_dataset1.get_item(5).unwrap();
 
         let _ = ImageICP::new(
             ICPParams {

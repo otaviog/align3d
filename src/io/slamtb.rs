@@ -118,7 +118,9 @@ impl RGBDDataset for SlamTbDataset {
     fn get_item(&self, index: usize) -> Result<(Camera, RGBDImage), DatasetError> {
         let rgb_image = image::open(self.base_dir.join(&self.rgb_images[index]))?
             .into_rgb8()
-            .into_ndarray3();
+            .into_ndarray3()
+            .as_standard_layout()
+            .into_owned();
         let depth_image = image::open(self.base_dir.join(&self.depth_images[index]))?
             .into_luma16()
             .into_ndarray2();

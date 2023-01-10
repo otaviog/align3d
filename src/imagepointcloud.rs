@@ -14,6 +14,7 @@ pub struct ImagePointCloud {
     pub mask: Array2<u8>,
     pub normals: Option<Array3<f32>>,
     pub colors: Option<Array3<u8>>,
+    // pub features: Option<Array3<f32>>,
     valid_points: usize,
 }
 
@@ -52,6 +53,7 @@ impl ImagePointCloud {
             mask,
             normals: None,
             colors: Some(colors),
+            //features: None,
             valid_points,
         }
     }

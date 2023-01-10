@@ -6,6 +6,7 @@ use crate::bilateral::BilateralFilter;
 use crate::camera::Camera;
 use crate::imagepointcloud::ImagePointCloud;
 use crate::io::dataset::RGBDDataset;
+use crate::io::slamtb::SlamTbDataset;
 use crate::io::{read_off, Geometry};
 use crate::mesh::compute_normals;
 use crate::pointcloud::PointCloud;
@@ -56,6 +57,11 @@ pub fn bloei_luma16() -> Array2<u16> {
     image
 }
 
+#[fixture]
+pub fn sample_rgbd_dataset1() -> impl RGBDDataset {
+    SlamTbDataset::load("tests/data/rgbd/sample1").unwrap()    
+}
+
 pub struct TestRGBDDataset {
     dataset: Box<dyn RGBDDataset>,
 }
@@ -83,10 +89,9 @@ impl TestRGBDDataset {
 }
 
 #[fixture]
-pub fn sample_rgbd_dataset1() -> TestRGBDDataset {
-    use crate::io::slamtb::SlamTbDataset;
-
+pub fn sample_imrgbd_dataset1() -> TestRGBDDataset {
     TestRGBDDataset {
         dataset: Box::new(SlamTbDataset::load("tests/data/rgbd/sample1").unwrap()),
     }
 }
+

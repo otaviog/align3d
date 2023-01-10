@@ -1,6 +1,6 @@
 use image::{imageops::FilterType, ImageBuffer, Luma, Rgb};
 use ndarray::{Array2, Array3};
-use nshare::{ToNdarray3, ToNdarray2};
+use nshare::{ToNdarray2, ToNdarray3};
 
 use crate::sampling::Downsampleble;
 
@@ -37,10 +37,10 @@ impl RGBDImage {
 }
 
 impl Downsampleble<RGBDImage> for RGBDImage {
-    fn downsample(&mut self, scale: f64) -> RGBDImage {
+    fn downsample(&self, scale: f64) -> RGBDImage {
         let (height, width) = (self.height() as u32, self.width() as u32);
         let resized_color = {
-            let raw = self.color.as_slice_mut().unwrap();
+            let raw = self.color.as_slice().unwrap();
             let color_buffer = ImageBuffer::<Rgb<u8>, &[u8]>::from_raw(width, height, raw).unwrap();
             let resized_image = image::imageops::resize(
                 &color_buffer,
@@ -52,7 +52,7 @@ impl Downsampleble<RGBDImage> for RGBDImage {
         };
 
         let resized_depth = {
-            let raw = self.depth.as_slice_mut().unwrap();
+            let raw = self.depth.as_slice().unwrap();
             let image_buffer =
                 ImageBuffer::<Luma<u16>, &[u16]>::from_raw(width, height, raw).unwrap();
             let resized_image = image::imageops::resize(
@@ -72,13 +72,21 @@ impl Downsampleble<RGBDImage> for RGBDImage {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use rstest::rstest;
 
-    #[rstest]
-    fn test_downsample() {
+    use crate::{
+        io::dataset::RGBDDataset, sampling::Downsampleble, unit_test::sample_rgbd_dataset1,
+    };
 
+    #[rstest]
+    fn test_downsample(sample_rgbd_dataset1: impl RGBDDataset) {
+        let (_, image) = sample_rgbd_dataset1.get_item(0).unwrap();
+        let scale_05 = image.downsample(0.5);
+        assert_eq!([3, 240, 320], scale_05.color.shape());
+        assert_eq!([240, 320], scale_05.depth.shape());
+        assert_eq!(320, scale_05.width());
+        assert_eq!(240, scale_05.height());
     }
 }
