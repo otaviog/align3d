@@ -1,10 +1,11 @@
+use std::iter::Enumerate;
+
 use super::camera::Camera;
 use super::io::rgbdimage::RGBDImage;
 
-
 use nalgebra::Vector3;
 use ndarray::iter::AxisIter;
-use ndarray::{ArcArray2, Array2, Array3, ArrayView2, Axis};
+use ndarray::{ArcArray2, Array2, Array3, ArrayView2, Axis, Array1};
 
 use crate::io::Geometry;
 use crate::pointcloud::PointCloud;
@@ -14,7 +15,7 @@ pub struct ImagePointCloud {
     pub mask: Array2<u8>,
     pub normals: Option<Array3<f32>>,
     pub colors: Option<Array3<u8>>,
-    // pub features: Option<Array3<f32>>,
+    pub intensities: Option<Array1<f32>>,
     valid_points: usize,
 }
 
@@ -53,7 +54,7 @@ impl ImagePointCloud {
             mask,
             normals: None,
             colors: Some(colors),
-            //features: None,
+            intensities: None,
             valid_points,
         }
     }
@@ -68,6 +69,11 @@ impl ImagePointCloud {
 
     pub fn valid_points_count(&self) -> usize {
         self.valid_points
+    }
+
+    pub fn len(&self) -> usize {
+        let shape = self.points.shape();
+        shape[0] * shape[1]
     }
 
     pub fn get_point(&self, row: usize, col: usize) -> Option<nalgebra::Vector3<f32>> {
@@ -158,6 +164,22 @@ impl ImagePointCloud {
 
         self.normals = Some(normals);
     }
+
+    pub fn compute_intensity(&mut self) {
+        let color = self
+            .colors
+            .as_ref()
+            .unwrap()
+            .view()
+            .into_shape((self.len(), 3))
+            .unwrap();
+        self.intensities = Some(
+            color
+                .axis_iter(Axis(0))
+                .map(|rgb| rgb[0] as f32*0.3 + rgb[1] as f32*0.59 + rgb[2] as f32*0.11)
+                .collect(),
+        );
+    }
 }
 
 pub struct PointView<'a> {
@@ -166,9 +188,11 @@ pub struct PointView<'a> {
 }
 
 pub struct PointViewIterator<'a> {
-    iter: std::iter::Zip<
-        AxisIter<'a, f32, ndarray::Dim<[usize; 1]>>,
-        AxisIter<'a, u8, ndarray::Dim<[usize; 1]>>,
+    iter: Enumerate<
+        std::iter::Zip<
+            AxisIter<'a, f32, ndarray::Dim<[usize; 1]>>,
+            AxisIter<'a, u8, ndarray::Dim<[usize; 1]>>,
+        >,
     >,
 }
 
@@ -178,19 +202,20 @@ impl<'a> PointView<'a> {
             iter: self
                 .points
                 .axis_iter(Axis(0))
-                .zip(self.mask.axis_iter(Axis(0))),
+                .zip(self.mask.axis_iter(Axis(0)))
+                .enumerate(),
         }
     }
 }
 
 impl<'a> Iterator for PointViewIterator<'a> {
-    type Item = Vector3<f32>;
+    type Item = (usize, Vector3<f32>);
 
     fn next(&mut self) -> Option<Self::Item> {
         loop {
-            let (v, m) = self.iter.next()?;
+            let (i, (v, m)) = self.iter.next()?;
             if m[0] > 0 {
-                return Some(Vector3::new(v[0], v[1], v[2]));
+                return Some((i, Vector3::new(v[0], v[1], v[2])));
             };
         }
     }
@@ -198,19 +223,16 @@ impl<'a> Iterator for PointViewIterator<'a> {
 
 impl ImagePointCloud {
     pub fn point_view<'a>(&'a self) -> PointView<'a> {
-        let total_points = self.width() * self.height();
+        let total_points = self.len();
         let points = self.points.view().into_shape((total_points, 3)).unwrap();
         let mask = self.mask.view().into_shape((total_points, 1)).unwrap();
-        PointView {
-            points: points,
-            mask: mask,
-        }
+        PointView { points, mask }
     }
 }
 
 impl From<&ImagePointCloud> for PointCloud {
     fn from(image_pcl: &ImagePointCloud) -> PointCloud {
-        let num_total_points = image_pcl.width() * image_pcl.height();
+        let num_total_points = image_pcl.len();
 
         let mask = image_pcl
             .mask
@@ -278,8 +300,6 @@ impl From<&ImagePointCloud> for Geometry {
         pcl.into()
     }
 }
-
-
 
 #[cfg(test)]
 mod tests {

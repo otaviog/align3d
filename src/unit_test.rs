@@ -43,6 +43,16 @@ pub fn sample_teapot_pointcloud() -> PointCloud {
 }
 
 #[fixture]
+pub fn bloei_luma8() -> Array2<u8> {
+    image::io::Reader::open("tests/data/images/bloei.jpg")
+        .unwrap()
+        .decode()
+        .unwrap()
+        .into_luma8()
+        .into_ndarray2()
+}
+
+#[fixture]
 pub fn bloei_luma16() -> Array2<u16> {
     let mut image = image::io::Reader::open("tests/data/images/bloei.jpg")
         .unwrap()
@@ -59,7 +69,7 @@ pub fn bloei_luma16() -> Array2<u16> {
 
 #[fixture]
 pub fn sample_rgbd_dataset1() -> impl RGBDDataset {
-    SlamTbDataset::load("tests/data/rgbd/sample1").unwrap()    
+    SlamTbDataset::load("tests/data/rgbd/sample1").unwrap()
 }
 
 pub struct TestRGBDDataset {
@@ -67,7 +77,10 @@ pub struct TestRGBDDataset {
 }
 
 impl TestRGBDDataset {
-    pub fn get_item(&self, index: usize) -> Result<(Camera, ImagePointCloud), crate::io::dataset::DatasetError> {
+    pub fn get_item(
+        &self,
+        index: usize,
+    ) -> Result<(Camera, ImagePointCloud), crate::io::dataset::DatasetError> {
         let (cam, mut rgbd_image) = self.dataset.get_item(index)?;
         rgbd_image.depth = {
             let filter = BilateralFilter::default();
@@ -75,7 +88,7 @@ impl TestRGBDDataset {
         };
         let mut pcl = ImagePointCloud::from_rgbd_image(&cam, rgbd_image);
         pcl.compute_normals();
-
+        pcl.compute_intensity();
         Ok((cam, pcl))
     }
 
@@ -94,4 +107,3 @@ pub fn sample_imrgbd_dataset1() -> TestRGBDDataset {
         dataset: Box::new(SlamTbDataset::load("tests/data/rgbd/sample1").unwrap()),
     }
 }
-

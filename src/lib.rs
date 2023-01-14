@@ -1,9 +1,10 @@
 pub mod bilateral;
 pub mod bounds;
 pub mod camera;
-// pub mod feature_map;
+pub mod color;
 pub mod icp;
 pub mod imagepointcloud;
+pub mod intensity_map;
 pub mod io;
 pub mod kdtree;
 mod memory;
