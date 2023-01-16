@@ -17,6 +17,7 @@ pub type Mat4x4 = nalgebra_glm::Mat4x4;
 pub struct NodeProperties {
     pub transformation: Mat4x4,
     pub bounding_sphere: Sphere3Df,
+    pub visible: bool
 }
 
 impl Default for NodeProperties {
@@ -24,6 +25,7 @@ impl Default for NodeProperties {
         Self {
             transformation: Mat4x4::identity(),
             bounding_sphere: Sphere3Df::empty(),
+            visible: true
         }
     }
 }
@@ -36,6 +38,11 @@ impl NodeProperties {
 
     pub fn bounding_sphere(&mut self, value: Sphere3Df) -> &mut Self {
         self.bounding_sphere = value;
+        self
+    }
+
+    pub fn set_visible(&mut self, value: bool) -> &mut Self {
+        self.visible = value;
         self
     }
 }

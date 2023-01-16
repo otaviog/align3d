@@ -19,7 +19,7 @@ use vulkano::{
 };
 use vulkano_win::VkSurfaceBuild;
 use winit::{
-    event::{Event, WindowEvent},
+    event::{Event, VirtualKeyCode, WindowEvent, ElementState},
     event_loop::{ControlFlow, EventLoop},
     platform::run_return::EventLoopExtRunReturn,
     window::{Window as WWindow, WindowBuilder},
@@ -40,6 +40,7 @@ pub struct Window {
     queue: Arc<Queue>,
     scene: Rc<RefCell<dyn Node>>,
     command_buffer_allocator: StandardCommandBufferAllocator,
+    pub on_key: Option<Box<dyn FnMut(VirtualKeyCode, &FrameStepInfo)>>,
 }
 
 fn window_size_dependent_setup(
@@ -88,6 +89,7 @@ impl Window {
                 manager.device.clone(),
                 Default::default(),
             ),
+            on_key: None,
         }
     }
 
@@ -289,6 +291,12 @@ impl Window {
                             window_state.keyboard_state.insert(vkeycode, input.state);
                         }
                         camera_control.key_event(&window_state, &scene_state);
+
+                        if let (Some(on_key), Some(vkeycode), ElementState::Pressed) =
+                            (self.on_key.as_mut(), input.virtual_keycode, input.state)
+                        {
+                            on_key(vkeycode, &window_state);
+                        }
                     }
                     Event::RedrawEventsCleared => {
                         // Do not draw frame when screen dimensions are zero.

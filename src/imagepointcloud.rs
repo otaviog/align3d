@@ -20,7 +20,7 @@ pub struct ImagePointCloud {
 }
 
 impl ImagePointCloud {
-    pub fn from_rgbd_image(camera: &Camera, rgbd_image: RGBDImage) -> Self {
+    pub fn from_rgbd_image(camera: &Camera, rgbd_image: &RGBDImage) -> Self {
         // TODO produce a warning or return an error
 
         let (width, height) = (rgbd_image.width(), rgbd_image.height());
@@ -89,7 +89,7 @@ impl ImagePointCloud {
         }
     }
 
-    pub fn compute_normals(&mut self) {
+    pub fn compute_normals(&mut self) -> &mut Self {
         let height = self.height();
         let width = self.width();
 
@@ -163,9 +163,11 @@ impl ImagePointCloud {
         }
 
         self.normals = Some(normals);
+
+        self
     }
 
-    pub fn compute_intensity(&mut self) {
+    pub fn compute_intensity(&mut self) -> &mut Self {
         let color = self
             .colors
             .as_ref()
@@ -179,6 +181,8 @@ impl ImagePointCloud {
                 .map(|rgb| rgb[0] as f32*0.3 + rgb[1] as f32*0.59 + rgb[2] as f32*0.11)
                 .collect(),
         );
+
+        self
     }
 }
 
@@ -317,7 +321,7 @@ mod tests {
         use crate::io::write_ply;
 
         let (cam, rgbd_image) = sample1.get_item(0).unwrap();
-        let im_pcl = ImagePointCloud::from_rgbd_image(&cam, rgbd_image);
+        let im_pcl = ImagePointCloud::from_rgbd_image(&cam, &rgbd_image);
 
         assert_eq!(480, im_pcl.height());
         assert_eq!(640, im_pcl.width());
@@ -330,7 +334,7 @@ mod tests {
     fn should_compute_normals(sample1: SlamTbDataset) {
         let (cam, rgbd_image) = sample1.get_item(0).unwrap();
 
-        let mut im_pcl = ImagePointCloud::from_rgbd_image(&cam, rgbd_image);
+        let mut im_pcl = ImagePointCloud::from_rgbd_image(&cam, &rgbd_image);
         im_pcl.compute_normals();
 
         {
@@ -349,7 +353,7 @@ mod tests {
     #[rstest]
     fn should_convert_into_pointcloud(sample1: SlamTbDataset) {
         let (cam, rgbd_image) = sample1.get_item(0).unwrap();
-        let im_pcl = ImagePointCloud::from_rgbd_image(&cam, rgbd_image);
+        let im_pcl = ImagePointCloud::from_rgbd_image(&cam, &rgbd_image);
 
         let pcl = PointCloud::from(&im_pcl);
         assert_eq!(pcl.len(), 270213);

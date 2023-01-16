@@ -180,6 +180,10 @@ impl Node for VkPointCloudNode {
         context: &mut CommandBuffersContext,
         window_state: &FrameStepInfo,
     ) {
+        if !self.properties.visible {
+            return ;
+        }
+
         let pipeline = context
             .pipelines
             .entry("VkPointCloud".to_string())

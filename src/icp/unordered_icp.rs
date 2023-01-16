@@ -124,8 +124,8 @@ mod tests {
 
         let (cam1, rgbd_image1) = dataset.get_item(0).unwrap();
         let (cam2, rgbd_image2) = dataset.get_item(3).unwrap();
-        let mut source = ImagePointCloud::from_rgbd_image(&cam1, rgbd_image1);
-        let mut target = ImagePointCloud::from_rgbd_image(&cam2, rgbd_image2);
+        let mut source = ImagePointCloud::from_rgbd_image(&cam1, &rgbd_image1);
+        let mut target = ImagePointCloud::from_rgbd_image(&cam2, &rgbd_image2);
 
         source.compute_normals();
         target.compute_normals();

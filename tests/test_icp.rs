@@ -14,14 +14,14 @@ pub fn main() {
     let item = dataset.get_item(0).unwrap();
 
     let pcl0: PointCloud = {
-        let mut pcl = ImagePointCloud::from_rgbd_image(&item.0, item.1);
+        let mut pcl = ImagePointCloud::from_rgbd_image(&item.0, &item.1);
         pcl.compute_normals();
         PointCloud::from(&pcl)
     };
 
     let item = dataset.get_item(5).unwrap();
     let pcl1: PointCloud = {
-        let mut pcl = ImagePointCloud::from_rgbd_image(&item.0, item.1);
+        let mut pcl = ImagePointCloud::from_rgbd_image(&item.0, &item.1);
         pcl.compute_normals();
         PointCloud::from(&pcl)
     };

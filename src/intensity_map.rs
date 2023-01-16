@@ -1,5 +1,4 @@
 use super::color::rgb_to_luma;
-use nalgebra::zero;
 use ndarray::{s, Array1, Array2, Array3, Axis};
 
 /// Stores a grayscale image with float and interpolation operations.
@@ -89,12 +88,12 @@ impl IntensityMap {
     pub fn from_rgb_image(image: &Array3<u8>) -> Self {
         // TODO: remove unnecessary copies.
         let shape = image.shape();
-        let color = image.view().into_shape((shape[0] * shape[1], 3)).unwrap();
+        let color = image.view().into_shape((shape[1] * shape[2], 3)).unwrap();
         let luma = color
             .axis_iter(Axis(0))
             .map(|rgb| (rgb_to_luma(rgb[0], rgb[1], rgb[2]) * 255.0) as u8)
             .collect::<Array1<u8>>()
-            .into_shape((shape[0], shape[1]))
+            .into_shape((shape[1], shape[2]))
             .unwrap();
         Self::from_luma_image(&luma)
     }

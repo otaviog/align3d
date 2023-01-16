@@ -86,7 +86,7 @@ impl TestRGBDDataset {
             let filter = BilateralFilter::default();
             filter.filter(&rgbd_image.depth, Array2Recycle::Empty)
         };
-        let mut pcl = ImagePointCloud::from_rgbd_image(&cam, rgbd_image);
+        let mut pcl = ImagePointCloud::from_rgbd_image(&cam, &rgbd_image);
         pcl.compute_normals();
         pcl.compute_intensity();
         Ok((cam, pcl))

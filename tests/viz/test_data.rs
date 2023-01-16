@@ -44,7 +44,7 @@ pub fn sample_rgbd_pointcloud() -> PointCloud {
         filter.filter(&item.1.depth, Array2Recycle::Empty)
     };
 
-    let mut point_cloud = ImagePointCloud::from_rgbd_image(item.0, item.1);
+    let mut point_cloud = ImagePointCloud::from_rgbd_image(&item.0, &item.1);
     point_cloud.compute_normals();
     PointCloud::from(&point_cloud)
 }

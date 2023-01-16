@@ -51,7 +51,10 @@ impl Node for Scene {
 
         // Traverse subnodes:
         for node in self.nodes.iter() {
-            node.borrow().collect_command_buffers(context, window_state);
+            let node = node.borrow_mut();
+            if node.properties().visible {
+                node.collect_command_buffers(context, window_state);
+            }
         }
 
         // Resets the matrices to the originals:
