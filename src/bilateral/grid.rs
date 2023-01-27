@@ -179,5 +179,8 @@ mod tests {
         let mut dest_image = bloei_luma16.clone();
         bilateral_grid.normalize();
         bilateral_grid.slice(&bloei_luma16, &mut dest_image);
+        
+        assert_eq!(dest_image.dim(), (600, 450));
+        assert_eq!(dest_image[(421, 123)], 2266);
     }
 }

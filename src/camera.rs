@@ -51,11 +51,18 @@ impl Camera {
     /// # Returns
     ///
     /// * (x and y) coordinates.
-    pub fn project(&self, point: &Vector3<f32>) -> (f32, f32) {
+    pub fn intrinsic_project(&self, point: &Vector3<f32>) -> (f32, f32) {
         (
             (point.x * self.fx as f32 + self.cx as f32) / point.z,
             (point.y * self.fy as f32 + self.cy as f32) / point.z,
         )
+    }
+
+    pub fn project(&self, point: &Vector3<f32>) -> (f32, f32) {
+        match self.camera_to_world.as_ref() {
+            Some(extrinsics) => self.intrinsic_project(point), // self.intrinsic_project(&extrinsics * &point),
+            None => self.intrinsic_project(point),
+        }
     }
 
     pub fn project_grad(&self, point: &Vector3<f32>) -> ((f32, f32), (f32, f32)) {
