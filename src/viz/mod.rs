@@ -19,5 +19,8 @@ pub use offscreen_render::OffscreenRenderer;
 
 pub mod controllers;
 
+pub mod rgbd_dataset_viewer;
+
 #[cfg(test)]
 pub mod unit_test;
+

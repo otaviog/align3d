@@ -13,9 +13,12 @@ pub mod pointcloud;
 pub mod sampling;
 pub mod transform;
 pub use memory::{Array1Recycle, Array2Recycle};
-
+pub mod error;
 // #[cfg(feature="viz")]
 pub mod viz;
-
+pub mod trajectory;
 #[cfg(test)]
 pub mod unit_test;
+
+// pub mod image;
+pub mod optim;

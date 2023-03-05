@@ -193,7 +193,7 @@ mod test {
             center: Vector3::new(2.0, 3.0, 4.0),
             radius: 3.4,
         };
-        let camera = VirtualCameraSphericalBuilder::fit(&sphere, std::f32::consts::PI / 2.0)
+        let _camera = VirtualCameraSphericalBuilder::fit(&sphere, std::f32::consts::PI / 2.0)
             .azimuth(4.0)
             .elevation(1.0);
         //let camera = camera.build();

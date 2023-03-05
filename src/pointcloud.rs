@@ -35,6 +35,34 @@ impl PointCloud {
     }
 }
 
+//#[cfg(rerun)]
+impl PointCloud {
+    pub fn rerun_msg(
+        &self,
+        name: &str,
+    ) -> Result<rerun::MsgSender, rerun::MsgSenderError> {
+        use rerun::external::glam;
+
+        let mut points = Vec::with_capacity(self.len());
+        let mut colors = Vec::with_capacity(self.len());
+        for (point, color) in self
+            .points
+            .outer_iter()
+            .zip(self.colors.iter().flat_map(|colors| colors.outer_iter()))
+        {
+            points.push(rerun::components::Point3D::from(
+                glam::Vec3::new(point[0], point[1], point[2])));
+                
+            colors.push(rerun::components::ColorRGBA::from_rgb(
+                color[0], color[1], color[2]));
+        }
+
+        Ok(rerun::MsgSender::new(name)
+            .with_component(&points)?
+            .with_component(&colors)?)
+    }
+}
+
 //impl<Idx> std::ops::Index<Idx> for PointCloud
 //where Idx: std::slice::SliceIndex<[PointCloud]>
 //{

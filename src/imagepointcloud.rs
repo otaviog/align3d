@@ -5,21 +5,33 @@ use super::io::rgbdimage::RGBDImage;
 
 use nalgebra::Vector3;
 use ndarray::iter::AxisIter;
-use ndarray::{ArcArray2, Array2, Array3, ArrayView2, Axis, Array1};
+use ndarray::{ArcArray2, Array1, Array2, Array3, ArrayView2, Axis};
 
 use crate::io::Geometry;
 use crate::pointcloud::PointCloud;
 
+/// A point cloud represented in an image structure.
 pub struct ImagePointCloud {
+    /// 3D points in the camera frame, as array with shape: (height, width, 3)
     pub points: Array3<f32>,
+    /// Mask of valid points, as array with shape: (height, width)
     pub mask: Array2<u8>,
+    /// Normals of the points, as array with shape: (height, width, 3)
     pub normals: Option<Array3<f32>>,
+    /// Colors of the points, as array with shape: (height, width, 3)
     pub colors: Option<Array3<u8>>,
+    /// Intensities of the points, as array with shape: (height, width)
     pub intensities: Option<Array1<f32>>,
     valid_points: usize,
 }
 
 impl ImagePointCloud {
+    /// Creates a new point cloud from a depth image and camera parameters.
+    ///
+    /// # Arguments
+    ///
+    /// * `camera` - Camera parameters.
+    /// * rgbd_image - RGBD image. Preferably, the depth image should be filtered with bilateral filter.
     pub fn from_rgbd_image(camera: &Camera, rgbd_image: &RGBDImage) -> Self {
         // TODO produce a warning or return an error
 
@@ -178,7 +190,7 @@ impl ImagePointCloud {
         self.intensities = Some(
             color
                 .axis_iter(Axis(0))
-                .map(|rgb| rgb[0] as f32*0.3 + rgb[1] as f32*0.59 + rgb[2] as f32*0.11)
+                .map(|rgb| rgb[0] as f32 * 0.3 + rgb[1] as f32 * 0.59 + rgb[2] as f32 * 0.11)
                 .collect(),
         );
 

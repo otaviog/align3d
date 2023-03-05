@@ -1,67 +1,78 @@
 use std::{cell::RefCell, rc::Rc};
 
 use align3d::{
+    bilateral::BilateralFilter,
+    camera::Camera,
     icp::{ICPParams, ImageICP},
     imagepointcloud::ImagePointCloud,
     intensity_map::IntensityMap,
-    io::{dataset::RGBDDataset, slamtb::SlamTbDataset},
+    io::{dataset::RGBDDataset, rgbdimage::RGBDImage, slamtb::SlamTbDataset},
     pointcloud::PointCloud,
     viz::{geometry::VkPointCloudNode, node::Node, scene::Scene, Manager, Window},
+    Array2Recycle,
 };
-use nalgebra::Matrix4;
+
 use winit::event::VirtualKeyCode;
 
+fn process_frame(item: &mut (Camera, RGBDImage)) -> ImagePointCloud {
+    item.1.depth = {
+        let filter = BilateralFilter::default();
+        filter.filter(&item.1.depth, Array2Recycle::Empty)
+    };
+    let mut pcl = ImagePointCloud::from_rgbd_image(&item.0, &item.1);
+
+    pcl.compute_normals().compute_intensity();
+
+    pcl
+}
+
 fn main() {
-    let dataset = SlamTbDataset::load("tests/data/rgbd/sample1").unwrap();
+    let dataset = SlamTbDataset::load("tests/data/rgbd/sample2").unwrap();
+    let trajectory = dataset.trajectory().unwrap();
+    const SOURCE_IDX: usize = 0;
+    const TARGET_IDX: usize = 14;
 
-    let (cam, pcl0, intensity_map) = {
-        let item = dataset.get_item(0).unwrap();
-        let mut pcl = ImagePointCloud::from_rgbd_image(&item.0, &item.1);
-        pcl.compute_normals().compute_intensity();
-
+    let (cam, source_pcl, intensity_map) = {
+        let mut item = dataset.get_item(SOURCE_IDX).unwrap();
+        let pcl = process_frame(&mut item);
         let intensity_map = IntensityMap::from_rgb_image(&item.1.color);
-
         (item.0, pcl, intensity_map)
     };
 
-    let pcl1 = {
-        let item = dataset.get_item(14).unwrap();
-        let mut pcl = ImagePointCloud::from_rgbd_image(&item.0, &item.1);
-        pcl.compute_normals();
-        pcl.compute_intensity();
-        pcl
-    };
+    let target_pcl = process_frame(&mut dataset.get_item(TARGET_IDX).unwrap());
 
     let icp = ImageICP::new(
         ICPParams {
-            max_iterations: 10,
-            weight: 0.01,
+            max_iterations: 2,
+            weight: 0.5,
         },
         cam,
-        &pcl0,
+        &source_pcl,
         &intensity_map,
     );
-    let result = icp.align(&pcl1);
+    let result = icp.align(&target_pcl);
 
     let mut manager = Manager::default();
-    let node0 = VkPointCloudNode::load(&manager, &PointCloud::from(&pcl0));
-    let node00 = node0.borrow().new_node();
-    node00.borrow_mut().properties.transformation = Matrix4::from(result);
+    let source_node = VkPointCloudNode::load(&manager, &PointCloud::from(&source_pcl));
+    let source_t_node = source_node.borrow().new_node();
+    source_t_node.borrow_mut().properties.transformation = result.into(); // Matrix4::from(result);
+                                                                                    //source_t_node.borrow_mut().properties.transformation =
+                                                                                    //    trajectory.get_relative_transform(TARGET_IDX as f32, SOURCE_IDX as f32).unwrap().into();
 
-    let node1 = VkPointCloudNode::load(&manager, &PointCloud::from(&pcl1));
+    let target_node = VkPointCloudNode::load(&manager, &PointCloud::from(&target_pcl));
 
     let mut scene = Scene::default();
     scene
-        .add(node1.clone())
-        .add(node0.clone())
-        .add(node00.clone());
+        .add(target_node.clone())
+        .add(source_node.clone())
+        .add(source_t_node.clone());
 
     let mut window = Window::create(&mut manager, Rc::new(RefCell::new(scene)));
     window.on_key = Some(Box::new(move |vkeycode, _window| {
         if let Some(node) = match vkeycode {
-            VirtualKeyCode::Key1 => Some(node1.clone()),
-            VirtualKeyCode::Key2 => Some(node00.clone()),
-            VirtualKeyCode::Key3 => Some(node0.clone()),
+            VirtualKeyCode::Key1 => Some(source_node.clone()),
+            VirtualKeyCode::Key2 => Some(target_node.clone()),
+            VirtualKeyCode::Key3 => Some(source_t_node.clone()),
             _ => None,
         } {
             let mut node = node.borrow_mut();

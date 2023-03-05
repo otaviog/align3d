@@ -18,7 +18,7 @@ impl<'target_lt> ICP<'target_lt> {
         Self {
             params,
             target,
-            kdtree: KdTree::new(&target.points),
+            kdtree: KdTree::new(&target.points.view()),
         }
     }
 
@@ -37,7 +37,7 @@ impl<'target_lt> ICP<'target_lt> {
             let current_source_points = &optim_transform * &source.points;
             let nearest = self
                 .kdtree
-                .nearest::<3>(&current_source_points, Array1Recycle::Empty);
+                .nearest::<3>(&current_source_points.view(), Array1Recycle::Empty);
 
             current_source_points
                 .axis_iter(Axis(0))
@@ -94,7 +94,7 @@ impl<'target_lt> ICP<'target_lt> {
                 update[0], update[1], update[2], update[3], update[4], update[5],
             );
 
-            optim_transform = &Transform::from_se3_exp(&update) * &optim_transform;
+            optim_transform = &Transform::se3_exp(&update) * &optim_transform;
 
             // Resets the Jacobians for the next iteration.
             jt_r_array.fill(0.0);

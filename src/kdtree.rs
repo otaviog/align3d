@@ -23,9 +23,9 @@ pub struct KdTree {
 }
 
 impl KdTree {
-    pub fn new(points: &Array2<f32>) -> Self {
+    pub fn new(points: &ArrayView2<f32>) -> Self {
         // Recursive creation.
-        fn rec(points: &Array2<f32>, mut indices: Vec<usize>, depth: usize) -> KdNode {
+        fn rec(points: &ArrayView2<f32>, mut indices: Vec<usize>, depth: usize) -> KdNode {
             // Stop recursion if this should be a leaf node.
             if indices.len() <= 16 {
                 return KdNode::Leaf {
@@ -57,7 +57,7 @@ impl KdTree {
 
     pub fn nearest<const DIM: usize>(
         &self,
-        queries: &Array2<f32>,
+        queries: &ArrayView2<f32>,
         nearest: Array1Recycle,
     ) -> Array1<usize> {
         let queries_shape = queries.shape();
@@ -154,7 +154,7 @@ mod tests {
     #[test]
     fn should_find_nearest_points() {
         let points = array![[1., 2., 3.], [2., 3., 4.], [5., 6., 7.], [8., 9., 1.]];
-        let tree = KdTree::new(&points);
+        let tree = KdTree::new(&points.view());
 
         let queries = array![
             [8., 9.1, 1.3],
@@ -163,7 +163,7 @@ mod tests {
             [2.2, 3.1, 4.2]
         ];
 
-        let found = tree.nearest::<3>(&queries, crate::Array1Recycle::Empty);
+        let found = tree.nearest::<3>(&queries.view(), crate::Array1Recycle::Empty);
         assert_eq!(found, array![3, 2, 0, 1]);
     }
 
@@ -186,9 +186,9 @@ mod tests {
             (random_indices, randomized_points)
         };
 
-        let tree = KdTree::new(&randomized_points);
+        let tree = KdTree::new(&randomized_points.view());
 
-        let found_indices = tree.nearest::<3>(&ordered_points, Array1Recycle::Empty);
+        let found_indices = tree.nearest::<3>(&ordered_points.view(), Array1Recycle::Empty);
         assert_eq!(Array::from_vec(random_indices), found_indices);
     }
 
@@ -212,14 +212,14 @@ mod tests {
             randomized_points.slice_move(s![0..5000, ..])
         };
 
-        let tree = KdTree::new(&randomized_points);
+        let tree = KdTree::new(&randomized_points.view());
 
         let mut sum_millis = 0;
         const M: usize = 10;
         let mut result = Array1Recycle::Empty;
         for _ in 0..M {
             let start = Instant::now();
-            result = Array1Recycle::Recycle(tree.nearest::<3>(&ordered_points, result));
+            result = Array1Recycle::Recycle(tree.nearest::<3>(&ordered_points.view(), result));
             sum_millis += start.elapsed().as_millis();
         }
 

@@ -6,6 +6,7 @@ use super::{
 };
 use crate::{
     camera::{Camera, CameraBuilder},
+    trajectory::Trajectory,
     transform::Transform,
 };
 
@@ -41,7 +42,7 @@ mod json {
         pub depth_bias: f64,
         pub depth_max: f64,
         pub rt_cam: RTCam,
-        pub timestamp: usize,
+        pub timestamp: f64,
     }
 
     #[derive(Deserialize, Debug)]
@@ -86,7 +87,7 @@ impl SlamTbDataset {
                     };
 
                     cameras.push(
-                        CameraBuilder::from_simple_intrinsics(fx, fy, cx, cy)
+                        CameraBuilder::from_simple_intrinsic(fx, fy, cx, cy)
                             .camera_to_world(Some(extrinsics))
                             .build(),
                     );
@@ -128,6 +129,18 @@ impl RGBDDataset for SlamTbDataset {
             self.cameras[index].clone(),
             RGBDImage::with_depth_scale(rgb_image, depth_image, self.depth_scales[index]),
         ))
+    }
+
+    fn trajectory(&self) -> Option<Trajectory> {
+        let mut trajectory = Trajectory::new();
+        for (i, cam) in self.cameras.iter().enumerate() {
+            if let Some(transform) = cam.camera_to_world.clone() {
+                trajectory.push(transform, i as f32);
+            } else {
+                return None;
+            }
+        }
+        Some(trajectory)
     }
 }
 

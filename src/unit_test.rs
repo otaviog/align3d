@@ -1,5 +1,5 @@
-use ndarray::{Array2, Axis};
-use nshare::ToNdarray2;
+use ndarray::{Array2, Axis, Array3};
+use nshare::{ToNdarray2, ToNdarray3};
 use rstest::*;
 
 use crate::bilateral::BilateralFilter;
@@ -40,6 +40,16 @@ pub fn sample_teapot_pointcloud() -> PointCloud {
     geometry.colors = Some(Array2::<u8>::zeros((num_vertices, 3)));
 
     PointCloud::from_geometry(geometry)
+}
+
+#[fixture]
+pub fn bloei_rgb() -> Array3<u8> {
+    image::io::Reader::open("tests/data/images/bloei.jpg")
+        .unwrap()
+        .decode()
+        .unwrap()
+        .into_rgb8()
+        .into_ndarray3()
 }
 
 #[fixture]
