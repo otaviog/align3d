@@ -1,11 +1,9 @@
-use std::iter::Enumerate;
-
-use super::camera::Camera;
-use super::io::rgbdimage::RGBDImage;
+use crate::camera::Camera;
+use crate::io::rgbdimage::{RGBDFrame, RGBDImage};
 
 use nalgebra::Vector3;
-use ndarray::iter::AxisIter;
-use ndarray::{ArcArray2, Array1, Array2, Array3, ArrayView2, Axis};
+
+use ndarray::{ArcArray2, Array1, Array2, Array3, Axis};
 
 use crate::io::Geometry;
 use crate::pointcloud::PointCloud;
@@ -69,6 +67,17 @@ impl ImagePointCloud {
             intensities: None,
             valid_points,
         }
+    }
+
+    pub fn from_rgbd_frame(frame: &RGBDFrame) -> Self {
+        Self::from_rgbd_image(&frame.camera, &frame.image)
+    }
+
+    pub fn from_pyramid(pyramid: &Vec<RGBDFrame>) -> Vec<Self> {
+        pyramid
+            .iter()
+            .map(|frame| Self::from_rgbd_frame(frame))
+            .collect()
     }
 
     pub fn width(&self) -> usize {
@@ -163,7 +172,7 @@ impl ImagePointCloud {
                     top - center
                 };
 
-                let normal = left_to_right.cross(&bottom_to_top);
+                let normal = left_to_right.cross(&bottom_to_top).normalize();
 
                 let normal_magnitude = normal.magnitude();
                 if normal_magnitude > 1e-6_f32 {
@@ -195,54 +204,6 @@ impl ImagePointCloud {
         );
 
         self
-    }
-}
-
-pub struct PointView<'a> {
-    points: ArrayView2<'a, f32>,
-    mask: ArrayView2<'a, u8>,
-}
-
-pub struct PointViewIterator<'a> {
-    iter: Enumerate<
-        std::iter::Zip<
-            AxisIter<'a, f32, ndarray::Dim<[usize; 1]>>,
-            AxisIter<'a, u8, ndarray::Dim<[usize; 1]>>,
-        >,
-    >,
-}
-
-impl<'a> PointView<'a> {
-    pub fn iter(&'a self) -> PointViewIterator<'a> {
-        PointViewIterator {
-            iter: self
-                .points
-                .axis_iter(Axis(0))
-                .zip(self.mask.axis_iter(Axis(0)))
-                .enumerate(),
-        }
-    }
-}
-
-impl<'a> Iterator for PointViewIterator<'a> {
-    type Item = (usize, Vector3<f32>);
-
-    fn next(&mut self) -> Option<Self::Item> {
-        loop {
-            let (i, (v, m)) = self.iter.next()?;
-            if m[0] > 0 {
-                return Some((i, Vector3::new(v[0], v[1], v[2])));
-            };
-        }
-    }
-}
-
-impl ImagePointCloud {
-    pub fn point_view<'a>(&'a self) -> PointView<'a> {
-        let total_points = self.len();
-        let points = self.points.view().into_shape((total_points, 3)).unwrap();
-        let mask = self.mask.view().into_shape((total_points, 1)).unwrap();
-        PointView { points, mask }
     }
 }
 
@@ -320,7 +281,7 @@ impl From<&ImagePointCloud> for Geometry {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::io::{dataset::RGBDDataset, slamtb::SlamTbDataset, write_ply};
+    use crate::io::{core::RGBDDataset, slamtb::SlamTbDataset, write_ply};
     use rstest::*;
 
     #[fixture]
@@ -332,7 +293,7 @@ mod tests {
     fn should_backproject_rgbd_image(sample1: SlamTbDataset) {
         use crate::io::write_ply;
 
-        let (cam, rgbd_image) = sample1.get_item(0).unwrap();
+        let (cam, rgbd_image) = sample1.get_item(0).unwrap().into_parts();
         let im_pcl = ImagePointCloud::from_rgbd_image(&cam, &rgbd_image);
 
         assert_eq!(480, im_pcl.height());
@@ -344,27 +305,33 @@ mod tests {
 
     #[rstest]
     fn should_compute_normals(sample1: SlamTbDataset) {
-        let (cam, rgbd_image) = sample1.get_item(0).unwrap();
+        let (cam, rgbd_image) = sample1.get_item(0).unwrap().into_parts();
 
         let mut im_pcl = ImagePointCloud::from_rgbd_image(&cam, &rgbd_image);
         im_pcl.compute_normals();
-
-        {
-            let normals = im_pcl.normals.as_ref().unwrap();
-            assert_eq!(480, normals.shape()[0]);
-            assert_eq!(640, normals.shape()[1]);
-        }
-
         write_ply(
             "tests/data/out-imagepcl-normals.ply",
             &Geometry::from(&im_pcl),
         )
         .expect("Error while writing the results");
+
+        {
+            let normals = im_pcl.normals.as_ref().unwrap();
+            assert_eq!(480, normals.shape()[0]);
+            assert_eq!(640, normals.shape()[1]);
+
+            let v = Vector3::new(
+                normals[[44, 42, 0]],
+                normals[[44, 42, 1]],
+                normals[[44, 42, 2]],
+            );
+            assert_eq!(v.norm(), 1.0);
+        }
     }
 
     #[rstest]
     fn should_convert_into_pointcloud(sample1: SlamTbDataset) {
-        let (cam, rgbd_image) = sample1.get_item(0).unwrap();
+        let (cam, rgbd_image) = sample1.get_item(0).unwrap().into_parts();
         let im_pcl = ImagePointCloud::from_rgbd_image(&cam, &rgbd_image);
 
         let pcl = PointCloud::from(&im_pcl);

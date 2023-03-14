@@ -1,6 +1,8 @@
 use std::{rc::Rc, cell::RefCell};
 
-use crate::{io::dataset::RGBDDataset, pointcloud::PointCloud, imagepointcloud::ImagePointCloud, bilateral::BilateralFilter, Array2Recycle};
+use nalgebra::Matrix4;
+
+use crate::{io::core::RGBDDataset, pointcloud::PointCloud, imagepointcloud::ImagePointCloud, bilateral::BilateralFilter, Array2Recycle};
 
 use super::{Manager, scene::Scene, geometry::VkPointCloudNode, Window};
 
@@ -20,7 +22,7 @@ impl RgbdDatasetViewer {
         
         for i in 0..self.dataset.len() {            
             let transform = trajectory.get_relative_transform(0.0, i as f32).unwrap();
-            let (camera, mut frame) = self.dataset.get_item(i).unwrap();
+            let (camera, mut frame) = self.dataset.get_item(i).unwrap().into_parts();
 
             frame.depth = {
                 let filter = BilateralFilter::default();
@@ -34,7 +36,7 @@ impl RgbdDatasetViewer {
             
             let node = VkPointCloudNode::load(&manager, &PointCloud::from(&point_cloud));
             
-            node.borrow_mut().properties.transformation = transform.into();
+            node.borrow_mut().properties.transformation = Matrix4::from(&transform);
             scene.add(node.clone());
         }
         

@@ -1,7 +1,7 @@
 use image::ImageError;
 
-use super::rgbdimage::RGBDImage;
-use crate::{camera::Camera, trajectory::Trajectory};
+use super::rgbdimage::RGBDFrame;
+use crate::trajectory::Trajectory;
 use std::io::Error;
 
 #[derive(Debug)]
@@ -23,16 +23,10 @@ impl From<ImageError> for DatasetError {
     }
 }
 
-pub struct RGBDDatasetItem {
-    pub camera: Camera,
-    pub rgbd_image: RGBDImage,
-    pub timestamp: f64,
-}
-
 pub trait RGBDDataset {
     fn len(&self) -> usize;
     fn is_empty(&self) -> bool;
-    fn get_item(&self, index: usize) -> Result<(Camera, RGBDImage), DatasetError>;
+    fn get_item(&self, index: usize) -> Result<RGBDFrame, DatasetError>;
     fn trajectory(&self) -> Option<Trajectory>;
 }
 
@@ -56,7 +50,7 @@ impl<D: RGBDDataset> RGBDDataset for SubsetDataset<D> {
         self.len() == 0
     }
 
-    fn get_item(&self, index: usize) -> Result<(Camera, RGBDImage), DatasetError> {
+    fn get_item(&self, index: usize) -> Result<RGBDFrame, DatasetError> {
         self.dataset.get_item(self.indices[index])
     }
 

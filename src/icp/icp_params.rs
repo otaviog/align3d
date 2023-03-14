@@ -1,3 +1,4 @@
+#[derive(Debug, Clone, Copy)]
 pub struct ICPParams {
     pub max_iterations: usize,
     pub weight: f32,

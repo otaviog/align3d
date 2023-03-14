@@ -2,7 +2,7 @@ use image::{imageops::FilterType, ImageBuffer, Luma, Rgb};
 use ndarray::{Array2, Array3};
 use nshare::{ToNdarray2, ToNdarray3};
 
-use crate::sampling::Downsampleble;
+use crate::{camera::Camera, sampling::Downsampleble};
 
 pub struct RGBDImage {
     pub color: Array3<u8>,
@@ -48,7 +48,7 @@ impl Downsampleble<RGBDImage> for RGBDImage {
                 (height as f64 * scale) as u32,
                 FilterType::Gaussian,
             );
-            resized_image.into_ndarray3()
+            resized_image.into_ndarray3().as_standard_layout().into_owned()
         };
 
         let resized_depth = {
@@ -72,17 +72,46 @@ impl Downsampleble<RGBDImage> for RGBDImage {
     }
 }
 
+pub struct RGBDFrame {
+    pub camera: Camera,
+    pub image: RGBDImage,
+}
+
+impl RGBDFrame {
+    pub fn new(camera: Camera, image: RGBDImage) -> Self {
+        Self { camera, image }
+    }
+
+    pub fn into_parts(self) -> (Camera, RGBDImage) {
+        (self.camera, self.image)
+    }
+
+    pub fn pyramid(self, levels: usize) -> Vec<RGBDFrame> {
+        let mut pyramid = vec![self];
+        let mut scale = 0.5;
+        for _ in 0..(levels - 1) {
+            let last = pyramid.last().unwrap();
+            pyramid.push(Self::new(
+                last.camera.scale(scale),
+                last.image.downsample(scale),
+            ));
+            scale *= 0.5;
+        }
+        pyramid
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use rstest::rstest;
 
     use crate::{
-        io::dataset::RGBDDataset, sampling::Downsampleble, unit_test::sample_rgbd_dataset1,
+        io::core::RGBDDataset, sampling::Downsampleble, unit_test::sample_rgbd_dataset1,
     };
 
     #[rstest]
     fn test_downsample(sample_rgbd_dataset1: impl RGBDDataset) {
-        let (_, image) = sample_rgbd_dataset1.get_item(0).unwrap();
+        let image = sample_rgbd_dataset1.get_item(0).unwrap().image;
         let scale_05 = image.downsample(0.5);
         assert_eq!([3, 240, 320], scale_05.color.shape());
         assert_eq!([240, 320], scale_05.depth.shape());

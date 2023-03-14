@@ -112,7 +112,7 @@ mod tests {
 
     use crate::{
         imagepointcloud::ImagePointCloud,
-        io::{dataset::RGBDDataset, write_ply},
+        io::{core::RGBDDataset, write_ply},
         pointcloud::PointCloud,
     };
 
@@ -122,8 +122,8 @@ mod tests {
 
         let dataset = SlamTbDataset::load("tests/data/rgbd/sample1").unwrap();
 
-        let (cam1, rgbd_image1) = dataset.get_item(0).unwrap();
-        let (cam2, rgbd_image2) = dataset.get_item(3).unwrap();
+        let (cam1, rgbd_image1) = dataset.get_item(0).unwrap().into_parts();
+        let (cam2, rgbd_image2) = dataset.get_item(3).unwrap().into_parts();
         let mut source = ImagePointCloud::from_rgbd_image(&cam1, &rgbd_image1);
         let mut target = ImagePointCloud::from_rgbd_image(&cam2, &rgbd_image2);
 

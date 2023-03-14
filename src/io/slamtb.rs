@@ -1,8 +1,8 @@
 use std::path::{Path, PathBuf};
 
 use super::{
-    dataset::{DatasetError, RGBDDataset},
-    rgbdimage::RGBDImage,
+    core::{DatasetError, RGBDDataset},
+    rgbdimage::{RGBDFrame, RGBDImage},
 };
 use crate::{
     camera::{Camera, CameraBuilder},
@@ -116,7 +116,7 @@ impl RGBDDataset for SlamTbDataset {
         self.len() == 0
     }
 
-    fn get_item(&self, index: usize) -> Result<(Camera, RGBDImage), DatasetError> {
+    fn get_item(&self, index: usize) -> Result<RGBDFrame, DatasetError> {
         let rgb_image = image::open(self.base_dir.join(&self.rgb_images[index]))?
             .into_rgb8()
             .into_ndarray3()
@@ -125,7 +125,7 @@ impl RGBDDataset for SlamTbDataset {
         let depth_image = image::open(self.base_dir.join(&self.depth_images[index]))?
             .into_luma16()
             .into_ndarray2();
-        Ok((
+        Ok(RGBDFrame::new(
             self.cameras[index].clone(),
             RGBDImage::with_depth_scale(rgb_image, depth_image, self.depth_scales[index]),
         ))
@@ -149,13 +149,13 @@ mod tests {
     //use rstest::*;
 
     use super::*;
-    use crate::io::dataset::RGBDDataset;
+    use crate::io::core::RGBDDataset;
 
     #[test]
     fn test_load() {
         let rgbd_dataset = SlamTbDataset::load("tests/data/rgbd/sample1").unwrap();
 
-        let (camera, image) = rgbd_dataset.get_item(0).unwrap();
+        let (camera, image) = rgbd_dataset.get_item(0).unwrap().into_parts();
 
         assert_eq!(camera.fx, 544.4732666015625);
         assert_eq!(camera.fy, 544.4732666015625);

@@ -1,4 +1,4 @@
-use ndarray::{Array1, Array2, Array3, Axis, s};
+use ndarray::{Array1, Array2, Array3, s};
 
 pub fn rgb_to_luma(r: u8, g: u8, b: u8) -> f32 {
     const DIV: f32 = 1.0 / 255.0;

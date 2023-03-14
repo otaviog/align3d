@@ -1,4 +1,4 @@
-pub mod dataset;
+pub mod core;
 mod off;
 pub use off::read_off;
 mod geometry;

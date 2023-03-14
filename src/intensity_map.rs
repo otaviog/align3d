@@ -87,14 +87,44 @@ impl IntensityMap {
     /// See `fill`.
     pub fn from_rgb_image(image: &Array3<u8>) -> Self {
         // TODO: remove unnecessary copies.
-        let shape = image.shape();
-        let color = image.view().into_shape((shape[1] * shape[2], 3)).unwrap();
-        let luma = color
-            .axis_iter(Axis(0))
-            .map(|rgb| (rgb_to_luma(rgb[0], rgb[1], rgb[2]) * 255.0) as u8)
-            .collect::<Array1<u8>>()
-            .into_shape((shape[1], shape[2]))
-            .unwrap();
+
+        let luma = match image.dim() {
+            (width, height, 3) => {
+                let mut luma = Array2::<u8>::zeros((width, height));
+                for y in 0..height {
+                    for x in 0..width {
+                        let r = image[[x, y, 0]];
+                        let g = image[[x, y, 1]];
+                        let b = image[[x, y, 2]];
+                        luma[[x, y]] = (rgb_to_luma(r, g, b) * 255.0) as u8;
+                    }
+                }
+                luma
+
+                //let shape = image.shape();
+                //let color = image.view().into_shape((shape[1] * shape[2], 3)).unwrap();
+                //color
+                //    .axis_iter(Axis(0))
+                //    .map(|rgb| (rgb_to_luma(rgb[0], rgb[1], rgb[2]) * 255.0) as u8)
+                //    .collect::<Array1<u8>>()
+                //    .into_shape((shape[1], shape[2]))
+                //    .unwrap()
+            }
+            (3, width, height) => {
+                let mut luma = Array2::<u8>::zeros((width, height));
+                for y in 0..height {
+                    for x in 0..width {
+                        let r = image[[0, x, y]];
+                        let g = image[[1, x, y]];
+                        let b = image[[2, x, y]];
+                        luma[[x, y]] = (rgb_to_luma(r, g, b) * 255.0) as u8;
+                    }
+                }
+                luma
+            }
+            _ => panic!("Invalid image shape"),
+        };
+
         Self::from_luma_image(&luma)
     }
 

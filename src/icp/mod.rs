@@ -4,3 +4,4 @@ mod unordered_icp;
 pub use unordered_icp::ICP;
 mod image_icp;
 pub use image_icp::ImageICP;
+pub mod multiscale;

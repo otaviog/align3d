@@ -23,12 +23,13 @@ impl GaussNewton {
         residual_array: &Array1<f32>,
         jacobian_array: &Array2<f32>,
         weight: f32,
-    ) {
+    ) -> f32 {
         let size = residual_array.shape()[0];
         // TODO: Don't zeroed every time
         let mut jt_r_array = Array2::<f32>::zeros((size, 6));
         let mut jt_j_array = Array2::<f32>::zeros((size, 6 * 6));
 
+        let mut mean_residual = 0.0;
         for (residual, jacobian, mut dst_jt_r, mut dst_jtj) in izip!(
             residual_array.iter(),
             jacobian_array.axis_iter(Axis(0)),
@@ -36,6 +37,7 @@ impl GaussNewton {
             jt_j_array.axis_iter_mut(Axis(0))
         ) {
             let residual = *residual;
+            mean_residual += residual*residual;
 
             let jt_r = [
                 jacobian[0] * residual,
@@ -64,13 +66,22 @@ impl GaussNewton {
 
         self.hessian += &(hessian * weight);
         self.gradient += &(gradient * weight);
+
+        return mean_residual / size as f32;
     }
 
     pub fn solve(&self) -> Vector6<f32> {
-        let v = Cholesky::new(self.hessian.clone().into_nalgebra())
+        let hessian = self.hessian.clone().into_nalgebra();
+        let gradient = self.gradient.clone().into_nalgebra();
+        println!("Hessian: {:?}", hessian);
+        println!("Gradient: {:?}", gradient);
+        let v = Cholesky::new(hessian)
             .unwrap()
-            .solve(&self.gradient.clone().into_nalgebra());
-        Vector6::<f32>::new(v[0], v[1], v[2], v[3], v[4], v[5])
+            .solve(&gradient);
+        let update = Vector6::<f32>::new(v[0], v[1], v[2], v[3], v[4], v[5]);
+        
+        println!("Update: {:?}", update);
+        update
     }
 
     pub fn reset(&mut self) {

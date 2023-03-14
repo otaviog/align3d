@@ -2,7 +2,7 @@ use std::time::Instant;
 
 use align3d::icp::{ICPParams, ICP};
 use align3d::imagepointcloud::ImagePointCloud;
-use align3d::io::dataset::RGBDDataset;
+use align3d::io::core::RGBDDataset;
 use align3d::pointcloud::PointCloud;
 
 use align3d::io::slamtb::SlamTbDataset;

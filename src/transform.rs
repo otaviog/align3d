@@ -51,11 +51,71 @@ impl Transform {
     ///
     /// * Transform
     pub fn se3_exp(xyz_so3: &Vector6<f32>) -> Self {
+        const EPSILON: f32 = 1e-8;
+
+        let omega = Vector3::new(xyz_so3[3], xyz_so3[4], xyz_so3[5]);
+        let theta_sq = omega.norm_squared();
+
+        let (theta, quat) = {
+            let (theta, imag_factor, real_factor) = if theta_sq < EPSILON * EPSILON {
+                let theta_po4 = theta_sq * theta_sq;
+                (
+                    0.0,
+                    0.5 - (1.0 / 48.0) * theta_sq + (1.0 / 3840.0) * theta_po4,
+                    1.0 - (1.0 / 8.0) * theta_sq + (1.0 / 384.0) * theta_po4,
+                )
+            } else {
+                let theta = theta_sq.sqrt();
+                let half_theta = 0.5 * theta;
+                (theta, half_theta.sin() / theta, half_theta.cos())
+            };
+            (
+                theta,
+                UnitQuaternion::from_quaternion(nalgebra::Quaternion::new(
+                    real_factor,
+                    imag_factor * omega[0],
+                    imag_factor * omega[1],
+                    imag_factor * omega[2],
+                )),
+            )
+        };
+        let xyz = {
+            let left_jacobian = {
+                // https://github.com/strasdat/Sophus/blob/main-1.x/sophus/so3.hpp
+                let big_omega = omega.cross_matrix();
+
+                if theta_sq < EPSILON {
+                    Matrix3::identity() + (big_omega * 0.5)
+                } else {
+                    let big_omega_squared = big_omega * big_omega;
+                    Matrix3::identity()
+                        + (1.0 - theta.cos()) / theta_sq * big_omega
+                        + (theta - theta.sin()) / (theta_sq * theta) * big_omega_squared
+                }
+            };
+
+            left_jacobian * Vector3::new(xyz_so3[0], xyz_so3[1], xyz_so3[2])
+        };
+
+        Self(Isometry3::<f32>::from_parts(xyz.into(), quat))
+    }
+
+    /// Create a transform from a 6D vector of the form [x, y, z, rx, ry, rz] where x, y, and z are the translation part
+    /// and rx,ry, and rz are the rotation part in the form of a scaled axis.
+    ///
+    /// # Arguments
+    ///
+    /// * xyz_so3 - 6D vector of the form [x, y, z, rx, ry, rz]
+    ///
+    /// # Returns
+    ///
+    /// * Transform
+    pub fn se3_exp2(xyz_so3: &Vector6<f32>) -> Self {
         let omega = Vector3::new(xyz_so3[3], xyz_so3[4], xyz_so3[5]);
 
         let left_jacobian = {
             // https://github.com/strasdat/Sophus/blob/main-1.x/sophus/so3.hpp
-            let big_omega = omega.cross_matrix();            
+            let big_omega = omega.cross_matrix();
             let theta_sqr = omega.norm_squared();
             if theta_sqr < 0.00005 {
                 Matrix3::identity() + (big_omega * 0.5)
@@ -68,8 +128,7 @@ impl Transform {
             }
         };
 
-        let xyz = left_jacobian
-            * Vector3::new(xyz_so3[0], xyz_so3[1], xyz_so3[2]);
+        let xyz = left_jacobian * Vector3::new(xyz_so3[0], xyz_so3[1], xyz_so3[2]);
 
         Self(Isometry3::<f32>::from_parts(
             Translation3::new(xyz[0], xyz[1], xyz[2]),
@@ -87,16 +146,29 @@ impl Transform {
     }
 
     /// Transforms a 3D point.
-    /// 
+    ///
     /// # Arguments
-    /// 
+    ///
     /// * rhs - 3D point.
-    /// 
+    ///
     /// # Returns
-    /// 
+    ///
     /// * 3D point transformed.
     pub fn transform_vector(&self, rhs: &Vector3<f32>) -> Vector3<f32> {
         self.0.rotation * rhs + self.0.translation.vector
+    }
+
+    /// Transforms a 3D normal. That's use only the rotation part of the transform.
+    /// 
+    /// # Arguments
+    /// 
+    /// * rhs - 3D normal.
+    /// 
+    /// # Returns
+    /// 
+    /// * 3D normal transformed.
+    pub fn transform_normal(&self, rhs: &Vector3<f32>) -> Vector3<f32> {
+        self.0.rotation * rhs
     }
 
     /// Transforms an array of 3D points.
@@ -178,18 +250,20 @@ impl ops::Mul<&Transform> for &Transform {
     }
 }
 
-impl From<Transform> for Matrix4<f32> {
+impl From<&Transform> for Matrix4<f32> {
     /// Converts a transform to a 4x4 matrix.
-    fn from(transform: Transform) -> Self {
+    fn from(transform: &Transform) -> Self {
         transform.0.into()
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use std::f32::consts::PI;
+
     use super::Transform;
     use nalgebra::Vector6;
-    use nalgebra::{Isometry3, Translation3, UnitQuaternion, Vector3};
+    use nalgebra::{Isometry3, Matrix4, Translation3, UnitQuaternion, Vector3, Vector4};
     use ndarray::array;
 
     use ndarray::prelude::*;
@@ -253,10 +327,27 @@ mod tests {
     }
 
     #[test]
+    fn test_se3() {
+        let se3 = Transform::se3_exp(&Vector6::new(1.0, 2.0, 3.0, 0.4, 0.5, 0.3));
+        let matrix = Matrix4::from(&se3);
+        let test_mult = matrix * Vector4::new(1.0, 2.0, 3.0, 1.0);
+        println!("{:?}", test_mult);
+        assert_eq!(
+            test_mult,
+            Vector4::new(3.5280778, 2.8378963, 5.8994026, 1.0000)
+        );
+        let test_mult = se3.transform_vector(&Vector3::new(1.0, 2.0, 3.0));
+        assert_eq!(
+            (test_mult - Vector3::new(3.5280778, 2.8378963, 5.8994026)).norm(),
+            0.0
+        );
+    }
+
+    #[test]
     fn test_compose() {
         let transform1 = Transform(Isometry3::from_parts(
             Translation3::<f32>::new(0., 0., 3.),
-            UnitQuaternion::<f32>::identity()
+            UnitQuaternion::<f32>::identity(),
         ));
         let transform2 = Transform(Isometry3::from_parts(
             Translation3::<f32>::new(0., 0., 3.),

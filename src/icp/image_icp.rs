@@ -1,13 +1,14 @@
-use nalgebra::{Cholesky, Vector3, Vector6};
-use ndarray::{s, Array1, Array2, Axis};
-use nshare::ToNalgebra;
+use nalgebra::Vector3;
+use ndarray::{s, Array1, Array2};
+use num::Float;
 
 use crate::{
     camera::{Camera, PointSpace},
     imagepointcloud::ImagePointCloud,
     intensity_map::IntensityMap,
     optim::GaussNewton,
-    transform::Transform,
+    transform::{Transform},
+    trig,
 };
 
 use super::icp_params::ICPParams;
@@ -46,12 +47,13 @@ impl PointPlaneDistance {
             twist[2],
         ];
 
-        let residual_weight = {
-            let residual = (target_point - source_point).dot(&target_normal);
-            residual*residual
+        let residual = {
+            let cost = (target_point - source_point).dot(&target_normal);
+            // cost * cost
+            cost
         };
 
-        (residual_weight, jacobian)
+        (residual, jacobian)
     }
 }
 
@@ -89,25 +91,28 @@ pub struct ImageICP<'target_lt, 'it_map> {
     camera: Camera,
     target: &'target_lt ImagePointCloud,
     intensity_map: &'it_map IntensityMap,
+    pub initial_transform: Transform,
 }
 
-impl<'target_lt, 'it_map> ImageICP<'target_lt, 'it_map> {
+impl<'target_lt, 'map_lt> ImageICP<'target_lt, 'map_lt> {
     pub fn new(
         params: ICPParams,
-        camera: Camera,
+        camera: &Camera,
         target: &'target_lt ImagePointCloud,
-        intensity_map: &'it_map IntensityMap,
+        intensity_map: &'map_lt IntensityMap,
     ) -> Self {
         Self {
             params,
-            camera,
+            camera: camera.clone(),
             target,
             intensity_map,
+            initial_transform: Transform::eye(),
         }
     }
 
     /// Aligns the source point cloud to the target point cloud.
     pub fn align(&self, source: &ImagePointCloud) -> Transform {
+        let source_normals = source.normals.as_ref().unwrap();
         let target_normals = self.target.normals.as_ref().unwrap();
         let source_colors = source.intensities.as_ref().unwrap();
 
@@ -121,48 +126,67 @@ impl<'target_lt, 'it_map> ImageICP<'target_lt, 'it_map> {
         };
 
         let mut optim = GaussNewton::new();
-
+        let mut best_residual = Float::infinity();
+        let mut best_transform = optim_transform.clone();
         for _ in 0..self.params.max_iterations {
             let num_points = source.len();
             let mut residuals = Array1::<f32>::zeros(num_points);
             let mut jacobians = Array2::<f32>::zeros((num_points, 6));
-            source.point_view().iter().enumerate().for_each(
-                |(point_index, (pcl_index, src_point))| {
-                    let source_point = optim_transform.transform_vector(&src_point);
+            source.point_cloud_view().iter().enumerate().for_each(
+                |(point_index, (_, source_point, source_normal))| {
+                    let source_point = optim_transform.transform_vector(&source_point);
                     let (x, y) = self
                         .camera
                         .project_point(&PointSpace::Camera(source_point))
                         .unwrap();
-                    let (xu, yu) = (x as usize, y as usize);
+                    let (xu, yu) = ((x + 0.5) as usize, (y + 0.5) as usize);
 
                     if let Some(target_point) = self.target.get_point(yu, xu) {
-                        // Geometric part
+                        if (target_point - source_point).norm_squared() > 0.5 {
+                            return; // exit closure
+                        }
+                        let src_normal = optim_transform.transform_normal(&source_normal);
                         let target_normal = {
                             let elem = target_normals.slice(s![yu, xu, ..]);
                             Vector3::new(elem[0], elem[1], elem[2])
                         };
 
+                        if trig::angle_between_normals(&src_normal, &target_normal)
+                            > 18.0.to_radians()
+                        {
+                            return; // exit closure
+                        }
+
                         let (residual, jacobian) =
                             geometric_distance.jacobian(source_point, target_point, target_normal);
 
                         residuals[point_index] = residual;
-                        jacobians
-                            .row_mut(point_index)
-                            .iter_mut()
-                            .zip(jacobian)
-                            .for_each(|(jdst, jsrc)| {
-                                *jdst = jsrc;
-                            });
+                        for i in 0..6 {
+                            jacobians[[point_index, i]] = jacobian[i];
+                        }
+
+                        // jacobians
+                        //     .row_mut(point_index)
+                        //     .iter_mut()
+                        //     .zip(jacobian)
+                        //     .for_each(|(jdst, jsrc)| {
+                        //         *jdst = jsrc;
+                        //     });
                     }
                 },
             );
 
-            optim.step(&residuals, &jacobians, 0.005);
+            let residual = optim.step(&residuals, &jacobians, self.params.weight);
+            println!("Residual: {}", residual);
             let update = optim.solve();
             optim_transform = &Transform::se3_exp(&update) * &optim_transform;
-         
+
+            if residual < best_residual {
+                best_residual = residual;
+                best_transform = optim_transform.clone();
+            }
         }
-        optim_transform
+        best_transform
     }
 }
 
@@ -174,11 +198,11 @@ mod tests {
     use crate::{
         icp::icp_params::ICPParams,
         intensity_map::IntensityMap,
-        unit_test::{sample_imrgbd_dataset1, TestRGBDDataset},
+        unit_test::{sample_imrgbd_dataset1, TestImagePointCloudDataset},
     };
 
     #[rstest]
-    fn test_icp(sample_imrgbd_dataset1: TestRGBDDataset) {
+    fn test_icp(sample_imrgbd_dataset1: TestImagePointCloudDataset) {
         let (cam, pcl0) = sample_imrgbd_dataset1.get_item(0).unwrap();
         let (_, pcl1) = sample_imrgbd_dataset1.get_item(5).unwrap();
 
@@ -196,7 +220,7 @@ mod tests {
                 max_iterations: 5,
                 weight: 0.05,
             },
-            cam,
+            &cam,
             &pcl0,
             &IntensityMap::from_rgb_image(&rgb),
         )

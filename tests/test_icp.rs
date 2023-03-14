@@ -3,7 +3,7 @@ use std::{cell::RefCell, rc::Rc};
 use align3d::{
     icp::{ICPParams, ICP},
     imagepointcloud::ImagePointCloud,
-    io::{dataset::RGBDDataset, slamtb::SlamTbDataset},
+    io::{core::RGBDDataset, slamtb::SlamTbDataset},
     pointcloud::PointCloud,
     viz::{geometry::VkPointCloudNode, scene::Scene, Manager, Window},
 };
@@ -15,14 +15,14 @@ pub fn main_1() {
     let item = dataset.get_item(0).unwrap();
 
     let pcl0: PointCloud = {
-        let mut pcl = ImagePointCloud::from_rgbd_image(&item.0, &item.1);
+        let mut pcl = ImagePointCloud::from_rgbd_frame(&item);
         pcl.compute_normals();
         PointCloud::from(&pcl)
     };
 
     let item = dataset.get_item(5).unwrap();
     let pcl1: PointCloud = {
-        let mut pcl = ImagePointCloud::from_rgbd_image(&item.0, &item.1);
+        let mut pcl = ImagePointCloud::from_rgbd_frame(&item);
         pcl.compute_normals();
         PointCloud::from(&pcl)
     };
@@ -53,17 +53,17 @@ pub fn main_1() {
 
 pub fn main() -> Result<(), Box<dyn std::error::Error>> {
     let dataset = SlamTbDataset::load("tests/data/rgbd/sample1").unwrap();
-    let item = dataset.get_item(0).unwrap();
+    let frame = dataset.get_item(0).unwrap();
 
     let pcl0: PointCloud = {
-        let mut pcl = ImagePointCloud::from_rgbd_image(&item.0, &item.1);
+        let mut pcl = ImagePointCloud::from_rgbd_frame(&frame);
         pcl.compute_normals();
         PointCloud::from(&pcl)
     };
 
-    let item = dataset.get_item(5).unwrap();
+    let frame = dataset.get_item(5).unwrap();
     let pcl1: PointCloud = {
-        let mut pcl = ImagePointCloud::from_rgbd_image(&item.0, &item.1);
+        let mut pcl = ImagePointCloud::from_rgbd_frame(&frame);
         pcl.compute_normals();
         PointCloud::from(&pcl)
     };
