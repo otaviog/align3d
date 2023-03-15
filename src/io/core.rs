@@ -1,6 +1,6 @@
 use image::ImageError;
 
-use super::rgbdimage::RGBDFrame;
+use super::rgbd_image::RgbdFrame;
 use crate::trajectory::Trajectory;
 use std::io::Error;
 
@@ -23,25 +23,25 @@ impl From<ImageError> for DatasetError {
     }
 }
 
-pub trait RGBDDataset {
+pub trait RgbdDataset {
     fn len(&self) -> usize;
     fn is_empty(&self) -> bool;
-    fn get_item(&self, index: usize) -> Result<RGBDFrame, DatasetError>;
+    fn get_item(&self, index: usize) -> Result<RgbdFrame, DatasetError>;
     fn trajectory(&self) -> Option<Trajectory>;
 }
 
-pub struct SubsetDataset<D: RGBDDataset> {
+pub struct SubsetDataset<D: RgbdDataset> {
     dataset: D,
     indices: Vec<usize>,
 }
 
-impl<D: RGBDDataset> SubsetDataset<D> {
+impl<D: RgbdDataset> SubsetDataset<D> {
     pub fn new(dataset: D, indices: Vec<usize>) -> Self {
         Self { dataset, indices }
     }
 }
 
-impl<D: RGBDDataset> RGBDDataset for SubsetDataset<D> {
+impl<D: RgbdDataset> RgbdDataset for SubsetDataset<D> {
     fn len(&self) -> usize {
         self.indices.len()
     }
@@ -50,7 +50,7 @@ impl<D: RGBDDataset> RGBDDataset for SubsetDataset<D> {
         self.len() == 0
     }
 
-    fn get_item(&self, index: usize) -> Result<RGBDFrame, DatasetError> {
+    fn get_item(&self, index: usize) -> Result<RgbdFrame, DatasetError> {
         self.dataset.get_item(self.indices[index])
     }
 

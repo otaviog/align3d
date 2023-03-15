@@ -2,15 +2,14 @@ use std::{cell::RefCell, rc::Rc};
 
 use align3d::{
     bilateral::BilateralFilter,
-    camera::Camera,
-    icp::{multiscale::MultiscaleAlign, ICPParams, ImageICP},
-    imagepointcloud::ImagePointCloud,
+    icp::{multiscale::MultiscaleAlign, IcpParams},
     io::{
-        core::RGBDDataset,
-        rgbdimage::{RGBDFrame, RGBDImage},
+        core::RgbdDataset,
+        rgbd_image::{RgbdFrame},
         slamtb::SlamTbDataset,
     },
     pointcloud::PointCloud,
+    range_image::RangeImage,
     viz::{geometry::VkPointCloudNode, node::Node, scene::Scene, Manager, Window},
     Array2Recycle,
 };
@@ -18,21 +17,19 @@ use align3d::{
 use nalgebra::Matrix4;
 use winit::event::VirtualKeyCode;
 
-fn process_frame(mut frame: RGBDFrame) -> (Vec<ImagePointCloud>, Vec<Camera>) {
+fn process_frame(mut frame: RgbdFrame) -> Vec<RangeImage> {
     frame.image.depth = {
         let filter = BilateralFilter::default();
         filter.filter(&frame.image.depth, Array2Recycle::Empty)
     };
-    let frame = frame.pyramid(3);
-    let cameras = frame.iter().map(|f| f.camera.clone()).collect();
 
-    let mut pyramid = ImagePointCloud::from_pyramid(&frame);
+    let mut pyramid = RangeImage::from_pyramid(&frame.pyramid(3));
 
     for pcl in pyramid.iter_mut() {
         pcl.compute_normals().compute_intensity();
     }
 
-    (pyramid, cameras)
+    pyramid
 }
 
 fn main() {
@@ -41,17 +38,13 @@ fn main() {
     const SOURCE_IDX: usize = 0;
     const TARGET_IDX: usize = 6;
 
-    let (source_pcl, cameras) = {
-        let frame = dataset.get_item(SOURCE_IDX).unwrap();
-        process_frame(frame)
-    };
+    let source_pcl = process_frame(dataset.get_item(SOURCE_IDX).unwrap());
 
-    let (target_pcl, _) = process_frame(dataset.get_item(TARGET_IDX).unwrap());
+    let target_pcl = process_frame(dataset.get_item(TARGET_IDX).unwrap());
 
     let icp = MultiscaleAlign::new(
         &target_pcl,
-        cameras,
-        ICPParams {
+        IcpParams {
             max_iterations: 20,
             weight: 0.5,
         },

@@ -1,5 +1,9 @@
+use std::rc::Rc;
+
 use crate::camera::Camera;
-use crate::io::rgbdimage::{RGBDFrame, RGBDImage};
+use crate::color::rgb_to_luma_u8;
+use crate::intensity_map::IntensityMap;
+use crate::io::rgbd_image::{RgbdFrame, RgbdImage};
 
 use nalgebra::Vector3;
 
@@ -8,8 +12,8 @@ use ndarray::{ArcArray2, Array1, Array2, Array3, Axis};
 use crate::io::Geometry;
 use crate::pointcloud::PointCloud;
 
-/// A point cloud represented in an image structure.
-pub struct ImagePointCloud {
+/// A point cloud that comes from an image-based measurement. It representation holds its grid structure.
+pub struct RangeImage {
     /// 3D points in the camera frame, as array with shape: (height, width, 3)
     pub points: Array3<f32>,
     /// Mask of valid points, as array with shape: (height, width)
@@ -18,19 +22,24 @@ pub struct ImagePointCloud {
     pub normals: Option<Array3<f32>>,
     /// Colors of the points, as array with shape: (height, width, 3)
     pub colors: Option<Array3<u8>>,
+    /// Camera parameters that originated the image.
+    pub camera: Camera,
+
     /// Intensities of the points, as array with shape: (height, width)
-    pub intensities: Option<Array1<f32>>,
+    pub intensities: Option<Array1<u8>>,
+
+    intensity_map: Option<Rc<IntensityMap>>,
     valid_points: usize,
 }
 
-impl ImagePointCloud {
-    /// Creates a new point cloud from a depth image and camera parameters.
+impl RangeImage {
+    /// Creates a new range image from a depth image and camera parameters.
     ///
     /// # Arguments
     ///
     /// * `camera` - Camera parameters.
-    /// * rgbd_image - RGBD image. Preferably, the depth image should be filtered with bilateral filter.
-    pub fn from_rgbd_image(camera: &Camera, rgbd_image: &RGBDImage) -> Self {
+    /// * rgbd_image - Rgbd image. Preferably, the depth image should be filtered with bilateral filter.
+    pub fn from_rgbd_image(camera: &Camera, rgbd_image: &RgbdImage) -> Self {
         // TODO produce a warning or return an error
 
         let (width, height) = (rgbd_image.width(), rgbd_image.height());
@@ -64,16 +73,18 @@ impl ImagePointCloud {
             mask,
             normals: None,
             colors: Some(colors),
+            camera: camera.clone(),
             intensities: None,
+            intensity_map: None,
             valid_points,
         }
     }
 
-    pub fn from_rgbd_frame(frame: &RGBDFrame) -> Self {
+    pub fn from_rgbd_frame(frame: &RgbdFrame) -> Self {
         Self::from_rgbd_image(&frame.camera, &frame.image)
     }
 
-    pub fn from_pyramid(pyramid: &Vec<RGBDFrame>) -> Vec<Self> {
+    pub fn from_pyramid(pyramid: &Vec<RgbdFrame>) -> Vec<Self> {
         pyramid
             .iter()
             .map(|frame| Self::from_rgbd_frame(frame))
@@ -199,16 +210,35 @@ impl ImagePointCloud {
         self.intensities = Some(
             color
                 .axis_iter(Axis(0))
-                .map(|rgb| rgb[0] as f32 * 0.3 + rgb[1] as f32 * 0.59 + rgb[2] as f32 * 0.11)
+                .map(|rgb| rgb_to_luma_u8(rgb[0], rgb[1], rgb[2]))
                 .collect(),
         );
 
         self
     }
+
+    pub fn intensity_map(&mut self) -> Rc<IntensityMap> {
+        if self.intensity_map.is_none() {
+            if self.intensities.is_none() {
+                self.compute_intensity();
+            }
+        }
+
+        self.intensity_map = Some(Rc::new(IntensityMap::from_luma_image(
+            &self.intensities
+                .as_ref()
+                .unwrap()
+                .view()
+                .into_shape((self.height(), self.width()))
+                .unwrap(),
+        )));
+
+        self.intensity_map.as_ref().unwrap().clone()
+    }
 }
 
-impl From<&ImagePointCloud> for PointCloud {
-    fn from(image_pcl: &ImagePointCloud) -> PointCloud {
+impl From<&RangeImage> for PointCloud {
+    fn from(image_pcl: &RangeImage) -> PointCloud {
         let num_total_points = image_pcl.len();
 
         let mask = image_pcl
@@ -271,8 +301,8 @@ impl From<&ImagePointCloud> for PointCloud {
     }
 }
 
-impl From<&ImagePointCloud> for Geometry {
-    fn from(image_pcl: &ImagePointCloud) -> Geometry {
+impl From<&RangeImage> for Geometry {
+    fn from(image_pcl: &RangeImage) -> Geometry {
         let pcl = PointCloud::from(image_pcl);
         pcl.into()
     }
@@ -281,7 +311,7 @@ impl From<&ImagePointCloud> for Geometry {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::io::{core::RGBDDataset, slamtb::SlamTbDataset, write_ply};
+    use crate::io::{core::RgbdDataset, slamtb::SlamTbDataset, write_ply};
     use rstest::*;
 
     #[fixture]
@@ -294,12 +324,12 @@ mod tests {
         use crate::io::write_ply;
 
         let (cam, rgbd_image) = sample1.get_item(0).unwrap().into_parts();
-        let im_pcl = ImagePointCloud::from_rgbd_image(&cam, &rgbd_image);
+        let im_pcl = RangeImage::from_rgbd_image(&cam, &rgbd_image);
 
         assert_eq!(480, im_pcl.height());
         assert_eq!(640, im_pcl.width());
 
-        write_ply("tests/data/out-backproj.ply", &Geometry::from(&im_pcl))
+        write_ply("tests/data/out-back-projection.ply", &Geometry::from(&im_pcl))
             .expect("Error while writing results");
     }
 
@@ -307,10 +337,10 @@ mod tests {
     fn should_compute_normals(sample1: SlamTbDataset) {
         let (cam, rgbd_image) = sample1.get_item(0).unwrap().into_parts();
 
-        let mut im_pcl = ImagePointCloud::from_rgbd_image(&cam, &rgbd_image);
+        let mut im_pcl = RangeImage::from_rgbd_image(&cam, &rgbd_image);
         im_pcl.compute_normals();
         write_ply(
-            "tests/data/out-imagepcl-normals.ply",
+            "tests/data/out-range-image-normals.ply",
             &Geometry::from(&im_pcl),
         )
         .expect("Error while writing the results");
@@ -332,7 +362,7 @@ mod tests {
     #[rstest]
     fn should_convert_into_pointcloud(sample1: SlamTbDataset) {
         let (cam, rgbd_image) = sample1.get_item(0).unwrap().into_parts();
-        let im_pcl = ImagePointCloud::from_rgbd_image(&cam, &rgbd_image);
+        let im_pcl = RangeImage::from_rgbd_image(&cam, &rgbd_image);
 
         let pcl = PointCloud::from(&im_pcl);
         assert_eq!(pcl.len(), 270213);

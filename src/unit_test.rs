@@ -1,16 +1,16 @@
-use ndarray::{Array2, Axis, Array3};
+use ndarray::{Array2, Array3, Axis};
 use nshare::{ToNdarray2, ToNdarray3};
 use rstest::*;
 
 use crate::bilateral::BilateralFilter;
-use crate::camera::Camera;
-use crate::imagepointcloud::ImagePointCloud;
-use crate::io::core::RGBDDataset;
-use crate::io::rgbdimage::RGBDFrame;
+
+use crate::io::core::RgbdDataset;
+use crate::io::rgbd_image::RgbdFrame;
 use crate::io::slamtb::SlamTbDataset;
 use crate::io::{read_off, Geometry};
 use crate::mesh::compute_normals;
 use crate::pointcloud::PointCloud;
+use crate::range_image::RangeImage;
 use crate::Array2Recycle;
 
 #[fixture]
@@ -79,25 +79,22 @@ pub fn bloei_luma16() -> Array2<u16> {
 }
 
 #[fixture]
-pub fn sample_rgbd_dataset1() -> impl RGBDDataset {
+pub fn sample_rgbd_dataset1() -> impl RgbdDataset {
     SlamTbDataset::load("tests/data/rgbd/sample1").unwrap()
 }
 
-pub struct TestRGBDFrameDataset {
-    dataset: Box<dyn RGBDDataset>,
+pub struct TestRgbdFrameDataset {
+    dataset: Box<dyn RgbdDataset>,
 }
 
-impl TestRGBDFrameDataset {
-    pub fn get_item(
-        &self,
-        index: usize,
-    ) -> Result<RGBDFrame, crate::io::core::DatasetError> {
+impl TestRgbdFrameDataset {
+    pub fn get_item(&self, index: usize) -> Result<RgbdFrame, crate::io::core::DatasetError> {
         let (cam, mut rgbd_image) = self.dataset.get_item(index)?.into_parts();
         rgbd_image.depth = {
             let filter = BilateralFilter::default();
             filter.filter(&rgbd_image.depth, Array2Recycle::Empty)
         };
-        Ok(RGBDFrame::new(cam, rgbd_image))
+        Ok(RgbdFrame::new(cam, rgbd_image))
     }
 
     pub fn len(&self) -> usize {
@@ -110,30 +107,27 @@ impl TestRGBDFrameDataset {
 }
 
 #[fixture]
-pub fn sample_rgbd_frame_dataset1() -> TestRGBDFrameDataset {
-    TestRGBDFrameDataset {
+pub fn sample_rgbd_frame_dataset1() -> TestRgbdFrameDataset {
+    TestRgbdFrameDataset {
         dataset: Box::new(SlamTbDataset::load("tests/data/rgbd/sample1").unwrap()),
     }
 }
 
-pub struct TestImagePointCloudDataset {
-    dataset: Box<dyn RGBDDataset>,
+pub struct TestRangeImageDataset {
+    dataset: Box<dyn RgbdDataset>,
 }
 
-impl TestImagePointCloudDataset {
-    pub fn get_item(
-        &self,
-        index: usize,
-    ) -> Result<(Camera, ImagePointCloud), crate::io::core::DatasetError> {
+impl TestRangeImageDataset {
+    pub fn get_item(&self, index: usize) -> Result<RangeImage, crate::io::core::DatasetError> {
         let (cam, mut rgbd_image) = self.dataset.get_item(index)?.into_parts();
         rgbd_image.depth = {
             let filter = BilateralFilter::default();
             filter.filter(&rgbd_image.depth, Array2Recycle::Empty)
         };
-        let mut pcl = ImagePointCloud::from_rgbd_image(&cam, &rgbd_image);
-        pcl.compute_normals();
-        pcl.compute_intensity();
-        Ok((cam, pcl))
+        let mut range_img = RangeImage::from_rgbd_image(&cam, &rgbd_image);
+        range_img.compute_normals();
+        range_img.compute_intensity();
+        Ok(range_img)
     }
 
     pub fn len(&self) -> usize {
@@ -146,8 +140,15 @@ impl TestImagePointCloudDataset {
 }
 
 #[fixture]
-pub fn sample_imrgbd_dataset1() -> TestImagePointCloudDataset {
-    TestImagePointCloudDataset {
+pub fn sample_range_img_ds1() -> TestRangeImageDataset {
+    TestRangeImageDataset {
         dataset: Box::new(SlamTbDataset::load("tests/data/rgbd/sample1").unwrap()),
+    }
+}
+
+#[fixture]
+pub fn sample_range_img_ds2() -> TestRangeImageDataset {
+    TestRangeImageDataset {
+        dataset: Box::new(SlamTbDataset::load("tests/data/rgbd/sample2").unwrap()),
     }
 }

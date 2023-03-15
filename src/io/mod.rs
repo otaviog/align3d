@@ -2,7 +2,7 @@ pub mod core;
 mod off;
 pub use off::read_off;
 mod geometry;
-pub mod rgbdimage;
+pub mod rgbd_image;
 pub mod slamtb;
 pub use geometry::Geometry;
 mod error;

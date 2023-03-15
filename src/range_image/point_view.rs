@@ -3,7 +3,7 @@ use ndarray::iter::AxisIter;
 use ndarray::{ArrayView2, Axis};
 use std::iter::Enumerate;
 
-use super::ImagePointCloud;
+use super::RangeImage;
 
 pub struct PointView<'a> {
     points: ArrayView2<'a, f32>,
@@ -44,7 +44,7 @@ impl<'a> Iterator for PointViewIterator<'a> {
     }
 }
 
-impl ImagePointCloud {
+impl RangeImage {
     pub fn point_view<'a>(&'a self) -> PointView<'a> {
         let total_points = self.len();
         let points = self.points.view().into_shape((total_points, 3)).unwrap();

@@ -2,16 +2,16 @@ use std::{rc::Rc, cell::RefCell};
 
 use nalgebra::Matrix4;
 
-use crate::{io::core::RGBDDataset, pointcloud::PointCloud, imagepointcloud::ImagePointCloud, bilateral::BilateralFilter, Array2Recycle};
+use crate::{io::core::RgbdDataset, pointcloud::PointCloud, range_image::RangeImage, bilateral::BilateralFilter, Array2Recycle};
 
 use super::{Manager, scene::Scene, geometry::VkPointCloudNode, Window};
 
 pub struct RgbdDatasetViewer {
-    pub dataset: Box<dyn RGBDDataset>,
+    pub dataset: Box<dyn RgbdDataset>,
 }
 
 impl RgbdDatasetViewer {
-    pub fn new(dataset: Box<dyn RGBDDataset>) -> Self {
+    pub fn new(dataset: Box<dyn RgbdDataset>) -> Self {
         Self { dataset }
     }
 
@@ -29,7 +29,7 @@ impl RgbdDatasetViewer {
                 filter.filter(&frame.depth, Array2Recycle::Empty)
             };
 
-            let mut point_cloud = ImagePointCloud::from_rgbd_image(&camera, &frame);
+            let mut point_cloud = RangeImage::from_rgbd_image(&camera, &frame);
 
             point_cloud.compute_normals();
             // point_cloud.compute_intensity();

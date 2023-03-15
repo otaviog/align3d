@@ -3,15 +3,11 @@ use ndarray::{s, Array1, Array2};
 use num::Float;
 
 use crate::{
-    camera::{Camera, PointSpace},
-    imagepointcloud::ImagePointCloud,
-    intensity_map::IntensityMap,
-    optim::GaussNewton,
-    transform::{Transform},
-    trig,
+    camera::PointSpace, optim::GaussNewton, range_image::RangeImage,
+    transform::Transform, trig,
 };
 
-use super::icp_params::ICPParams;
+use super::icp_params::IcpParams;
 
 pub struct PointPlaneDistance {
     weight: f32,
@@ -47,11 +43,7 @@ impl PointPlaneDistance {
             twist[2],
         ];
 
-        let residual = {
-            let cost = (target_point - source_point).dot(&target_normal);
-            // cost * cost
-            cost
-        };
+        let residual = (target_point - source_point).dot(&target_normal);
 
         (residual, jacobian)
     }
@@ -80,38 +72,29 @@ impl ColorDistance {
         ];
 
         let residual = target_color - source_color;
-        let residual = residual * residual;
+        let residual = residual;
 
         (residual, jacobian)
     }
 }
 
-pub struct ImageICP<'target_lt, 'it_map> {
-    pub params: ICPParams,
-    camera: Camera,
-    target: &'target_lt ImagePointCloud,
-    intensity_map: &'it_map IntensityMap,
+pub struct ImageIcp<'target_lt> {
+    pub params: IcpParams,
+    target: &'target_lt RangeImage,
     pub initial_transform: Transform,
 }
 
-impl<'target_lt, 'map_lt> ImageICP<'target_lt, 'map_lt> {
-    pub fn new(
-        params: ICPParams,
-        camera: &Camera,
-        target: &'target_lt ImagePointCloud,
-        intensity_map: &'map_lt IntensityMap,
-    ) -> Self {
+impl<'target_lt> ImageIcp<'target_lt> {
+    pub fn new(params: IcpParams, target: &'target_lt RangeImage) -> Self {
         Self {
             params,
-            camera: camera.clone(),
             target,
-            intensity_map,
             initial_transform: Transform::eye(),
         }
     }
 
     /// Aligns the source point cloud to the target point cloud.
-    pub fn align(&self, source: &ImagePointCloud) -> Transform {
+    pub fn align(&self, source: &RangeImage) -> Transform {
         let source_normals = source.normals.as_ref().unwrap();
         let target_normals = self.target.normals.as_ref().unwrap();
         let source_colors = source.intensities.as_ref().unwrap();
@@ -136,6 +119,7 @@ impl<'target_lt, 'map_lt> ImageICP<'target_lt, 'map_lt> {
                 |(point_index, (_, source_point, source_normal))| {
                     let source_point = optim_transform.transform_vector(&source_point);
                     let (x, y) = self
+                        .target
                         .camera
                         .project_point(&PointSpace::Camera(source_point))
                         .unwrap();
@@ -164,23 +148,17 @@ impl<'target_lt, 'map_lt> ImageICP<'target_lt, 'map_lt> {
                         for i in 0..6 {
                             jacobians[[point_index, i]] = jacobian[i];
                         }
-
-                        // jacobians
-                        //     .row_mut(point_index)
-                        //     .iter_mut()
-                        //     .zip(jacobian)
-                        //     .for_each(|(jdst, jsrc)| {
-                        //         *jdst = jsrc;
-                        //     });
                     }
                 },
             );
 
-            let residual = optim.step(&residuals, &jacobians, self.params.weight);
+            let residual = optim.step_batch(&residuals, &jacobians, self.params.weight);
+
             println!("Residual: {}", residual);
+
             let update = optim.solve();
             optim_transform = &Transform::se3_exp(&update) * &optim_transform;
-
+            optim.reset();
             if residual < best_residual {
                 best_residual = residual;
                 best_transform = optim_transform.clone();
@@ -192,38 +170,37 @@ impl<'target_lt, 'map_lt> ImageICP<'target_lt, 'map_lt> {
 
 #[cfg(test)]
 mod tests {
+    use nalgebra::{Quaternion, Vector3};
     use rstest::rstest;
 
-    use super::ImageICP;
+    use super::ImageIcp;
     use crate::{
-        icp::icp_params::ICPParams,
-        intensity_map::IntensityMap,
-        unit_test::{sample_imrgbd_dataset1, TestImagePointCloudDataset},
+        icp::icp_params::IcpParams,
+        metrics::transform_difference,
+        transform::Transform,
+        unit_test::{sample_range_img_ds2, TestRangeImageDataset},
     };
 
     #[rstest]
-    fn test_icp(sample_imrgbd_dataset1: TestImagePointCloudDataset) {
-        let (cam, pcl0) = sample_imrgbd_dataset1.get_item(0).unwrap();
-        let (_, pcl1) = sample_imrgbd_dataset1.get_item(5).unwrap();
+    fn test_align(sample_range_img_ds2: TestRangeImageDataset) {
+        let rimage0 = sample_range_img_ds2.get_item(0).unwrap();
+        let rimage1 = sample_range_img_ds2.get_item(5).unwrap();
 
-        let (height, width, _) = pcl0.colors.as_ref().unwrap().dim();
-        let rgb = pcl0
-            .colors
-            .as_ref()
-            .unwrap()
-            .clone()
-            .to_shape((3, height, width))
-            .unwrap()
-            .into_owned();
-        let _ = ImageICP::new(
-            ICPParams {
-                max_iterations: 5,
+        let result = ImageIcp::new(
+            IcpParams {
+                max_iterations: 10,
                 weight: 0.05,
             },
-            &cam,
-            &pcl0,
-            &IntensityMap::from_rgb_image(&rgb),
+            &rimage0,
         )
-        .align(&pcl1);
+        .align(&rimage1);
+        println!("Result: {:?}", result);
+
+        let inv_expected = Transform::new(
+            &Vector3::new(0.0101086255, 0.0012701201, 0.005253905),
+            Quaternion::new(0.0058144825, 0.0009396147, 0.9999828, 0.00034628328),
+        )
+        .inverse();
+        assert_eq!(transform_difference(&result, &inv_expected), 0.0);
     }
 }

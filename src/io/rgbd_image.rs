@@ -4,13 +4,13 @@ use nshare::{ToNdarray2, ToNdarray3};
 
 use crate::{camera::Camera, sampling::Downsampleble};
 
-pub struct RGBDImage {
+pub struct RgbdImage {
     pub color: Array3<u8>,
     pub depth: Array2<u16>,
     pub depth_scale: Option<f64>,
 }
 
-impl RGBDImage {
+impl RgbdImage {
     pub fn new(color: Array3<u8>, depth: Array2<u16>) -> Self {
         Self {
             color,
@@ -36,8 +36,8 @@ impl RGBDImage {
     }
 }
 
-impl Downsampleble<RGBDImage> for RGBDImage {
-    fn downsample(&self, scale: f64) -> RGBDImage {
+impl Downsampleble<RgbdImage> for RgbdImage {
+    fn downsample(&self, scale: f64) -> RgbdImage {
         let (height, width) = (self.height() as u32, self.width() as u32);
         let resized_color = {
             let raw = self.color.as_slice().unwrap();
@@ -64,7 +64,7 @@ impl Downsampleble<RGBDImage> for RGBDImage {
             resized_image.into_ndarray2()
         };
 
-        RGBDImage {
+        RgbdImage {
             color: resized_color,
             depth: resized_depth,
             depth_scale: self.depth_scale,
@@ -72,21 +72,21 @@ impl Downsampleble<RGBDImage> for RGBDImage {
     }
 }
 
-pub struct RGBDFrame {
+pub struct RgbdFrame {
     pub camera: Camera,
-    pub image: RGBDImage,
+    pub image: RgbdImage,
 }
 
-impl RGBDFrame {
-    pub fn new(camera: Camera, image: RGBDImage) -> Self {
+impl RgbdFrame {
+    pub fn new(camera: Camera, image: RgbdImage) -> Self {
         Self { camera, image }
     }
 
-    pub fn into_parts(self) -> (Camera, RGBDImage) {
+    pub fn into_parts(self) -> (Camera, RgbdImage) {
         (self.camera, self.image)
     }
 
-    pub fn pyramid(self, levels: usize) -> Vec<RGBDFrame> {
+    pub fn pyramid(self, levels: usize) -> Vec<RgbdFrame> {
         let mut pyramid = vec![self];
         let mut scale = 0.5;
         for _ in 0..(levels - 1) {
@@ -106,11 +106,11 @@ mod tests {
     use rstest::rstest;
 
     use crate::{
-        io::core::RGBDDataset, sampling::Downsampleble, unit_test::sample_rgbd_dataset1,
+        io::core::RgbdDataset, sampling::Downsampleble, unit_test::sample_rgbd_dataset1,
     };
 
     #[rstest]
-    fn test_downsample(sample_rgbd_dataset1: impl RGBDDataset) {
+    fn test_downsample(sample_rgbd_dataset1: impl RgbdDataset) {
         let image = sample_rgbd_dataset1.get_item(0).unwrap().image;
         let scale_05 = image.downsample(0.5);
         assert_eq!([3, 240, 320], scale_05.color.shape());

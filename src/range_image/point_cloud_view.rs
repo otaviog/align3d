@@ -1,10 +1,9 @@
-use itertools::izip;
 use nalgebra::Vector3;
 use ndarray::iter::AxisIter;
 use ndarray::{ArrayView2, Axis};
 use std::iter::{Enumerate, Zip};
 
-use super::ImagePointCloud;
+use super::RangeImage;
 
 pub struct PointCloudView<'a> {
     points: ArrayView2<'a, f32>,
@@ -54,7 +53,7 @@ impl<'a> Iterator for PointCloudViewIterator<'a> {
     }
 }
 
-impl ImagePointCloud {
+impl RangeImage {
     pub fn point_cloud_view<'a>(&'a self) -> PointCloudView<'a> {
         let total_points = self.len();
         let points = self.points.view().into_shape((total_points, 3)).unwrap();

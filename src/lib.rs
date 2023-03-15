@@ -3,7 +3,7 @@ pub mod bounds;
 pub mod camera;
 pub mod color;
 pub mod icp;
-pub mod imagepointcloud;
+pub mod range_image;
 pub mod intensity_map;
 pub mod io;
 pub mod kdtree;
@@ -23,5 +23,5 @@ pub mod unit_test;
 
 pub mod image;
 pub mod optim;
-// pub mod se3;
 pub mod trig;
+pub mod metrics;

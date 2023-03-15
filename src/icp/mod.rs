@@ -1,7 +1,7 @@
 mod icp_params;
-pub use icp_params::ICPParams;
-mod unordered_icp;
-pub use unordered_icp::ICP;
+pub use icp_params::IcpParams;
+mod icp;
+pub use icp::Icp;
 mod image_icp;
-pub use image_icp::ImageICP;
+pub use image_icp::ImageIcp;
 pub mod multiscale;

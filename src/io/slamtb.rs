@@ -1,8 +1,8 @@
 use std::path::{Path, PathBuf};
 
 use super::{
-    core::{DatasetError, RGBDDataset},
-    rgbdimage::{RGBDFrame, RGBDImage},
+    core::{DatasetError, RgbdDataset},
+    rgbd_image::{RgbdFrame, RgbdImage},
 };
 use crate::{
     camera::{Camera, CameraBuilder},
@@ -107,7 +107,7 @@ impl SlamTbDataset {
     }
 }
 
-impl RGBDDataset for SlamTbDataset {
+impl RgbdDataset for SlamTbDataset {
     fn len(&self) -> usize {
         self.rgb_images.len().min(self.depth_images.len())
     }
@@ -116,7 +116,7 @@ impl RGBDDataset for SlamTbDataset {
         self.len() == 0
     }
 
-    fn get_item(&self, index: usize) -> Result<RGBDFrame, DatasetError> {
+    fn get_item(&self, index: usize) -> Result<RgbdFrame, DatasetError> {
         let rgb_image = image::open(self.base_dir.join(&self.rgb_images[index]))?
             .into_rgb8()
             .into_ndarray3()
@@ -125,9 +125,9 @@ impl RGBDDataset for SlamTbDataset {
         let depth_image = image::open(self.base_dir.join(&self.depth_images[index]))?
             .into_luma16()
             .into_ndarray2();
-        Ok(RGBDFrame::new(
+        Ok(RgbdFrame::new(
             self.cameras[index].clone(),
-            RGBDImage::with_depth_scale(rgb_image, depth_image, self.depth_scales[index]),
+            RgbdImage::with_depth_scale(rgb_image, depth_image, self.depth_scales[index]),
         ))
     }
 
@@ -149,7 +149,7 @@ mod tests {
     //use rstest::*;
 
     use super::*;
-    use crate::io::core::RGBDDataset;
+    use crate::io::core::RgbdDataset;
 
     #[test]
     fn test_load() {

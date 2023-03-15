@@ -1,6 +1,6 @@
 use nalgebra::{self, Matrix3, Rotation3};
 
-use nalgebra::{Isometry3, Matrix4, Translation3, UnitQuaternion, Vector3, Vector6};
+use nalgebra::{Isometry3, Matrix4, Quaternion, Translation3, UnitQuaternion, Vector3, Vector6};
 use ndarray::Axis;
 use ndarray::{self, Array2};
 
@@ -37,6 +37,13 @@ impl Transform {
         Self(Isometry3::<f32>::from_parts(
             Translation3::new(0.0, 0.0, 0.0),
             UnitQuaternion::new(Vector3::<f32>::zeros()),
+        ))
+    }
+
+    pub fn new(xyz: &Vector3<f32>, rotation: Quaternion<f32>) -> Self {
+        Self(Isometry3::<f32>::from_parts(
+            Translation3::new(xyz[0], xyz[1], xyz[2]),
+            UnitQuaternion::from_quaternion(rotation),
         ))
     }
 
@@ -100,42 +107,6 @@ impl Transform {
         Self(Isometry3::<f32>::from_parts(xyz.into(), quat))
     }
 
-    /// Create a transform from a 6D vector of the form [x, y, z, rx, ry, rz] where x, y, and z are the translation part
-    /// and rx,ry, and rz are the rotation part in the form of a scaled axis.
-    ///
-    /// # Arguments
-    ///
-    /// * xyz_so3 - 6D vector of the form [x, y, z, rx, ry, rz]
-    ///
-    /// # Returns
-    ///
-    /// * Transform
-    pub fn se3_exp2(xyz_so3: &Vector6<f32>) -> Self {
-        let omega = Vector3::new(xyz_so3[3], xyz_so3[4], xyz_so3[5]);
-
-        let left_jacobian = {
-            // https://github.com/strasdat/Sophus/blob/main-1.x/sophus/so3.hpp
-            let big_omega = omega.cross_matrix();
-            let theta_sqr = omega.norm_squared();
-            if theta_sqr < 0.00005 {
-                Matrix3::identity() + (big_omega * 0.5)
-            } else {
-                let big_omega_squared = big_omega * big_omega;
-                let theta = theta_sqr.sqrt();
-                Matrix3::identity()
-                    + (1.0 - theta.cos()) / theta_sqr * big_omega
-                    + (theta - theta.sin()) / (theta_sqr * theta) * big_omega_squared
-            }
-        };
-
-        let xyz = left_jacobian * Vector3::new(xyz_so3[0], xyz_so3[1], xyz_so3[2]);
-
-        Self(Isometry3::<f32>::from_parts(
-            Translation3::new(xyz[0], xyz[1], xyz[2]),
-            UnitQuaternion::from_scaled_axis(omega.clone()),
-        ))
-    }
-
     /// Create a transform from a 4x4 matrix.
     pub fn from_matrix4(matrix: &Matrix4<f32>) -> Self {
         let translation = Translation3::new(matrix[(0, 3)], matrix[(1, 3)], matrix[(2, 3)]);
@@ -159,13 +130,13 @@ impl Transform {
     }
 
     /// Transforms a 3D normal. That's use only the rotation part of the transform.
-    /// 
+    ///
     /// # Arguments
-    /// 
+    ///
     /// * rhs - 3D normal.
-    /// 
+    ///
     /// # Returns
-    /// 
+    ///
     /// * 3D normal transformed.
     pub fn transform_normal(&self, rhs: &Vector3<f32>) -> Vector3<f32> {
         self.0.rotation * rhs
@@ -204,6 +175,14 @@ impl Transform {
     /// Inverts the transform.
     pub fn inverse(&self) -> Self {
         Self(self.0.inverse())
+    }
+
+    pub fn angle(&self) -> f32 {
+        self.0.rotation.angle()
+    }
+
+    pub fn translation(&self) -> Vector3<f32> {
+        self.0.translation.vector
     }
 }
 
@@ -259,8 +238,6 @@ impl From<&Transform> for Matrix4<f32> {
 
 #[cfg(test)]
 mod tests {
-    use std::f32::consts::PI;
-
     use super::Transform;
     use nalgebra::Vector6;
     use nalgebra::{Isometry3, Matrix4, Translation3, UnitQuaternion, Vector3, Vector4};
@@ -324,14 +301,10 @@ mod tests {
             &transform.transform(array![[5.5, 6.4, 7.8]]),
             &array![[8.9848175, 6.9635687, 9.880962]]
         ));
-    }
 
-    #[test]
-    fn test_se3() {
         let se3 = Transform::se3_exp(&Vector6::new(1.0, 2.0, 3.0, 0.4, 0.5, 0.3));
         let matrix = Matrix4::from(&se3);
         let test_mult = matrix * Vector4::new(1.0, 2.0, 3.0, 1.0);
-        println!("{:?}", test_mult);
         assert_eq!(
             test_mult,
             Vector4::new(3.5280778, 2.8378963, 5.8994026, 1.0000)

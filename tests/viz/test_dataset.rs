@@ -1,5 +1,5 @@
 use align3d::{
-    io::{core::{SubsetDataset, RGBDDataset}, slamtb::SlamTbDataset},
+    io::{core::{SubsetDataset, RgbdDataset}, slamtb::SlamTbDataset},
     viz::rgbd_dataset_viewer::RgbdDatasetViewer,
 };
 

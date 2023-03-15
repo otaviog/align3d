@@ -1,5 +1,5 @@
+use ndarray::{s, Array2, ArrayView2, ArrayView3};
 use super::color::rgb_to_luma;
-use ndarray::{s, Array1, Array2, Array3, Axis};
 
 /// Stores a grayscale image with float and interpolation operations.
 pub struct IntensityMap {
@@ -31,7 +31,7 @@ impl IntensityMap {
     /// # Arguments
     /// * image: The image data to be converted in a intensity map.
     ///   Its values are divided by 255.0.
-    pub fn fill(&mut self, image: &Array2<u8>) {
+    pub fn fill(&mut self, image: &ArrayView2<u8>) {
         let (in_height, in_width) = {
             let dim = image.shape();
             (dim[0], dim[1])
@@ -72,7 +72,7 @@ impl IntensityMap {
 
     /// Constructor to create a map filled with an image.
     /// See `fill`.
-    pub fn from_luma_image(image: &Array2<u8>) -> Self {
+    pub fn from_luma_image(image: &ArrayView2<u8>) -> Self {
         let shape = {
             let sh = image.shape();
             (sh[0], sh[1])
@@ -85,7 +85,7 @@ impl IntensityMap {
 
     /// Constructor to create a map filled with a RGBimage.
     /// See `fill`.
-    pub fn from_rgb_image(image: &Array3<u8>) -> Self {
+    pub fn from_rgb_image(image: &ArrayView3<u8>) -> Self {
         // TODO: remove unnecessary copies.
 
         let luma = match image.dim() {
@@ -125,7 +125,7 @@ impl IntensityMap {
             _ => panic!("Invalid image shape"),
         };
 
-        Self::from_luma_image(&luma)
+        Self::from_luma_image(&luma.view())
     }
 
     /// Returns the intensity value with bilinear interpolation if
@@ -186,7 +186,7 @@ impl IntensityMap {
             let v_frac = v - vi as f32;
 
             let (val00, val10, val01, val11) = {
-                // Consider bord padding
+                // Consider board padding
                 (
                     self.map[(vi, ui)],
                     self.map[(vi, ui + 1)],
@@ -206,7 +206,7 @@ impl IntensityMap {
             let u_frac = u - ui as f32;
 
             let (val00, val10, val01, val11) = {
-                // Consider bord padding
+                // Consider board padding
                 let vi = vi + 1;
                 let ui = ui + 1;
                 (
@@ -236,7 +236,7 @@ mod tests {
 
     #[rstest]
     fn border_should_repeat(bloei_luma8: Array2<u8>) {
-        let map = IntensityMap::from_luma_image(&bloei_luma8);
+        let map = IntensityMap::from_luma_image(&bloei_luma8.view());
         let width = bloei_luma8.shape()[1];
         let _height = bloei_luma8.shape()[0];
         assert_eq!(
@@ -251,7 +251,7 @@ mod tests {
 
     #[rstest]
     fn round_uv_should_match_image(bloei_luma8: Array2<u8>) {
-        let map = IntensityMap::from_luma_image(&bloei_luma8);
+        let map = IntensityMap::from_luma_image(&bloei_luma8.view());
 
         for (y, x) in [(20, 0), (33, 44), (12, 48)] {
             assert_eq!(

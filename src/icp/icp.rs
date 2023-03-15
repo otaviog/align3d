@@ -5,23 +5,44 @@ use crate::Array1Recycle;
 use nalgebra::{Cholesky, Vector3, Vector6};
 use ndarray::{Array2, Array3, Axis};
 use nshare::ToNalgebra;
-use super::icp_params::ICPParams;
+use super::icp_params::IcpParams;
 
-pub struct ICP<'target_lt> {
-    pub params: ICPParams,
+/// Standard Iterative Closest Point (ICP) algorithm for aligning two point clouds.
+/// This implementation uses the point-to-plane distance.
+pub struct Icp<'target_lt> {
+    // Parameters of the ICP algorithm.
+    pub params: IcpParams,
+    // Initial transformation to start the algorithm. Default is the identity.
+    pub initial_transform: Transform,
     target: &'target_lt PointCloud,
     kdtree: KdTree,
 }
 
-impl<'target_lt> ICP<'target_lt> {
-    pub fn new(params: ICPParams, target: &'target_lt PointCloud) -> Self {
+impl<'target_lt> Icp<'target_lt> {
+    /// Create a new ICP instance.
+    /// 
+    /// # Arguments
+    /// 
+    /// * params - Parameters of the ICP algorithm.
+    /// * target - Target point cloud.
+    pub fn new(params: IcpParams, target: &'target_lt PointCloud) -> Self {
         Self {
             params,
+            initial_transform: Transform::eye(),
             target,
             kdtree: KdTree::new(&target.points.view()),
         }
     }
 
+    /// Aligns the source point cloud to the target point cloud.
+    /// 
+    /// # Arguments
+    /// 
+    /// * source - Source point cloud.
+    /// 
+    /// # Returns
+    /// 
+    /// The transformation that aligns the source point cloud to the target point cloud.
     pub fn align(&self, source: &PointCloud) -> Transform {
         if let None = self.target.normals {
             return Transform::eye();
@@ -111,8 +132,8 @@ mod tests {
     use rstest::*;
 
     use crate::{
-        imagepointcloud::ImagePointCloud,
-        io::{core::RGBDDataset, write_ply},
+        range_image::RangeImage,
+        io::{core::RgbdDataset, write_ply},
         pointcloud::PointCloud,
     };
 
@@ -124,8 +145,8 @@ mod tests {
 
         let (cam1, rgbd_image1) = dataset.get_item(0).unwrap().into_parts();
         let (cam2, rgbd_image2) = dataset.get_item(3).unwrap().into_parts();
-        let mut source = ImagePointCloud::from_rgbd_image(&cam1, &rgbd_image1);
-        let mut target = ImagePointCloud::from_rgbd_image(&cam2, &rgbd_image2);
+        let mut source = RangeImage::from_rgbd_image(&cam1, &rgbd_image1);
+        let mut target = RangeImage::from_rgbd_image(&cam2, &rgbd_image2);
 
         source.compute_normals();
         target.compute_normals();
@@ -133,11 +154,12 @@ mod tests {
         (PointCloud::from(&source), PointCloud::from(&target))
     }
 
+    /// Test the ICP algorithm.
     #[rstest]
     fn test_icp(sample1: (PointCloud, PointCloud)) {
         let (source_pcl, target_pcl) = sample1;
 
-        let transform = ICP::new(ICPParams::default(), &target_pcl).align(&source_pcl);
+        let transform = Icp::new(IcpParams::default(), &target_pcl).align(&source_pcl);
 
         let aligned_source_pcl = &transform * &source_pcl;
         write_ply("tests/data/out-icp1.ply", &aligned_source_pcl.into())
