@@ -21,7 +21,6 @@ pub mod trajectory;
 #[cfg(test)]
 pub mod unit_test;
 
-pub mod image;
 pub mod optim;
 pub mod trig;
 pub mod metrics;

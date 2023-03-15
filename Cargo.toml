@@ -13,16 +13,10 @@ path = "src/lib.rs"
 name = "cli"
 path = "src/bin/main.rs"
 
-# [features]
-# viz = [
-#     "dep:vulkano",
-#     "dep:vulkano-shaders",
-#     "dep:vulkano-win",
-#     "dep:winit",
-#     "dep:bytemuck",
-#     "dep:nalgebra-glm",
-#     "dep:cgmath"
-# ]
+[features]
+with_rerun = [
+    "dep:rerun"
+]
 
 [dependencies]
 ndarray = { version = "0.15.3", features = ["approx", "rayon"] }
@@ -40,13 +34,13 @@ serde = "1.0.117"
 serde_derive = "1.0.117"
 serde_json = "1.0.59"
 ply-rs = "0.1.3"
-vulkano = { version = "0.32.1", optional = false }
-vulkano-shaders = { version = "0.32.0", optional = false }
-vulkano-win = { version = "0.32.0", optional = false }
-winit = { version = "0.27.5", optional = false }
-bytemuck = { version = "1.12.3", optional = false }
-
-# align3d-derive = { version = "0.1.0", path = "align3d-derive" }
+vulkano = "0.32.1"
+vulkano-shaders = "0.32.0"
+vulkano-win = "0.32.0"
+winit = "0.27.5"
+bytemuck = "1.12.3"
+itertools = "0.10.5"
+rerun = {version = "0.2.0", optional = true }
 
 [dev-dependencies]
 rstest = "0.15.0"
@@ -59,7 +53,6 @@ pprof = { version = "0.11", features = ["flamegraph", "criterion"] }
 name = "viz-point_cloud"
 path = "tests/viz/test_point_cloud.rs"
 harness = false
-features = "viz"
 
 [[test]]
 name = "viz-window"
@@ -67,13 +60,14 @@ path = "tests/viz/test_window.rs"
 harness = false
 
 [[test]]
-name = "icp"
+name = "test_icp"
 path = "tests/test_icp.rs"
 harness = false
+features = "with_rerun"
 
 [[test]]
-name = "rgbd_image_icp"
-path = "tests/test_rgbd_image_icp.rs"
+name = "test_image_icp"
+path = "tests/test_image_icp.rs"
 harness = false
 
 [[bench]]
