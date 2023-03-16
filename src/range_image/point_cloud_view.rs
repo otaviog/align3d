@@ -12,15 +12,14 @@ pub struct PointCloudView<'a> {
 }
 
 pub struct PointCloudViewIterator<'a> {
-    iter: Enumerate<
+    iter: Zip<
         Zip<
-            Zip<
-                AxisIter<'a, f32, ndarray::Dim<[usize; 1]>>,
-                AxisIter<'a, f32, ndarray::Dim<[usize; 1]>>,
-            >,
-            AxisIter<'a, u8, ndarray::Dim<[usize; 1]>>,
+            AxisIter<'a, f32, ndarray::Dim<[usize; 1]>>,
+            AxisIter<'a, f32, ndarray::Dim<[usize; 1]>>,
         >,
+        AxisIter<'a, u8, ndarray::Dim<[usize; 1]>>,
     >,
+    linear_index: usize,
 }
 
 impl<'a> PointCloudView<'a> {
@@ -30,8 +29,8 @@ impl<'a> PointCloudView<'a> {
                 .points
                 .axis_iter(Axis(0))
                 .zip(self.normals.axis_iter(Axis(0)))
-                .zip(self.mask.axis_iter(Axis(0)))
-                .enumerate(),
+                .zip(self.mask.axis_iter(Axis(0))),
+            linear_index: 0,
         }
     }
 }
@@ -41,10 +40,12 @@ impl<'a> Iterator for PointCloudViewIterator<'a> {
 
     fn next(&mut self) -> Option<Self::Item> {
         loop {
-            let (i, ((v, n), m)) = self.iter.next()?;
-            if m[0] > 0 {
+            let ((v, n), m) = self.iter.next()?;
+            let linear_index = self.linear_index;
+            self.linear_index += 1;
+            if m[0] > 0 {    
                 return Some((
-                    i,
+                    linear_index,
                     Vector3::new(v[0], v[1], v[2]),
                     Vector3::new(n[0], n[1], n[2]),
                 ));

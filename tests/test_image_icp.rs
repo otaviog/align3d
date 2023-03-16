@@ -40,10 +40,10 @@ fn main() {
 
     let source_pcl = process_frame(dataset.get_item(SOURCE_IDX).unwrap());
 
-    let target_pcl = process_frame(dataset.get_item(TARGET_IDX).unwrap());
+    let mut target_pcl = process_frame(dataset.get_item(TARGET_IDX).unwrap());
 
-    let icp = MultiscaleAlign::new(
-        &target_pcl,
+    let mut icp = MultiscaleAlign::new(
+        &mut target_pcl,
         IcpParams {
             max_iterations: 20,
             weight: 0.5,

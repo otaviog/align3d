@@ -8,7 +8,8 @@ use num::Zero;
 pub struct GaussNewton {
     pub hessian: Matrix6<f32>,
     pub gradient: Vector6<f32>,
-    mean_squared_residual: f32,
+    squared_residual_sum: f32,
+    count: usize,
 }
 
 impl GaussNewton {
@@ -16,12 +17,13 @@ impl GaussNewton {
         Self {
             hessian: Matrix6::zeros(),
             gradient: Vector6::zeros(),
-            mean_squared_residual: 0.0,
+            squared_residual_sum: 0.0,
+            count: 0,
         }
     }
 
     pub fn step(&mut self, residual: f32, jacobian: &[f32]) {
-        self.mean_squared_residual += residual * residual;
+        self.squared_residual_sum += residual * residual;
 
         let jt_r = [[
             jacobian[0] * residual,
@@ -41,6 +43,7 @@ impl GaussNewton {
 
         self.hessian += Matrix6::from_data(nalgebra::ArrayStorage(jt_j));
         self.gradient += Vector6::from_data(nalgebra::ArrayStorage(jt_r));
+        self.count += 1;
     }
 
     pub fn step_batch(
@@ -48,19 +51,14 @@ impl GaussNewton {
         residual_array: &Array1<f32>,
         jacobian_array: &Array2<f32>,
         weight: f32,
-    ) -> f32 {
+    ) {
         let size = residual_array.shape()[0];
 
-        let mut mean_residual = 0.0;
         for (residual, jacobian) in izip!(residual_array.iter(), jacobian_array.axis_iter(Axis(0)))
         {
             let residual = *residual;
-            mean_residual += residual * residual;
-
             self.step(residual, jacobian.as_slice().unwrap());
         }
-
-        return mean_residual / size as f32;
     }
 
     pub fn solve(&self) -> Vector6<f32> {
@@ -69,9 +67,23 @@ impl GaussNewton {
         update
     }
 
+    pub fn combine(&mut self, other: &Self, weight1: f32, weight2: f32) {
+        self.hessian = self.hessian * weight1 + &other.hessian * weight2;
+        self.gradient = self.gradient * weight1 + &other.gradient * weight2;
+        self.squared_residual_sum =
+            self.squared_residual_sum * weight1 + other.squared_residual_sum * weight2;
+        self.count += other.count;
+    }
+
+    pub fn mean_squared_residual(&self) -> f32 {
+        self.squared_residual_sum / self.count as f32
+    }
+
     pub fn reset(&mut self) {
         self.hessian.set_zero();
         self.gradient.set_zero();
+        self.squared_residual_sum = 0.0;
+        self.count = 0;
     }
 }
 

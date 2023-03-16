@@ -1,5 +1,5 @@
-use ndarray::{s, Array2, ArrayView2, ArrayView3};
 use super::color::rgb_to_luma;
+use ndarray::{s, Array2, ArrayView2, ArrayView3};
 
 /// Stores a grayscale image with float and interpolation operations.
 pub struct IntensityMap {
@@ -10,6 +10,7 @@ pub struct IntensityMap {
 // The H is gradient divisor constant.
 const H: f32 = 0.0005;
 const H_INV: f32 = 1.0 / H;
+const BORDER_SIZE: usize = 2;
 
 impl IntensityMap {
     /// Returns the shape of the map (height, width).
@@ -20,8 +21,8 @@ impl IntensityMap {
     /// Creates a map with all zeros.
     pub fn zeros(shape: (usize, usize)) -> Self {
         Self {
-            map: Array2::zeros((shape.0 + 1, shape.1 + 1)), // Adds border
-            shape: shape,
+            map: Array2::zeros((shape.0 + BORDER_SIZE, shape.1 + BORDER_SIZE)),
+            shape,
         }
     }
 
@@ -37,13 +38,10 @@ impl IntensityMap {
             (dim[0], dim[1])
         };
 
-        let (map_grid_height, map_grid_width) = {
-            let dim = self.map.shape();
-            (dim[0], dim[1])
-        };
+        let (map_grid_height, map_grid_width) = self.map.dim();
 
         if in_height >= map_grid_height && in_width >= map_grid_width {
-            self.map = Array2::zeros((in_height + 1, in_width + 1));
+            self.map = Array2::zeros((in_height + BORDER_SIZE, in_width + BORDER_SIZE));
         }
 
         self.shape = (in_height, in_width);

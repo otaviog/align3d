@@ -3,22 +3,22 @@ use crate::{intensity_map::IntensityMap, range_image::RangeImage, transform::Tra
 use itertools::izip;
 
 pub struct MultiscaleAlign<'pyramid_lt> {
-    target_pyramid: &'pyramid_lt Vec<RangeImage>,
+    target_pyramid: &'pyramid_lt mut Vec<RangeImage>,
     params: IcpParams,
 }
 
 impl<'pyramid_lt> MultiscaleAlign<'pyramid_lt> {
-    pub fn new(target_pyramid: &'pyramid_lt Vec<RangeImage>, params: IcpParams) -> Self {
+    pub fn new(target_pyramid: &'pyramid_lt mut Vec<RangeImage>, params: IcpParams) -> Self {
         Self {
             target_pyramid,
             params,
         }
     }
 
-    pub fn align(&self, source_pyramid: &Vec<RangeImage>) -> Transform {
+    pub fn align(&mut self, source_pyramid: &Vec<RangeImage>) -> Transform {
         let mut optim_transform = Transform::eye();
 
-        for (target, source) in izip!(self.target_pyramid.iter(), source_pyramid.iter()).rev() {
+        for (target, source) in izip!(self.target_pyramid.iter_mut(), source_pyramid.iter()).rev() {
             let mut icp = ImageIcp::new(self.params.clone(), target);
             icp.initial_transform = optim_transform;
             optim_transform = icp.align(source);
@@ -53,8 +53,8 @@ mod tests {
             source.compute_normals();
         }
 
-        let align = super::MultiscaleAlign {
-            target_pyramid: &target,
+        let mut align = super::MultiscaleAlign {
+            target_pyramid: &mut target,
             params: crate::icp::icp_params::IcpParams {
                 max_iterations: 5,
                 weight: 0.05,

@@ -3,15 +3,13 @@ use ndarray::{s, Array1, Array2};
 use num::Float;
 
 use crate::{
-    camera::PointSpace, optim::GaussNewton, range_image::RangeImage,
+    camera::PointSpace, intensity_map, optim::GaussNewton, range_image::RangeImage,
     transform::Transform, trig,
 };
 
 use super::icp_params::IcpParams;
 
-pub struct PointPlaneDistance {
-    weight: f32,
-}
+pub struct PointPlaneDistance {}
 
 impl PointPlaneDistance {
     /// Computes the residual and the Jacobian of the point-plane distance.
@@ -49,17 +47,15 @@ impl PointPlaneDistance {
     }
 }
 
-pub struct ColorDistance {
-    pub weight: f32,
-}
+pub struct ColorDistance {}
 
 impl ColorDistance {
     pub fn jacobian(
         &self,
         source_point: Vector3<f32>,
+        target_normal: Vector3<f32>,
         source_color: f32,
         target_color: f32,
-        target_normal: Vector3<f32>,
     ) -> (f32, [f32; 6]) {
         let twist = source_point.cross(&target_normal);
         let jacobian = [
@@ -71,7 +67,7 @@ impl ColorDistance {
             twist[2],
         ];
 
-        let residual = target_color - source_color;
+        let residual = source_color - target_color;
         let residual = residual;
 
         (residual, jacobian)
@@ -80,12 +76,12 @@ impl ColorDistance {
 
 pub struct ImageIcp<'target_lt> {
     pub params: IcpParams,
-    target: &'target_lt RangeImage,
+    target: &'target_lt mut RangeImage,
     pub initial_transform: Transform,
 }
 
 impl<'target_lt> ImageIcp<'target_lt> {
-    pub fn new(params: IcpParams, target: &'target_lt RangeImage) -> Self {
+    pub fn new(params: IcpParams, target: &'target_lt mut RangeImage) -> Self {
         Self {
             params,
             target,
@@ -94,29 +90,24 @@ impl<'target_lt> ImageIcp<'target_lt> {
     }
 
     /// Aligns the source point cloud to the target point cloud.
-    pub fn align(&self, source: &RangeImage) -> Transform {
-        let source_normals = source.normals.as_ref().unwrap();
+    pub fn align(&mut self, source: &RangeImage) -> Transform {
+        let intensity_map = self.target.intensity_map();
+
         let target_normals = self.target.normals.as_ref().unwrap();
         let source_colors = source.intensities.as_ref().unwrap();
 
         let mut optim_transform = Transform::eye();
 
-        let geometric_distance = PointPlaneDistance {
-            weight: 1.0, // self.params.weight,
-        };
-        let color_distance = ColorDistance {
-            weight: 1.0, //self.params.weight * 0.01,
-        };
+        let geometric_distance = PointPlaneDistance {};
+        let color_distance = ColorDistance {};
 
-        let mut optim = GaussNewton::new();
+        let mut geom_optim = GaussNewton::new();
+        let mut color_optim = GaussNewton::new();
         let mut best_residual = Float::infinity();
         let mut best_transform = optim_transform.clone();
         for _ in 0..self.params.max_iterations {
-            let num_points = source.len();
-            let mut residuals = Array1::<f32>::zeros(num_points);
-            let mut jacobians = Array2::<f32>::zeros((num_points, 6));
-            source.point_cloud_view().iter().enumerate().for_each(
-                |(point_index, (_, source_point, source_normal))| {
+            source.point_cloud_view().iter().for_each(
+                |(linear_index, source_point, source_normal)| {
                     let source_point = optim_transform.transform_vector(&source_point);
                     let (x, y) = self
                         .target
@@ -144,21 +135,33 @@ impl<'target_lt> ImageIcp<'target_lt> {
                         let (residual, jacobian) =
                             geometric_distance.jacobian(source_point, target_point, target_normal);
 
-                        residuals[point_index] = residual;
-                        for i in 0..6 {
-                            jacobians[[point_index, i]] = jacobian[i];
-                        }
+                        geom_optim.step(residual, &jacobian);
+
+                        // Color part.
+                        let (target_color, du, dv) = intensity_map.bilinear_grad(x, y);
+                        let ((dfx, dcx), (dfy, dcy)) =
+                            self.target.camera.project_grad(&source_point);
+                        let color_gradient = Vector3::new(du * dfx, dv * dfy, du * dcx + dv * dcy);
+                        let source_color = source_colors[linear_index] as f32 / 255.0;
+                        let (color_residual, color_jacobian) = color_distance.jacobian(
+                            source_point,
+                            color_gradient,
+                            source_color,
+                            target_color,
+                        );
+
+                        color_optim.step(color_residual, &color_jacobian);
                     }
                 },
             );
 
-            let residual = optim.step_batch(&residuals, &jacobians, self.params.weight);
-
+            geom_optim.combine(&color_optim, self.params.weight, 0.25);
+            let residual = geom_optim.mean_squared_residual();
             println!("Residual: {}", residual);
 
-            let update = optim.solve();
+            let update = geom_optim.solve();
             optim_transform = &Transform::se3_exp(&update) * &optim_transform;
-            optim.reset();
+            geom_optim.reset();
             if residual < best_residual {
                 best_residual = residual;
                 best_transform = optim_transform.clone();
@@ -183,7 +186,7 @@ mod tests {
 
     #[rstest]
     fn test_align(sample_range_img_ds2: TestRangeImageDataset) {
-        let rimage0 = sample_range_img_ds2.get_item(0).unwrap();
+        let mut rimage0 = sample_range_img_ds2.get_item(0).unwrap();
         let rimage1 = sample_range_img_ds2.get_item(5).unwrap();
 
         let result = ImageIcp::new(
@@ -191,14 +194,14 @@ mod tests {
                 max_iterations: 10,
                 weight: 0.05,
             },
-            &rimage0,
+            &mut rimage0,
         )
         .align(&rimage1);
         println!("Result: {:?}", result);
 
         let inv_expected = Transform::new(
-            &Vector3::new(0.0101086255, 0.0012701201, 0.005253905),
-            Quaternion::new(0.0058144825, 0.0009396147, 0.9999828, 0.00034628328),
+            &Vector3::new(0.00022050377, 7.3633055e-5, -1.51071e-5),
+            Quaternion::new(2.059626e-5, 0.00888227, 0.0008264509, 0.99996024),
         )
         .inverse();
         assert_eq!(transform_difference(&result, &inv_expected), 0.0);
