@@ -61,6 +61,7 @@ impl Downsampleble<RgbdImage> for RgbdImage {
                 (height as f64 * scale) as u32,
                 FilterType::Nearest,
             );
+            
             resized_image.into_ndarray2()
         };
 

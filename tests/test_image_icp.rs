@@ -2,12 +2,9 @@ use std::{cell::RefCell, rc::Rc};
 
 use align3d::{
     bilateral::BilateralFilter,
-    icp::{multiscale::MultiscaleAlign, IcpParams},
-    io::{
-        core::RgbdDataset,
-        rgbd_image::{RgbdFrame},
-        slamtb::SlamTbDataset,
-    },
+    icp::{multiscale::MultiscaleAlign, IcpParams, MsIcpParams},
+    io::{core::RgbdDataset, rgbd_image::RgbdFrame, slamtb::SlamTbDataset},
+    metrics::TransformMetrics,
     pointcloud::PointCloud,
     range_image::RangeImage,
     viz::{geometry::VkPointCloudNode, node::Node, scene::Scene, Manager, Window},
@@ -33,7 +30,7 @@ fn process_frame(mut frame: RgbdFrame) -> Vec<RangeImage> {
 }
 
 fn main() {
-    let dataset = SlamTbDataset::load("tests/data/rgbd/sample2").unwrap();
+    let dataset = SlamTbDataset::load("tests/data/rgbd/sample1").unwrap();
     let trajectory = dataset.trajectory().unwrap();
     const SOURCE_IDX: usize = 0;
     const TARGET_IDX: usize = 6;
@@ -42,26 +39,29 @@ fn main() {
 
     let mut target_pcl = process_frame(dataset.get_item(TARGET_IDX).unwrap());
 
-    let mut icp = MultiscaleAlign::new(
-        &mut target_pcl,
-        IcpParams {
-            max_iterations: 20,
-            weight: 0.5,
-        },
-    );
+    let params = MsIcpParams::repeat(3, &IcpParams::default()).customize(|level, mut params| {
+        match level {
+            0 => params.max_iterations = 10, // 0 is the last level run
+            1 => params.max_iterations = 20,
+            2 => params.max_iterations = 30,
+            _ => {}
+        };
+    });
+
+    let mut icp = MultiscaleAlign::new(&mut target_pcl, params).unwrap();
 
     let result = icp.align(&source_pcl);
 
     let mut manager = Manager::default();
     let source_node = VkPointCloudNode::load(&manager, &PointCloud::from(&source_pcl[0]));
     let source_t_node = source_node.borrow().new_node();
-    let gt_mat: Matrix4<f32> = Matrix4::from(
-        &trajectory
-            .get_relative_transform(TARGET_IDX as f32, SOURCE_IDX as f32)
-            .unwrap(),
-    );
 
-    println!("GT: {}", gt_mat);
+    let gt_transform = trajectory
+        .get_relative_transform(TARGET_IDX as f32, SOURCE_IDX as f32)
+        .unwrap();
+
+    let metrics = TransformMetrics::new(&gt_transform, &result);
+    println!("Metrics: {:?}", metrics);
     source_t_node.borrow_mut().properties.transformation = Matrix4::from(&result);
 
     let target_node = VkPointCloudNode::load(&manager, &PointCloud::from(&target_pcl[0]));

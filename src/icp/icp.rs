@@ -1,11 +1,14 @@
-use crate::kdtree::KdTree;
+use super::cost_function::PointPlaneDistance;
+use super::icp_params::IcpParams;
 use crate::pointcloud::PointCloud;
 use crate::transform::Transform;
-use crate::Array1Recycle;
-use nalgebra::{Cholesky, Vector3, Vector6};
-use ndarray::{Array2, Array3, Axis};
+use crate::trig;
+use crate::{kdtree::KdTree, optim::GaussNewton};
+use itertools::izip;
+use nalgebra::Vector3;
+use ndarray::Axis;
 use nshare::ToNalgebra;
-use super::icp_params::IcpParams;
+use num::Float;
 
 /// Standard Iterative Closest Point (ICP) algorithm for aligning two point clouds.
 /// This implementation uses the point-to-plane distance.
@@ -20,9 +23,9 @@ pub struct Icp<'target_lt> {
 
 impl<'target_lt> Icp<'target_lt> {
     /// Create a new ICP instance.
-    /// 
+    ///
     /// # Arguments
-    /// 
+    ///
     /// * params - Parameters of the ICP algorithm.
     /// * target - Target point cloud.
     pub fn new(params: IcpParams, target: &'target_lt PointCloud) -> Self {
@@ -35,94 +38,89 @@ impl<'target_lt> Icp<'target_lt> {
     }
 
     /// Aligns the source point cloud to the target point cloud.
-    /// 
+    ///
     /// # Arguments
-    /// 
+    ///
     /// * source - Source point cloud.
-    /// 
+    ///
     /// # Returns
-    /// 
+    ///
     /// The transformation that aligns the source point cloud to the target point cloud.
     pub fn align(&self, source: &PointCloud) -> Transform {
         if let None = self.target.normals {
             return Transform::eye();
         }
 
-        let target_normals = self.target.normals.as_ref().unwrap();
         let mut optim_transform = Transform::eye();
+        let mut optim = GaussNewton::new();
+        let geom_cost = PointPlaneDistance {};
 
-        let mut jt_j_array = Array3::<f32>::zeros((self.target.len(), 6, 6));
-        let mut jt_r_array = Array2::<f32>::zeros((self.target.len(), 6));
-
+        let mut best_residual = Float::infinity();
+        let mut best_transform = optim_transform.clone();
         for _ in 0..self.params.max_iterations {
-            let current_source_points = &optim_transform * &source.points;
-            let nearest = self
-                .kdtree
-                .nearest::<3>(&current_source_points.view(), Array1Recycle::Empty);
+            for (source_point, source_normal) in izip!(
+                source.points.axis_iter(Axis(0)),
+                source.normals.as_ref().unwrap().axis_iter(Axis(0))
+            ) {
+                let source_point = optim_transform.transform_vector(&Vector3::new(
+                    source_point[0],
+                    source_point[1],
+                    source_point[2],
+                ));
+                let source_normal = optim_transform.transform_normal(&Vector3::new(
+                    source_normal[0],
+                    source_normal[1],
+                    source_normal[2],
+                ));
 
-            current_source_points
-                .axis_iter(Axis(0))
-                .enumerate()
-                .for_each(|(idx, source_point)| {
-                    let source_point =
-                        Vector3::new(source_point[0], source_point[1], source_point[2]);
-                    let (target_point, target_normal) = {
-                        let row_point = self.target.points.row(idx);
-                        let row_normal = target_normals.row(idx);
+                let (found_index, found_distance) = self.kdtree.nearest3d(&source_point);
 
-                        (
-                            Vector3::new(row_point[0], row_point[1], row_point[2]),
-                            Vector3::new(row_normal[0], row_normal[1], row_normal[2]),
-                        )
-                    };
+                if found_distance > self.params.max_distance * self.params.max_distance {
+                    // continue;
+                }
 
-                    let twist = source_point.cross(&target_normal);
-                    let jacobian = [
-                        target_normal[0],
-                        target_normal[1],
-                        target_normal[2],
-                        twist[0],
-                        twist[1],
-                        twist[2],
-                    ];
+                let target_normal = self
+                    .target
+                    .normals
+                    .as_ref()
+                    .unwrap()
+                    .row(found_index)
+                    .into_nalgebra()
+                    .fixed_slice::<3, 1>(0, 0)
+                    .into_owned();
+                if trig::angle_between_normals(&source_normal, &target_normal)
+                    > self.params.max_normal_angle
+                {
+                    continue;
+                }
 
-                    let residual = (target_point - source_point).dot(&target_normal);
-                    let nearest_idx = nearest[idx];
-                    let mut jt_r_row = jt_r_array.row_mut(nearest_idx);
+                let target_point = self
+                    .target
+                    .points
+                    .row(found_index)
+                    .into_nalgebra()
+                    .fixed_slice::<3, 1>(0, 0)
+                    .into_owned();
 
-                    let residual = residual * self.params.weight;
-                    for i in 0..6 {
-                        jt_r_row[i] = jacobian[i] * residual;
-                    }
+                let (residual, jacobian) =
+                    geom_cost.jacobian(&source_point, &target_point, &target_normal);
 
-                    for i in 0..6 {
-                        for j in 0..6 {
-                            jt_j_array[[nearest_idx, i, j]] =
-                                jacobian[i] * self.params.weight * jacobian[j];
-                        }
-                    }
-                });
+                optim.step(residual, &jacobian);
+            }
 
-            let jt_j = jt_j_array
-                .sum_axis(Axis(0))
-                .into_nalgebra()
-                .fixed_slice::<6, 6>(0, 0)
-                .into_owned();
-            let jt_r = jt_r_array.sum_axis(Axis(0));
+            let residual = optim.mean_squared_residual();
+            println!("Residual: {}", residual);
 
-            let update = Cholesky::new(jt_j).unwrap().solve(&jt_r.into_nalgebra());
-            let update = Vector6::new(
-                update[0], update[1], update[2], update[3], update[4], update[5],
-            );
-
+            let update = optim.solve();
             optim_transform = &Transform::se3_exp(&update) * &optim_transform;
-
-            // Resets the Jacobians for the next iteration.
-            jt_r_array.fill(0.0);
-            jt_j_array.fill(0.0);
+            optim.reset();
+            if residual < best_residual {
+                best_residual = residual;
+                best_transform = optim_transform.clone();
+            }
         }
 
-        optim_transform
+        best_transform
     }
 }
 
@@ -132,9 +130,9 @@ mod tests {
     use rstest::*;
 
     use crate::{
-        range_image::RangeImage,
         io::{core::RgbdDataset, write_ply},
         pointcloud::PointCloud,
+        range_image::RangeImage,
     };
 
     #[fixture]
@@ -159,12 +157,12 @@ mod tests {
     fn test_icp(sample1: (PointCloud, PointCloud)) {
         let (source_pcl, target_pcl) = sample1;
 
-        let transform = Icp::new(IcpParams::default(), &target_pcl).align(&source_pcl);
+        let mut params = IcpParams::default();
+        params.weight = 0.25;
+        let transform = Icp::new(params, &target_pcl).align(&source_pcl);
 
         let aligned_source_pcl = &transform * &source_pcl;
         write_ply("tests/data/out-icp1.ply", &aligned_source_pcl.into())
             .expect("Unable to write result");
     }
 }
-
-

@@ -46,14 +46,7 @@ impl GaussNewton {
         self.count += 1;
     }
 
-    pub fn step_batch(
-        &mut self,
-        residual_array: &Array1<f32>,
-        jacobian_array: &Array2<f32>,
-        weight: f32,
-    ) {
-        let size = residual_array.shape()[0];
-
+    pub fn step_batch(&mut self, residual_array: &Array1<f32>, jacobian_array: &Array2<f32>) {
         for (residual, jacobian) in izip!(residual_array.iter(), jacobian_array.axis_iter(Axis(0)))
         {
             let residual = *residual;
@@ -68,7 +61,7 @@ impl GaussNewton {
     }
 
     pub fn combine(&mut self, other: &Self, weight1: f32, weight2: f32) {
-        self.hessian = self.hessian * weight1 + &other.hessian * weight2;
+        self.hessian = self.hessian * (weight1 * weight1) + &other.hessian * (weight2 * weight2);
         self.gradient = self.gradient * weight1 + &other.gradient * weight2;
         self.squared_residual_sum =
             self.squared_residual_sum * weight1 + other.squared_residual_sum * weight2;
@@ -105,7 +98,7 @@ mod tests {
             [1.0, 2.0, 3.0, 4.0, 5.0, 6.0],
         ];
 
-        gn.step_batch(&residual_array, &jacobian_array, 1.0);
+        gn.step_batch(&residual_array, &jacobian_array);
 
         let hessian = gn.hessian.clone();
         let gradient = gn.gradient.clone();

@@ -8,7 +8,7 @@ pub struct IntensityMap {
 }
 
 // The H is gradient divisor constant.
-const H: f32 = 0.0005;
+const H: f32 = 0.005;
 const H_INV: f32 = 1.0 / H;
 const BORDER_SIZE: usize = 2;
 
@@ -138,9 +138,36 @@ impl IntensityMap {
     ///
     /// Bilinear interpolated value.
     pub fn bilinear(&self, u: f32, v: f32) -> f32 {
-        // Hope that rustc knows how to optimize this.
-        // Not in the mood to do another one
-        self.bilinear_grad(u, v).0
+        let ui = u as usize;
+        let vi = v as usize;
+
+        let u_frac = u - ui as f32;
+        let v_frac = v - vi as f32;
+
+        let (val00, val10, val01, val11) = {
+            (
+                self.map[(vi, ui)],
+                self.map[(vi, ui + 1)],
+                self.map[[vi + 1, ui]],
+                self.map[(vi + 1, ui + 1)],
+            )
+        };
+
+        let u0_interp = val00 * (1.0 - u_frac) + val10 * u_frac;
+        let u1_interp = val01 * (1.0 - u_frac) + val11 * u_frac;
+        u0_interp * (1.0 - v_frac) + u1_interp * v_frac
+    }
+
+    pub fn bilinear_grad(&self, u: f32, v: f32) -> (f32, f32, f32) {
+        let value = self.bilinear(u, v);
+        let uh = self.bilinear(u + H, v);
+        let vh = self.bilinear(u, v + H);
+        
+        (
+            value,
+            (uh - value) / H,
+            (vh - value) / H,
+        )
     }
 
     /// Returns the intensity value with bilinear interpolation if
@@ -156,7 +183,7 @@ impl IntensityMap {
     /// * Bilinear interpolated value.
     /// * `u`'s gradient.
     /// * `v`'s gradient.
-    pub fn bilinear_grad(&self, u: f32, v: f32) -> (f32, f32, f32) {
+    pub fn bilinear_grad2(&self, u: f32, v: f32) -> (f32, f32, f32) {
         let ui = u as usize;
         let vi = v as usize;
 
@@ -236,14 +263,14 @@ mod tests {
     fn border_should_repeat(bloei_luma8: Array2<u8>) {
         let map = IntensityMap::from_luma_image(&bloei_luma8.view());
         let width = bloei_luma8.shape()[1];
-        let _height = bloei_luma8.shape()[0];
+        let height = bloei_luma8.shape()[0];
         assert_eq!(
-            map.bilinear(0.0, (width - 1) as f32),
-            bloei_luma8[(width - 1, 0)] as f32 / 255.0
+            map.bilinear(0.0, (height - 1) as f32 + 0.25),
+            bloei_luma8[(height - 1, 0)] as f32 / 255.0
         );
         assert_eq!(
-            map.bilinear(0.0, (width - 1) as f32 + 0.1),
-            bloei_luma8[(width - 1, 0)] as f32 / 255.0
+            map.bilinear((width - 1) as f32 + 0.25, 0.0),
+            bloei_luma8[(0, width - 1)] as f32 / 255.0
         );
     }
 
@@ -255,6 +282,18 @@ mod tests {
             assert_eq!(
                 map.bilinear(x as f32, y as f32),
                 bloei_luma8[(y, x)] as f32 / 255.0
+            );
+        }
+    }
+
+    #[rstest]
+    fn bilinear_interp(bloei_luma8: Array2<u8>) {
+        let map = IntensityMap::from_luma_image(&bloei_luma8.view());
+
+        for (y, x) in [(20.25, 0.25), (33.75, 44.25), (12.5, 48.75)] {
+            assert_eq!(
+                map.bilinear(x, y),
+                bloei_luma8[(y as usize, x as usize)] as f32 / 255.0
             );
         }
     }

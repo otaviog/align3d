@@ -1,25 +1,64 @@
-use super::{IcpParams, ImageIcp};
-use crate::{intensity_map::IntensityMap, range_image::RangeImage, transform::Transform};
+use super::{ImageIcp, MsIcpParams};
+use crate::{error::Error, range_image::RangeImage, transform::Transform};
 use itertools::izip;
 
+/// Multiscale interface for ICP algorithms.
+/// TODO: Make it generic for point cloud ICP.
 pub struct MultiscaleAlign<'pyramid_lt> {
     target_pyramid: &'pyramid_lt mut Vec<RangeImage>,
-    params: IcpParams,
+    params: MsIcpParams,
 }
 
 impl<'pyramid_lt> MultiscaleAlign<'pyramid_lt> {
-    pub fn new(target_pyramid: &'pyramid_lt mut Vec<RangeImage>, params: IcpParams) -> Self {
-        Self {
+    /// Creates a new multiscale ICP instance.
+    /// The number of levels in the target pyramid and the number of ICP parameters must be equal.
+    ///
+    /// # Arguments
+    ///
+    /// * target_pyramid: The target point cloud pyramid.
+    /// * params: The ICP parameters for each pyramid level.
+    ///
+    /// # Returns
+    ///
+    /// * Ok(MultiscaleAlign)
+    /// * Err(Error(InvalidParameter)) if the number of levels in the target pyramid and the number 
+    ///   of ICP parameters are equal.
+    pub fn new(
+        target_pyramid: &'pyramid_lt mut Vec<RangeImage>,
+        params: MsIcpParams,
+    ) -> Result<Self, Error> {
+        if params.len() != target_pyramid.len() {
+            return Err(Error::invalid_parameter(
+                "The number of range images pyramid levels and ICP parameters must be equal.",
+            ));
+        }
+
+        Ok(Self {
             target_pyramid,
             params,
-        }
+        })
     }
 
+    /// Aligns the source point cloud to the target point cloud.
+    /// 
+    /// # Arguments
+    /// 
+    /// * source_pyramid: The source point cloud pyramid.
+    /// 
+    /// # Returns
+    /// 
+    /// * The optimized transform.
     pub fn align(&mut self, source_pyramid: &Vec<RangeImage>) -> Transform {
         let mut optim_transform = Transform::eye();
 
-        for (target, source) in izip!(self.target_pyramid.iter_mut(), source_pyramid.iter()).rev() {
-            let mut icp = ImageIcp::new(self.params.clone(), target);
+        for (params, mut target, source) in izip!(
+            self.params.iter(),
+            self.target_pyramid.iter_mut(),
+            source_pyramid.iter()
+        )
+        .rev()
+        {
+            let mut icp = ImageIcp::new(params.clone(), &mut target);
             icp.initial_transform = optim_transform;
             optim_transform = icp.align(source);
         }
@@ -34,6 +73,7 @@ mod tests {
     use rstest::rstest;
 
     use crate::{
+        icp::{IcpParams, MsIcpParams},
         range_image::RangeImage,
         unit_test::{sample_rgbd_frame_dataset1, TestRgbdFrameDataset},
     };
@@ -55,10 +95,7 @@ mod tests {
 
         let mut align = super::MultiscaleAlign {
             target_pyramid: &mut target,
-            params: crate::icp::icp_params::IcpParams {
-                max_iterations: 5,
-                weight: 0.05,
-            },
+            params: MsIcpParams::repeat(3, &IcpParams::default()),
         };
 
         let _ = align.align(&source);

@@ -1,7 +1,7 @@
 use nalgebra::Vector3;
 use ndarray::iter::AxisIter;
 use ndarray::{ArrayView2, Axis};
-use std::iter::{Enumerate, Zip};
+use std::iter::Zip;
 
 use super::RangeImage;
 
@@ -43,7 +43,7 @@ impl<'a> Iterator for PointCloudViewIterator<'a> {
             let ((v, n), m) = self.iter.next()?;
             let linear_index = self.linear_index;
             self.linear_index += 1;
-            if m[0] > 0 {    
+            if m[0] > 0 {
                 return Some((
                     linear_index,
                     Vector3::new(v[0], v[1], v[2]),
