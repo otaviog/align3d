@@ -10,6 +10,7 @@ use super::BilateralGrid;
 /// Bilateral filter using Bilateral Grid.
 ///
 /// Based on the code in https://gist.github.com/ginrou/02e945562607fad170a1.
+#[derive(Debug, Clone)]
 pub struct BilateralFilter<I> {
     _phantom: PhantomData<I>,
     /// The space (XY) down sample factor.

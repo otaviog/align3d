@@ -2,23 +2,22 @@ use align3d::{
     icp::{Icp, IcpParams},
     io::{core::RgbdDataset, slamtb::SlamTbDataset},
     pointcloud::PointCloud,
-    range_image::RangeImage,
+    range_image::RangeImage, viz::GeoViewer,
 };
 
-use rerun::Session;
 
 pub fn main() -> Result<(), Box<dyn std::error::Error>> {
     let dataset = SlamTbDataset::load("tests/data/rgbd/sample1").unwrap();
     let frame = dataset.get_item(0).unwrap();
 
-    let pcl0: PointCloud = {
+    let target_pcl: PointCloud = {
         let mut pcl = RangeImage::from_rgbd_frame(&frame);
         pcl.compute_normals();
         PointCloud::from(&pcl)
     };
 
     let frame = dataset.get_item(5).unwrap();
-    let pcl1: PointCloud = {
+    let source_pcl: PointCloud = {
         let mut pcl = RangeImage::from_rgbd_frame(&frame);
         pcl.compute_normals();
         PointCloud::from(&pcl)
@@ -28,19 +27,17 @@ pub fn main() -> Result<(), Box<dyn std::error::Error>> {
         IcpParams {
             max_iterations: 10,
             weight: 0.01,
+            ..Default::default()
         },
-        &pcl0,
+        &target_pcl,
     );
-    let result = icp.align(&pcl1);
+    let result = icp.align(&source_pcl);
 
-    let mut session = Session::new();
-    pcl0.rerun_msg("pcl0")?.send(&mut session)?;
-    pcl1.rerun_msg("pcl1")?.send(&mut session)?;
-    (&result * &pcl1)
-        .rerun_msg("pcl1_transformed")?
-        .send(&mut session)?;
-
-    session.show()?;
+    let mut viewer = GeoViewer::new();
+    viewer.add_point_cloud(&target_pcl);
+    viewer.add_point_cloud(&source_pcl);
+    viewer.add_point_cloud(&(&result * &source_pcl));
+    viewer.run();
 
     Ok(())
 }

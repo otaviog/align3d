@@ -27,9 +27,9 @@ impl Trajectory {
         self.camera_to_world.is_empty()
     }
 
-    pub fn get_relative_transform(&self, time_src: f32, time_dst: f32) -> Option<Transform> {
-        let (i_src, i_dst) = self.get_indices(time_src, time_dst)?;
-        Some(&self.camera_to_world[i_src].inverse() * &self.camera_to_world[i_dst])
+    pub fn get_relative_transform(&self, from_time: f32, to_time: f32) -> Option<Transform> {
+        let (i_src, i_dst) = self.get_indices(from_time, to_time)?;
+        Some(&self.camera_to_world[i_dst].inverse() * &self.camera_to_world[i_src])
     }
 
     pub fn get_indices(&self, time_src: f32, time_dst: f32) -> Option<(usize, usize)> {

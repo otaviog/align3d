@@ -24,3 +24,5 @@ pub mod unit_test;
 pub mod optim;
 pub mod trig;
 pub mod metrics;
+
+pub mod depth_processing;

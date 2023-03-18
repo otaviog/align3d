@@ -1,8 +1,10 @@
-use image::{imageops::FilterType, ImageBuffer, Luma, Rgb};
+use image::{imageops::FilterType, ImageBuffer, Rgb};
 use ndarray::{Array2, Array3};
-use nshare::{ToNdarray2, ToNdarray3};
+use nshare::ToNdarray3;
 
-use crate::{camera::Camera, sampling::Downsampleble};
+use crate::{
+    camera::Camera, depth_processing::resize_depth, sampling::Downsampleble, Array2Recycle,
+};
 
 pub struct RgbdImage {
     pub color: Array3<u8>,
@@ -39,31 +41,31 @@ impl RgbdImage {
 impl Downsampleble<RgbdImage> for RgbdImage {
     fn downsample(&self, scale: f64) -> RgbdImage {
         let (height, width) = (self.height() as u32, self.width() as u32);
+        let (scaled_height, scaled_width) = (
+            (height as f64 * scale) as usize,
+            (width as f64 * scale) as usize,
+        );
         let resized_color = {
             let raw = self.color.as_slice().unwrap();
             let color_buffer = ImageBuffer::<Rgb<u8>, &[u8]>::from_raw(width, height, raw).unwrap();
             let resized_image = image::imageops::resize(
                 &color_buffer,
-                (width as f64 * scale) as u32,
-                (height as f64 * scale) as u32,
+                scaled_width as u32,
+                scaled_height as u32,
                 FilterType::Gaussian,
             );
-            resized_image.into_ndarray3().as_standard_layout().into_owned()
+            resized_image
+                .into_ndarray3()
+                .as_standard_layout()
+                .into_owned()
         };
 
-        let resized_depth = {
-            let raw = self.depth.as_slice().unwrap();
-            let image_buffer =
-                ImageBuffer::<Luma<u16>, &[u16]>::from_raw(width, height, raw).unwrap();
-            let resized_image = image::imageops::resize(
-                &image_buffer,
-                (width as f64 * scale) as u32,
-                (height as f64 * scale) as u32,
-                FilterType::Nearest,
-            );
-            
-            resized_image.into_ndarray2()
-        };
+        let resized_depth = resize_depth(
+            &self.depth.view(),
+            scaled_height,
+            scaled_width,
+            Array2Recycle::Empty,
+        );
 
         RgbdImage {
             color: resized_color,
@@ -106,9 +108,7 @@ impl RgbdFrame {
 mod tests {
     use rstest::rstest;
 
-    use crate::{
-        io::core::RgbdDataset, sampling::Downsampleble, unit_test::sample_rgbd_dataset1,
-    };
+    use crate::{io::core::RgbdDataset, sampling::Downsampleble, unit_test::sample_rgbd_dataset1};
 
     #[rstest]
     fn test_downsample(sample_rgbd_dataset1: impl RgbdDataset) {

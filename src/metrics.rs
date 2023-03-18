@@ -27,9 +27,20 @@ impl TransformMetrics {
     }
 }
 
+impl std::fmt::Display for TransformMetrics {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "angle: {:.2}°, translation: {:.5}",
+            self.angle.to_degrees(),
+            self.translation
+        )
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use nalgebra::{Vector3, Quaternion};
+    use nalgebra::{Quaternion, Vector3};
 
     use super::*;
 
