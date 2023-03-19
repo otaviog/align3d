@@ -61,6 +61,7 @@ impl<'pyramid_lt> MultiscaleAlign<'pyramid_lt> {
             let mut icp = ImageIcp::new(params.clone(), &mut target);
             icp.initial_transform = optim_transform;
             optim_transform = icp.align(source);
+            optim_transform.scale_translation(2.0);
         }
 
         optim_transform

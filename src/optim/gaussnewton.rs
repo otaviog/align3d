@@ -6,10 +6,47 @@ use num::Zero;
 
 /// Implements the standard Gauss Newton optimization
 pub struct GaussNewton {
-    pub hessian: Matrix6<f32>,
-    pub gradient: Vector6<f32>,
+    hessian: Matrix6<f32>,
+    gradient: Vector6<f32>,
     squared_residual_sum: f32,
     count: usize,
+}
+
+pub struct GaussNewtonBatch {
+    jacobians: Array2<f32>,
+    residuals: Array1<f32>,
+    costs: Array1<f32>,
+    dirty: Array1<bool>,
+}
+
+impl GaussNewtonBatch {
+    pub fn new(max_entries: usize) -> Self {
+        Self {
+            jacobians: Array2::zeros((max_entries, 6)),
+            residuals: Array1::zeros(max_entries),
+            costs: Array1::zeros(max_entries),
+            dirty: Array1::from_elem(max_entries, true),
+        }
+    }
+
+    pub fn assign(&mut self, i: usize, cost: f32, residual: f32, jacobian: &[f32]) {
+        if !self.dirty[i] {
+            if self.costs[i] < cost {
+                return ;
+            }
+        }
+        
+        self.jacobians
+            .row_mut(i)
+            .assign(&Array1::from_vec(jacobian.to_vec()));
+        self.residuals[i] = residual;
+        self.dirty[i] = false;
+        self.costs[i] = cost;
+    }
+
+    pub fn reset(&mut self) {
+        self.dirty.fill(true);
+    }
 }
 
 impl GaussNewton {
@@ -46,7 +83,7 @@ impl GaussNewton {
         self.count += 1;
     }
 
-    pub fn step_batch(&mut self, residual_array: &Array1<f32>, jacobian_array: &Array2<f32>) {
+    pub fn step_array(&mut self, residual_array: &Array1<f32>, jacobian_array: &Array2<f32>) {
         for (residual, jacobian) in izip!(residual_array.iter(), jacobian_array.axis_iter(Axis(0)))
         {
             let residual = *residual;
@@ -54,8 +91,22 @@ impl GaussNewton {
         }
     }
 
+    pub fn step_batch(&mut self, batch: &GaussNewtonBatch) {
+        for (dirty, residual, jacobian) in izip!(
+            batch.dirty.iter(),
+            batch.residuals.iter(),
+            batch.jacobians.axis_iter(Axis(0))
+        ) {
+            if !*dirty {
+                let residual = *residual;
+                self.step(residual, jacobian.as_slice().unwrap());
+            }
+        }
+    }
+
     pub fn solve(&self) -> Vector6<f32> {
-        let v = Cholesky::new(self.hessian).unwrap().solve(&self.gradient);
+        let v = Cholesky::new(self.hessian)
+            .unwrap().solve(&self.gradient);
         let update = Vector6::<f32>::new(v[0], v[1], v[2], v[3], v[4], v[5]);
         update
     }
@@ -104,7 +155,7 @@ mod tests {
             [1.0, 2.0, 3.0, 4.0, 5.0, 6.0],
         ];
 
-        gn.step_batch(&residual_array, &jacobian_array);
+        gn.step_array(&residual_array, &jacobian_array);
 
         let hessian = gn.hessian.clone();
         let gradient = gn.gradient.clone();

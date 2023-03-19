@@ -184,6 +184,10 @@ impl Transform {
     pub fn translation(&self) -> Vector3<f32> {
         self.0.translation.vector
     }
+
+    pub fn scale_translation(&mut self, scale: f32) {
+        self.0.translation.vector *= scale;
+    }
 }
 
 impl ops::Mul<&ndarray::Array2<f32>> for &Transform {
