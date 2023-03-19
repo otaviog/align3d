@@ -13,13 +13,13 @@ pub struct IcpParams {
     pub max_point_to_plane_distance: f32,
     /// Maximum distance between two points to be considered as the same.
     pub max_distance: f32,
-    /// Maximum angle between two normals to be considered as the same.
+    /// Maximum angle between two normals to be considered as the same in radians.
     pub max_normal_angle: f32,
 }
 
 impl Default for IcpParams {
     /// Default ICP parameters. Its values are:
-    /// 
+    ///
     /// ```rust
     /// # use align3d::icp::IcpParams;
     /// let params = IcpParams::default();

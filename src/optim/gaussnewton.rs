@@ -68,6 +68,12 @@ impl GaussNewton {
         self.count += other.count;
     }
 
+    pub fn weight(&mut self, weight: f32) {
+        self.hessian = self.hessian * (weight * weight);
+        self.gradient = self.gradient * weight;
+        self.squared_residual_sum = self.squared_residual_sum * weight;
+    }
+
     pub fn mean_squared_residual(&self) -> f32 {
         self.squared_residual_sum / self.count as f32
     }

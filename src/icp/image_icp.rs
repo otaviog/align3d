@@ -37,6 +37,7 @@ impl<'target_lt> ImageIcp<'target_lt> {
 
         let geometric_distance = PointPlaneDistance {};
         let color_distance = ColorDistance {};
+        let max_distance_sqr = self.params.max_distance * self.params.max_distance;
 
         let mut geom_optim = GaussNewton::new();
         let mut color_optim = GaussNewton::new();
@@ -54,7 +55,7 @@ impl<'target_lt> ImageIcp<'target_lt> {
                     let (xu, yu) = ((x + 0.5) as usize, (y + 0.5) as usize);
 
                     if let Some(target_point) = self.target.get_point(yu, xu) {
-                        if (target_point - source_point).norm_squared() > 0.5 {
+                        if (target_point - source_point).norm_squared() > max_distance_sqr {
                             return; // exit closure
                         }
                         let src_normal = optim_transform.transform_normal(&source_normal);
@@ -83,7 +84,8 @@ impl<'target_lt> ImageIcp<'target_lt> {
 
                         let ((dfx, dcx), (dfy, dcy)) =
                             self.target.camera.project_grad(&source_point);
-                        let color_gradient = Vector3::new(du * dfx, dv * dfy, du * dcx + dv * dcy);
+                        let color_gradient =
+                            Vector3::new(du * dfx, dv * dfy, du * dcx + dv * dcy);
 
                         let (color_residual, color_jacobian) = color_distance.jacobian(
                             &source_point,
@@ -91,7 +93,10 @@ impl<'target_lt> ImageIcp<'target_lt> {
                             source_color,
                             target_color,
                         );
-                        if color_residual * color_residual < 2.75 {
+                        // 2.75*2.75
+                        let max_color_residual = 7.5625 / 255.0;
+                        if color_residual * color_residual < max_color_residual * max_color_residual
+                        {
                             color_optim.step(color_residual, &color_jacobian);
                         }
                     }

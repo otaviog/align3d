@@ -8,7 +8,7 @@ pub struct RangeImageBuilder {
     with_normals: bool,
     with_luma: bool,
     bilateral_filter: Option<BilateralFilter<u16>>,
-    bilateral_data: Array2Recycle<u16>,
+    // bilateral_data: Array2Recycle<u16>,
     pyramid_levels: usize,
 }
 
@@ -19,7 +19,7 @@ impl Default for RangeImageBuilder {
             with_normals: false,
             with_luma: false,
             bilateral_filter: None,
-            bilateral_data: Array2Recycle::Empty,
+            // bilateral_data: Array2Recycle::Empty,
             pyramid_levels: 3,
         }
     }

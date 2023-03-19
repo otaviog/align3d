@@ -66,12 +66,12 @@ impl KdTree {
     ///
     /// # Arguments
     ///
-    /// * query - The query point.
+    /// * point - The query point.
     ///
     /// # Returns
     ///
     /// A tuple containing the index of the nearest neighbor and the distance to it.
-    pub fn nearest3d(&self, query: &Vector3<f32>) -> (usize, f32) {
+    pub fn nearest3d(&self, point: &Vector3<f32>) -> (usize, f32) {
         let mut curr_node = &self.root;
         let mut depth = 0;
 
@@ -82,7 +82,7 @@ impl KdTree {
                     left,
                     right,
                 } => {
-                    curr_node = if query[depth] < *mid { left } else { right };
+                    curr_node = if point[depth] < *mid { left } else { right };
                     depth = min(depth + 1, 2);
                 }
                 KdNode::Leaf {
@@ -91,9 +91,9 @@ impl KdTree {
                 } => {
                     let mut min_dist = f32::MAX;
                     let mut min_idx = 0;
-                    for (idx, point) in leaf_points.rows().into_iter().enumerate() {
-                        let point = Vector3::new(point[0], point[1], point[2]);
-                        let dist = (query - point).norm_squared();
+                    for (idx, leaf_point) in leaf_points.rows().into_iter().enumerate() {
+                        let leaf_point = Vector3::new(leaf_point[0], leaf_point[1], leaf_point[2]);
+                        let dist = (point - leaf_point).norm_squared();
                         if dist < min_dist {
                             min_dist = dist;
                             min_idx = idx;

@@ -1,9 +1,8 @@
 use super::cost_function::PointPlaneDistance;
 use super::icp_params::IcpParams;
-use crate::pointcloud::PointCloud;
-use crate::transform::Transform;
-use crate::trig;
-use crate::{kdtree::KdTree, optim::GaussNewton};
+use crate::{
+    kdtree::KdTree, optim::GaussNewton, pointcloud::PointCloud, transform::Transform, trig,
+};
 use itertools::izip;
 use nalgebra::Vector3;
 use ndarray::Axis;
@@ -55,6 +54,8 @@ impl<'target_lt> Icp<'target_lt> {
         let mut optim = GaussNewton::new();
         let geom_cost = PointPlaneDistance {};
 
+        let max_distance_sqr = self.params.max_distance * self.params.max_distance;
+
         let mut best_residual = Float::infinity();
         let mut best_transform = optim_transform.clone();
         for _ in 0..self.params.max_iterations {
@@ -73,10 +74,10 @@ impl<'target_lt> Icp<'target_lt> {
                     source_normal[2],
                 ));
 
-                let (found_index, found_distance) = self.kdtree.nearest3d(&source_point);
+                let (found_index, found_sqr_distance) = self.kdtree.nearest3d(&source_point);
 
-                if found_distance > self.params.max_distance * self.params.max_distance {
-                    // continue;
+                if found_sqr_distance > max_distance_sqr {
+                    continue;
                 }
 
                 let target_normal = self
@@ -110,7 +111,7 @@ impl<'target_lt> Icp<'target_lt> {
 
             let residual = optim.mean_squared_residual();
             println!("Residual: {}", residual);
-
+            optim.weight(self.params.weight);
             let update = optim.solve();
             optim_transform = &Transform::se3_exp(&update) * &optim_transform;
             optim.reset();

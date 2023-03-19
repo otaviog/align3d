@@ -1,32 +1,31 @@
 use align3d::{
+    bilateral::BilateralFilter,
     icp::{Icp, IcpParams},
     io::{core::RgbdDataset, slamtb::SlamTbDataset},
     pointcloud::PointCloud,
-    range_image::RangeImage, viz::GeoViewer,
+    range_image::RangeImageBuilder,
+    viz::GeoViewer,
 };
 
-
 pub fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let dataset = SlamTbDataset::load("tests/data/rgbd/sample1").unwrap();
-    let frame = dataset.get_item(0).unwrap();
+    const SOURCE_IDX: usize = 0;
+    const TARGET_IDX: usize = 6;
 
-    let target_pcl: PointCloud = {
-        let mut pcl = RangeImage::from_rgbd_frame(&frame);
-        pcl.compute_normals();
-        PointCloud::from(&pcl)
-    };
-
-    let frame = dataset.get_item(5).unwrap();
-    let source_pcl: PointCloud = {
-        let mut pcl = RangeImage::from_rgbd_frame(&frame);
-        pcl.compute_normals();
-        PointCloud::from(&pcl)
-    };
+    let dataset = SlamTbDataset::load("tests/data/rgbd/sample2").unwrap();
+    let frame_transform = RangeImageBuilder::default()
+        .with_bilateral_filter(Some(BilateralFilter::default()))
+        .with_normals(true)
+        .pyramid_levels(1);
+    let target_pcl =
+        PointCloud::from(&frame_transform.build(dataset.get_item(TARGET_IDX).unwrap())[0]);
+    let source_pcl =
+        PointCloud::from(&frame_transform.build(dataset.get_item(SOURCE_IDX).unwrap())[0]);
 
     let icp = Icp::new(
         IcpParams {
-            max_iterations: 10,
-            weight: 0.01,
+            max_iterations: 15,
+            max_distance: 0.5,
+            max_normal_angle: 25_f32.to_radians(),
             ..Default::default()
         },
         &target_pcl,
