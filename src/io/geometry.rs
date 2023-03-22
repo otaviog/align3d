@@ -16,7 +16,7 @@ pub struct Geometry {
 }
 
 impl Geometry {
-    
+        
     /// Number of vertices.
     pub fn len_vertices(&self) -> usize {
         self.points.nrows()
@@ -25,5 +25,52 @@ impl Geometry {
     /// Number of faces. Zero if `faces` is None.
     pub fn len_faces(&self) -> usize {
         self.faces.as_ref().map_or(0, |faces| faces.nrows())
+    }
+}
+
+pub struct GeometryBuilder {
+    geometry: Geometry
+}
+
+impl GeometryBuilder {
+    pub fn new(points: Array2<f32>) -> Self {
+        Self {
+            geometry: Geometry {
+                points, 
+                colors: None,
+                normals: None,
+                faces: None,
+                texcoords: None,
+            }
+        }
+    }
+
+    pub fn with_points(mut self, points: Array2<f32>) -> Self {
+        self.geometry.points = points;
+        self
+    }
+
+    pub fn with_colors(mut self, colors: Array2<u8>) -> Self {
+        self.geometry.colors = Some(colors);
+        self
+    }
+
+    pub fn with_normals(mut self, normals: Array2<f32>) -> Self {
+        self.geometry.normals = Some(normals);
+        self
+    }
+
+    pub fn with_faces(mut self, faces: Array2<usize>) -> Self {
+        self.geometry.faces = Some(faces);
+        self
+    }
+
+    pub fn with_texcoords(mut self, texcoords: Array2<f32>) -> Self {
+        self.geometry.texcoords = Some(texcoords);
+        self
+    }
+
+    pub fn build(self) -> Geometry {
+        self.geometry
     }
 }

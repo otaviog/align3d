@@ -5,6 +5,7 @@
         "bytemuck",
         "calib",
         "consts",
+        "convinence",
         "datatypes",
         "dmatch",
         "downsample",

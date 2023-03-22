@@ -2,6 +2,23 @@ use nalgebra::Vector3;
 
 pub struct PointPlaneDistance {}
 
+fn se3_jacobian(source_point: &Vector3<f32>, target_normal: &Vector3<f32>) -> [f32; 6] {
+    let twist = source_point.cross(&target_normal);
+    [
+        target_normal[0],
+        target_normal[1],
+        target_normal[2],
+        twist[0],
+        twist[1],
+        twist[2],
+    ]
+}
+
+fn so3_jacobian(source_point: &Vector3<f32>, target_normal: &Vector3<f32>) -> [f32; 3] {
+    let twist = source_point.cross(&target_normal);
+    [twist[0], twist[1], twist[2]]
+}
+
 impl PointPlaneDistance {
     /// Computes the residual and the Jacobian of the point-plane distance.
     ///
@@ -22,19 +39,8 @@ impl PointPlaneDistance {
         target_point: &Vector3<f32>,
         target_normal: &Vector3<f32>,
     ) -> (f32, [f32; 6]) {
-        let twist = source_point.cross(&target_normal);
-        let jacobian = [
-            target_normal[0],
-            target_normal[1],
-            target_normal[2],
-            twist[0],
-            twist[1],
-            twist[2],
-        ];
-
         let residual = (target_point - source_point).dot(&target_normal);
-
-        (residual, jacobian)
+        (residual, se3_jacobian(source_point, target_normal))
     }
 }
 
@@ -48,19 +54,22 @@ impl ColorDistance {
         source_color: f32,
         target_color: f32,
     ) -> (f32, [f32; 6]) {
-        let twist = source_point.cross(&target_normal);
-        let jacobian = [
-            target_normal[0],
-            target_normal[1],
-            target_normal[2],
-            twist[0],
-            twist[1],
-            twist[2],
-        ];
+        (
+            source_color - target_color,
+            se3_jacobian(source_point, target_normal),
+        )
+    }
 
-        let residual = source_color - target_color;
-        let residual = residual;
-
-        (residual, jacobian)
+    pub fn so3_jacobian(
+        &self,
+        source_point: &Vector3<f32>,
+        target_normal: &Vector3<f32>,
+        source_color: f32,
+        target_color: f32,
+    ) -> (f32, [f32; 3]) {
+        (
+            source_color - target_color,
+            so3_jacobian(source_point, target_normal),
+        )
     }
 }

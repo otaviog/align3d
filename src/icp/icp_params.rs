@@ -15,6 +15,8 @@ pub struct IcpParams {
     pub max_distance: f32,
     /// Maximum angle between two normals to be considered as the same in radians.
     pub max_normal_angle: f32,
+
+    pub max_color_distance: f32,
 }
 
 impl Default for IcpParams {
@@ -33,6 +35,7 @@ impl Default for IcpParams {
             max_point_to_plane_distance: 0.1,
             max_distance: 0.5,
             max_normal_angle: 18.0_f32.to_radians(),
+            max_color_distance: 0.25,
         }
     }
 }

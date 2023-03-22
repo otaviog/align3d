@@ -1,4 +1,4 @@
-use crate::{bilateral::BilateralFilter, io::rgbd_image::RgbdFrame, Array2Recycle};
+use crate::{bilateral::BilateralFilter, Array2Recycle, image::RgbdFrame};
 
 use super::RangeImage;
 
@@ -66,17 +66,12 @@ impl RangeImageBuilder {
         if let Some(filter) = &self.bilateral_filter {
             frame.image.depth = filter.filter(&frame.image.depth, Array2Recycle::Empty);
         }
-
-        let mut range_images = if self.pyramid_levels > 1 {
-            RangeImage::from_pyramid(&frame.pyramid(self.pyramid_levels))
-        } else {
-            vec![RangeImage::from_rgbd_frame(&frame)]
-        };
-
+        let mut first_image = RangeImage::from_rgbd_frame(&frame);
+        if self.with_normals {
+            first_image.compute_normals();
+        }
+        let mut range_images = first_image.pyramid(self.pyramid_levels);
         for range_image in range_images.iter_mut() {
-            if self.with_normals {
-                range_image.compute_normals();
-            }
             if self.with_luma {
                 range_image.compute_intensity();
                 range_image.intensity_map();

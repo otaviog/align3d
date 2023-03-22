@@ -1,9 +1,9 @@
 use std::rc::Rc;
 
 use crate::camera::Camera;
-use crate::color::rgb_to_luma_u8;
+
+use crate::image::{resize_image_rgb8, rgb_to_luma_u8, RgbdFrame, RgbdImage, resize_image_rgb82};
 use crate::intensity_map::IntensityMap;
-use crate::io::rgbd_image::{RgbdFrame, RgbdImage};
 
 use nalgebra::Vector3;
 
@@ -11,6 +11,8 @@ use ndarray::{ArcArray2, Array1, Array2, Array3, Axis};
 
 use crate::io::Geometry;
 use crate::pointcloud::PointCloud;
+
+use super::resize::{resize_range_points, resize_range_normals};
 
 /// A point cloud that comes from an image-based measurement. It representation holds its grid structure.
 pub struct RangeImage {
@@ -84,13 +86,6 @@ impl RangeImage {
         Self::from_rgbd_image(&frame.camera, &frame.image)
     }
 
-    pub fn from_pyramid(pyramid: &Vec<RgbdFrame>) -> Vec<Self> {
-        pyramid
-            .iter()
-            .map(|frame| Self::from_rgbd_frame(frame))
-            .collect()
-    }
-
     pub fn width(&self) -> usize {
         self.points.shape()[1]
     }
@@ -109,8 +104,7 @@ impl RangeImage {
     }
 
     pub fn get_point(&self, row: usize, col: usize) -> Option<nalgebra::Vector3<f32>> {
-        if col < self.width() && row < self.height() && self.mask[(row as usize, col as usize)] == 1
-        {
+        if col < self.width() && row < self.height() && self.mask[(row, col)] == 1 {
             Some(Vector3::new(
                 self.points[(row, col, 0)],
                 self.points[(row, col, 1)],
@@ -225,7 +219,8 @@ impl RangeImage {
         }
 
         self.intensity_map = Some(Rc::new(IntensityMap::from_luma_image(
-            &self.intensities
+            &self
+                .intensities
                 .as_ref()
                 .unwrap()
                 .view()
@@ -234,6 +229,55 @@ impl RangeImage {
         )));
 
         self.intensity_map.as_ref().unwrap().clone()
+    }
+
+    pub fn downsample(&self, scale: f64) -> RangeImage {
+        let (width, height) = (
+            (self.width() as f32 * 0.5) as usize,
+            (self.height() as f32 * 0.5) as usize,
+        );
+        let (points, mask) =
+            resize_range_points(&self.points.view(), &self.mask.view(), width, height);
+
+        let normals = if let Some(normals) = self.normals.as_ref() {
+            Some(resize_range_normals(&normals.view(), &self.mask.view(), width, height))
+        } else {
+            None
+        };
+
+        let colors = if let Some(colors) = self.colors.as_ref() {
+            // Todo fix:
+            let colors2 = colors
+                .clone()
+                .into_shape((3, self.height(), self.width()))
+                .unwrap();
+            // Some(resize_image_rgb8(&colors2.view(), width, height))
+            Some(resize_image_rgb82(&colors.view(), width, height))
+        } else {
+            None
+        };
+        let valid_points = mask.iter().map(|x| (*x == 1) as usize).sum();
+        RangeImage {
+            points,
+            mask,
+            normals,
+            colors,
+            camera: self.camera.scale(0.5),
+            intensities: None,
+            intensity_map: None,
+            valid_points,
+        }
+    }
+
+    pub fn pyramid(self, levels: usize) -> Vec<RangeImage> {
+        let mut pyramid = vec![self];
+
+        for _ in 0..levels - 1 {
+            let prev = pyramid.last().unwrap();
+            pyramid.push(prev.downsample(0.5));
+        }
+
+        pyramid
     }
 }
 
@@ -311,7 +355,11 @@ impl From<&RangeImage> for Geometry {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::io::{core::RgbdDataset, slamtb::SlamTbDataset, write_ply};
+    use crate::{
+        image::IntoLumaImage,
+        io::{core::RgbdDataset, slamtb::SlamTbDataset, write_ply},
+    };
+    use nshare::ToNdarray2;
     use rstest::*;
 
     #[fixture]
@@ -329,8 +377,11 @@ mod tests {
         assert_eq!(480, im_pcl.height());
         assert_eq!(640, im_pcl.width());
 
-        write_ply("tests/data/out-back-projection.ply", &Geometry::from(&im_pcl))
-            .expect("Error while writing results");
+        write_ply(
+            "tests/outputs/out-back-projection.ply",
+            &Geometry::from(&im_pcl),
+        )
+        .expect("Error while writing results");
     }
 
     #[rstest]
@@ -340,7 +391,7 @@ mod tests {
         let mut im_pcl = RangeImage::from_rgbd_image(&cam, &rgbd_image);
         im_pcl.compute_normals();
         write_ply(
-            "tests/data/out-range-image-normals.ply",
+            "tests/outputs/out-range-image-normals.ply",
             &Geometry::from(&im_pcl),
         )
         .expect("Error while writing the results");
@@ -366,5 +417,31 @@ mod tests {
 
         let pcl = PointCloud::from(&im_pcl);
         assert_eq!(pcl.len(), 270213);
+    }
+
+    #[rstest]
+    fn verify_pyramid(sample1: SlamTbDataset) {
+        let mut pyramid = RangeImage::from_rgbd_frame(&sample1.get_item(0).unwrap()).pyramid(3);
+
+        for im in pyramid.iter_mut() {
+            im.compute_normals();
+            im.compute_intensity();
+        }
+
+        for (i, im) in pyramid.iter().enumerate() {
+            write_ply(
+                format!("tests/outputs/out-range-image-{}.ply", i),
+                &Geometry::from(im),
+            )
+            .expect("Error while writing the results");
+        }
+
+        for (i, im) in pyramid.iter_mut().enumerate() {
+            let imap = im.intensity_map().clone().into_ndarray2();
+            imap.to_luma_image()
+                .save(format!("tests/outputs/out-range-image-{}.png", i))
+                .expect("Error while writing the results");
+        }
+        assert_eq!(pyramid.len(), 3);
     }
 }

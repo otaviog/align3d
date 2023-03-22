@@ -2,12 +2,11 @@ use std::path::{Path, PathBuf};
 
 use super::{
     core::{DatasetError, RgbdDataset},
-    rgbd_image::{RgbdFrame, RgbdImage},
 };
 use crate::{
     camera::{Camera, CameraBuilder},
     trajectory::Trajectory,
-    transform::Transform,
+    transform::Transform, image::{RgbdFrame, RgbdImage},
 };
 
 use nshare::{ToNdarray2, ToNdarray3};
@@ -119,8 +118,9 @@ impl RgbdDataset for SlamTbDataset {
     fn get_item(&self, index: usize) -> Result<RgbdFrame, DatasetError> {
         let rgb_image = image::open(self.base_dir.join(&self.rgb_images[index]))?
             .into_rgb8()
-            .into_ndarray3()
-            .as_standard_layout()
+            .into_ndarray3();
+
+        let rgb_image =  rgb_image.as_standard_layout()
             .into_owned();
         let depth_image = image::open(self.base_dir.join(&self.depth_images[index]))?
             .into_luma16()

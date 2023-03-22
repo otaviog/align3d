@@ -1,16 +1,8 @@
 use itertools::izip;
 
-use nalgebra::{Cholesky, Matrix6, Vector6};
+use nalgebra::{ArrayStorage, Cholesky, SMatrix, SVector, Const};
 use ndarray::{Array1, Array2, Axis};
 use num::Zero;
-
-/// Implements the standard Gauss Newton optimization
-pub struct GaussNewton {
-    hessian: Matrix6<f32>,
-    gradient: Vector6<f32>,
-    squared_residual_sum: f32,
-    count: usize,
-}
 
 pub struct GaussNewtonBatch {
     jacobians: Array2<f32>,
@@ -32,10 +24,10 @@ impl GaussNewtonBatch {
     pub fn assign(&mut self, i: usize, cost: f32, residual: f32, jacobian: &[f32]) {
         if !self.dirty[i] {
             if self.costs[i] < cost {
-                return ;
+                return;
             }
         }
-        
+
         self.jacobians
             .row_mut(i)
             .assign(&Array1::from_vec(jacobian.to_vec()));
@@ -49,37 +41,45 @@ impl GaussNewtonBatch {
     }
 }
 
-impl GaussNewton {
+/// Implements the standard Gauss Newton optimization
+pub struct GaussNewton<const DIM: usize> {
+    hessian: SMatrix<f32, DIM, DIM>,
+    gradient: SVector<f32, DIM>,
+    squared_residual_sum: f32,
+    count: usize,
+}
+
+impl<const DIM: usize> GaussNewton<DIM> {
     pub fn new() -> Self {
         Self {
-            hessian: Matrix6::zeros(),
-            gradient: Vector6::zeros(),
+            hessian: SMatrix::zeros(),
+            gradient: SVector::zeros(),
             squared_residual_sum: 0.0,
             count: 0,
         }
     }
 
+    pub fn reset(&mut self) {
+        self.hessian.set_zero();
+        self.gradient.set_zero();
+        self.squared_residual_sum = 0.0;
+        self.count = 0;
+    }
+
     pub fn step(&mut self, residual: f32, jacobian: &[f32]) {
         self.squared_residual_sum += residual * residual;
 
-        let jt_r = [[
-            jacobian[0] * residual,
-            jacobian[1] * residual,
-            jacobian[2] * residual,
-            jacobian[3] * residual,
-            jacobian[4] * residual,
-            jacobian[5] * residual,
-        ]];
+        let jt_r = SMatrix::from_row_slice(jacobian) * residual;
 
-        let mut jt_j = [[0.0; 6]; 6];
-        for i in 0..6 {
-            for j in 0..6 {
+        let mut jt_j = [[0.0; DIM]; DIM];
+        for i in 0..DIM {
+            for j in 0..DIM {
                 jt_j[i][j] += jacobian[i] * jacobian[j];
             }
         }
 
-        self.hessian += Matrix6::from_data(nalgebra::ArrayStorage(jt_j));
-        self.gradient += Vector6::from_data(nalgebra::ArrayStorage(jt_r));
+        self.hessian += SMatrix::from_data(ArrayStorage(jt_j));
+        self.gradient += jt_r;
         self.count += 1;
     }
 
@@ -104,11 +104,17 @@ impl GaussNewton {
         }
     }
 
-    pub fn solve(&self) -> Vector6<f32> {
-        let v = Cholesky::new(self.hessian)
-            .unwrap().solve(&self.gradient);
-        let update = Vector6::<f32>::new(v[0], v[1], v[2], v[3], v[4], v[5]);
-        update
+    pub fn solve(&self) -> Option<SVector<f32, DIM>> {
+        if self.count == 0 {
+            return None;
+        }
+        let hessian: SMatrix<f64, DIM, DIM> = nalgebra::convert(self.hessian);
+        let gradient: SVector<f64, DIM> = nalgebra::convert(self.gradient);
+        
+        let update = Cholesky::<f64, Const<DIM>>::new(hessian)
+                .unwrap()
+                .solve(&gradient);
+        Some(nalgebra::convert(update))
     }
 
     pub fn combine(&mut self, other: &Self, weight1: f32, weight2: f32) {
@@ -128,13 +134,6 @@ impl GaussNewton {
     pub fn mean_squared_residual(&self) -> f32 {
         self.squared_residual_sum / self.count as f32
     }
-
-    pub fn reset(&mut self) {
-        self.hessian.set_zero();
-        self.gradient.set_zero();
-        self.squared_residual_sum = 0.0;
-        self.count = 0;
-    }
 }
 
 #[cfg(test)]
@@ -146,7 +145,7 @@ mod tests {
         use super::*;
         use ndarray::array;
 
-        let mut gn = GaussNewton::new();
+        let mut gn = GaussNewton::<6>::new();
 
         let residual_array = array![1.0, 2.0, 3.0];
         let jacobian_array = array![
@@ -157,8 +156,8 @@ mod tests {
 
         gn.step_array(&residual_array, &jacobian_array);
 
-        let hessian = gn.hessian.clone();
-        let gradient = gn.gradient.clone();
+        let hessian = gn.hessian;
+        let gradient = gn.gradient;
 
         let expected_hessian = array![
             [3.0, 6.0, 9.0, 12.0, 15.0, 18.0],

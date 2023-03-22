@@ -4,14 +4,14 @@ use rstest::*;
 
 use crate::bilateral::BilateralFilter;
 
-use crate::io::core::RgbdDataset;
-use crate::io::rgbd_image::RgbdFrame;
-use crate::io::slamtb::SlamTbDataset;
-use crate::io::{read_off, Geometry};
-use crate::mesh::compute_normals;
-use crate::pointcloud::PointCloud;
-use crate::range_image::RangeImage;
-use crate::Array2Recycle;
+use crate::image::RgbdFrame;
+use crate::{
+    io::{core::RgbdDataset, read_off, slamtb::SlamTbDataset, Geometry},
+    mesh::compute_normals,
+    pointcloud::PointCloud,
+    range_image::RangeImage,
+    Array2Recycle,
+};
 
 #[fixture]
 pub fn sample_teapot_geometry() -> Geometry {

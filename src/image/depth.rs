@@ -1,31 +1,25 @@
-use image::GrayImage;
 use ndarray::{Array2, ArrayView2};
 
 use crate::Array2Recycle;
 
-fn integer_fractional(x: f32) -> (usize, f32) {
-    let x_int = x as usize;
-    let x_frac = x.fract();
-
-    (x_int, x_frac)
-}
+use crate::utils::math::integer_fractional;
 
 /// Resize a depth image using bilinear interpolation and not considering 0 values (empty depth pixels)
-/// 
+///
 /// # Arguments
-/// 
+///
 /// * `depth_image` - The depth image to resize.
 /// * `dst_height` - The target height of the resized image.
 /// * `dst_width` - The target width of the resized image.
 /// * `data` - An Array Recycle to reuse memory.
-/// 
+///
 /// # Returns
-/// 
+///
 /// The resized depth image.
-pub fn resize_depth(
+pub fn resize_depth_image(
     depth_image: &ArrayView2<u16>,
-    dst_height: usize,
     dst_width: usize,
+    dst_height: usize,
     data: Array2Recycle<u16>,
 ) -> Array2<u16> {
     let (src_height, src_width) = (depth_image.shape()[0], depth_image.shape()[1]);
@@ -93,47 +87,25 @@ pub fn resize_depth(
     dst_image
 }
 
-/// Trait to convert an ndarray::Array2<u16> to an image::GrayImage
-trait IntoGrayImage {
-    /// Convert an ndarray::Array2<u16> to an image::GrayImage
-    fn into_gray_image(&self) -> GrayImage;
-}
-
-impl IntoGrayImage for Array2<u16> {
-    /// Convert an ndarray::Array2<u16> to an image::GrayImage
-    fn into_gray_image(&self) -> GrayImage {
-        let (height, width) = (self.shape()[0], self.shape()[1]);
-
-        let max = *self.iter().max().unwrap() as f32;
-        let min = *self.iter().filter(|x| **x != 0).min().unwrap() as f32;
-
-        let u8_image = self.map(|x| (((*x as f32 - min) / (max - min)) * 255.0) as u8);
-
-        GrayImage::from_vec(width as u32, height as u32, u8_image.into_raw_vec()).unwrap()
-    }
-}
-
 #[cfg(test)]
 mod tests {
-    use super::IntoGrayImage;
+    use super::resize_depth_image;
+    use crate::image::IntoLumaImage;
+    use crate::Array2Recycle;
     use crate::{io::core::RgbdDataset, unit_test::sample_rgbd_dataset1};
     use rstest::rstest;
-
     #[rstest]
     fn should_resize_depth_images(sample_rgbd_dataset1: impl RgbdDataset) {
-        use crate::depth_processing::resize_depth;
-        use crate::Array2Recycle;
-
         let depth_image = sample_rgbd_dataset1.get_item(5).unwrap().image.depth;
 
         let data = Array2Recycle::Empty;
-        let resized = resize_depth(&depth_image.view(), 128, 128, data);
+        let resized = resize_depth_image(&depth_image.view(), 320, 240, data);
         depth_image
-            .into_gray_image()
+            .to_luma_image()
             .save("tests/outputs/depth.png")
             .unwrap();
         resized
-            .into_gray_image()
+            .to_luma_image()
             .save("tests/outputs/depth_resized.png")
             .unwrap();
     }

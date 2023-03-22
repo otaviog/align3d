@@ -3,7 +3,11 @@ use ndarray::s;
 use num::Float;
 
 use crate::{
-    camera::PointSpace, optim::GaussNewton, range_image::RangeImage, transform::Transform, trig,
+    camera::PointSpace,
+    optim::{GaussNewton, GaussNewtonBatch},
+    range_image::RangeImage,
+    transform::{LieGroup, Transform},
+    trig,
 };
 
 use super::{
@@ -33,39 +37,54 @@ impl<'target_lt> ImageIcp<'target_lt> {
         let target_normals = self.target.normals.as_ref().unwrap();
         let source_colors = source.intensities.as_ref().unwrap();
 
-        let mut optim_transform = Transform::eye();
+        let mut optim_transform = self.initial_transform.clone();
 
         let geometric_distance = PointPlaneDistance {};
         let color_distance = ColorDistance {};
+
+        let max_color_distance_sqr =
+            self.params.max_color_distance * self.params.max_color_distance;
         let max_distance_sqr = self.params.max_distance * self.params.max_distance;
 
-        let mut geom_optim = GaussNewton::new();
-        let mut color_optim = GaussNewton::new();
+        let mut geom_optim = GaussNewton::<6>::new();
+        let mut color_optim = GaussNewton::<6>::new();
+        let mut color_batch = GaussNewtonBatch::new(self.target.len());
+
         let mut best_residual = Float::infinity();
         let mut best_transform = optim_transform.clone();
         for _ in 0..self.params.max_iterations {
             source.point_cloud_view().iter().for_each(
                 |(linear_index, source_point, source_normal)| {
                     let source_point = optim_transform.transform_vector(&source_point);
-                    let (x, y) = self
+                    let (u, v) = self
                         .target
                         .camera
                         .project_point(&PointSpace::Camera(source_point))
                         .unwrap();
-                    let (xu, yu) = ((x + 0.5) as usize, (y + 0.5) as usize);
+                    let (u_int, v_int) = ((u + 0.5) as i32, (v + 0.5) as i32);
+                    if u_int < 0
+                        || u_int >= self.target.width() as i32
+                        || v_int < 0
+                        || v_int >= self.target.height() as i32
+                    {
+                        return; // exit closure
+                    }
 
-                    if let Some(target_point) = self.target.get_point(yu, xu) {
-                        if (target_point - source_point).norm_squared() > max_distance_sqr {
+                    if let Some(target_point) =
+                        self.target.get_point(v_int as usize, u_int as usize)
+                    {
+                        let geom_sqr_distance = (target_point - source_point).norm_squared();
+                        if geom_sqr_distance > max_distance_sqr {
                             return; // exit closure
                         }
-                        let src_normal = optim_transform.transform_normal(&source_normal);
+                        let source_normal = optim_transform.transform_normal(&source_normal);
                         let target_normal = {
-                            let elem = target_normals.slice(s![yu, xu, ..]);
+                            let elem = target_normals.slice(s![v_int, u_int, ..]);
                             Vector3::new(elem[0], elem[1], elem[2])
                         };
 
-                        if trig::angle_between_normals(&src_normal, &target_normal)
-                            > self.params.max_normal_angle
+                        if trig::angle_between_vecs(&source_normal, &target_normal)
+                            >= self.params.max_normal_angle
                         {
                             return; // exit closure
                         }
@@ -79,13 +98,13 @@ impl<'target_lt> ImageIcp<'target_lt> {
                         geom_optim.step(residual, &jacobian);
 
                         // Color part.
-                        let (target_color, du, dv) = intensity_map.bilinear_grad(x, y);
-                        let source_color = source_colors[linear_index] as f32 / 255.0;
+                        let (target_color, du, dv) = intensity_map.bilinear_grad(u, v);
+                        let source_color = source_colors[linear_index];
+                        let source_color = source_color as f32 / 255.0;
 
                         let ((dfx, dcx), (dfy, dcy)) =
                             self.target.camera.project_grad(&source_point);
-                        let color_gradient =
-                            Vector3::new(du * dfx, dv * dfy, du * dcx + dv * dcy);
+                        let color_gradient = Vector3::new(du * dfx, dv * dfy, du * dcx + dv * dcy);
 
                         let (color_residual, color_jacobian) = color_distance.jacobian(
                             &source_point,
@@ -93,23 +112,28 @@ impl<'target_lt> ImageIcp<'target_lt> {
                             source_color,
                             target_color,
                         );
-                        // 2.75*2.75
-                        let max_color_residual = 7.5625 / 255.0;
-                        if color_residual * color_residual < max_color_residual * max_color_residual
-                        {
-                            color_optim.step(color_residual, &color_jacobian);
+
+                        if color_residual * color_residual <= max_color_distance_sqr {
+                            color_batch.assign(
+                                linear_index,
+                                geom_sqr_distance,
+                                color_residual,
+                                &color_jacobian,
+                            );
                         }
                     }
                 },
             );
-
+            color_optim.step_batch(&color_batch);
             geom_optim.combine(&color_optim, self.params.weight, self.params.color_weight);
             let residual = geom_optim.mean_squared_residual();
-            println!("Residual: {}", residual);
+            let update = geom_optim.solve().unwrap();
+            optim_transform = &Transform::exp(&LieGroup::Se3(update)) * &optim_transform;
 
-            let update = geom_optim.solve();
-            optim_transform = &Transform::se3_exp(&update) * &optim_transform;
             geom_optim.reset();
+            color_optim.reset();
+            color_batch.reset();
+
             if residual < best_residual {
                 best_residual = residual;
                 best_transform = optim_transform.clone();

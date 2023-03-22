@@ -94,6 +94,10 @@ pub trait Node {
     );
 }
 
+pub trait IntoNode {
+    fn into_node(&self) -> Box<dyn Node>;
+}
+
 #[cfg(test)]
 mod tests {
     use super::NodeProperties;

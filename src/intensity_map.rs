@@ -1,7 +1,9 @@
-use super::color::rgb_to_luma;
+use super::image::rgb_to_luma;
 use ndarray::{s, Array2, ArrayView2, ArrayView3};
+use nshare::ToNdarray2;
 
 /// Stores a grayscale image with float and interpolation operations.
+#[derive(Debug, Clone)]
 pub struct IntensityMap {
     map: Array2<f32>,
     shape: (usize, usize),
@@ -56,16 +58,24 @@ impl IntensityMap {
             });
 
         // Fills the border X:
-
         for col in 0..in_width - 1 {
-            self.map[(in_height, col)] = self.map[(in_height - 1, col)];
+            let border = self.map[(in_height - 1, col)];
+            for k in 0..2 {
+                self.map[(in_height + k, col)] = border;
+            }
         }
 
         for row in 0..in_height - 1 {
-            self.map[(row, in_width)] = self.map[(row, in_width - 1)];
+            let border = self.map[(row, in_width - 1)];
+            for k in 0..2 {
+                self.map[(row, in_width + k)] = border;
+            }
         }
 
-        self.map[(in_height, in_width)] = image[(in_height - 1, in_width - 1)] as f32 / 255.0;
+        let last_elem = image[(in_height - 1, in_width - 1)] as f32 / 255.0;
+        for k in 0..2 {
+            self.map[(in_height + k, in_width + k)] = last_elem;
+        }
     }
 
     /// Constructor to create a map filled with an image.
@@ -131,8 +141,8 @@ impl IntensityMap {
     ///
     /// # Arguments:
     ///
-    /// * `u`: The "x" coordinate. Range is [0..1].
-    /// * `v`: The "y" coordinate. Range is [0..1].
+    /// * `u`: The "x" coordinate. Range is [0..width].
+    /// * `v`: The "y" coordinate. Range is [0..height].
     ///
     /// # Returns:
     ///
@@ -162,12 +172,8 @@ impl IntensityMap {
         let value = self.bilinear(u, v);
         let uh = self.bilinear(u + H, v);
         let vh = self.bilinear(u, v + H);
-        
-        (
-            value,
-            (uh - value) / H,
-            (vh - value) / H,
-        )
+
+        (value, (uh - value) / H, (vh - value) / H)
     }
 
     /// Returns the intensity value with bilinear interpolation if
@@ -251,6 +257,14 @@ impl IntensityMap {
     }
 }
 
+
+impl ToNdarray2 for &IntensityMap {
+    type Out = Array2<f32>;
+    fn into_ndarray2(self) -> Self::Out {
+        self.map.clone()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use ndarray::Array2;
@@ -297,4 +311,15 @@ mod tests {
             );
         }
     }
+
+    #[rstest]
+    fn values(bloei_luma8: Array2<u8>) {
+        let map = IntensityMap::from_luma_image(&bloei_luma8.view());
+        for ((y, x), img_value) in bloei_luma8.indexed_iter() {
+            let (value, _du, _dv) = map.bilinear_grad(x as f32, y as f32);
+            assert_eq!(*img_value as f32 / 255.0, value);
+        }
+    }
+
+    
 }

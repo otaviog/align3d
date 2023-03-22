@@ -26,6 +26,11 @@ impl ops::Mul<&ndarray::Array2<f32>> for &Rotation {
     }
 }
 
+pub enum LieGroup {
+    Se3(Vector6<f32>),
+    So3(Vector3<f32>),
+}
+
 /// A Rigid Body Transform in 3D space.
 #[derive(Clone, Debug)]
 // #[display(fmt = "Transform: {}", _0)]
@@ -47,6 +52,35 @@ impl Transform {
         ))
     }
 
+    fn exp_so3(omega: &Vector3<f32>) -> (f32, UnitQuaternion<f32>) {
+        // https://github.com/strasdat/Sophus/blob/main-1.x/sophus/so3.hpp
+        const EPSILON: f32 = 1e-8;
+        let theta_sq = omega.norm_squared();
+
+        let (theta, imag_factor, real_factor) = if theta_sq < EPSILON * EPSILON {
+            let theta_po4 = theta_sq * theta_sq;
+            (
+                0.0,
+                0.5 - (1.0 / 48.0) * theta_sq + (1.0 / 3840.0) * theta_po4,
+                1.0 - (1.0 / 8.0) * theta_sq + (1.0 / 384.0) * theta_po4,
+            )
+        } else {
+            let theta = theta_sq.sqrt();
+            let half_theta = 0.5 * theta;
+            (theta, half_theta.sin() / theta, half_theta.cos())
+        };
+
+        (
+            theta,
+            UnitQuaternion::from_quaternion(nalgebra::Quaternion::new(
+                real_factor,
+                imag_factor * omega[0],
+                imag_factor * omega[1],
+                imag_factor * omega[2],
+            )),
+        )
+    }
+
     /// Create a transform from a 6D vector of the form [x, y, z, rx, ry, rz] where x, y, and z are the translation part
     /// and rx,ry, and rz are the rotation part in the form of a scaled axis.
     ///
@@ -57,54 +91,41 @@ impl Transform {
     /// # Returns
     ///
     /// * Transform
-    pub fn se3_exp(xyz_so3: &Vector6<f32>) -> Self {
+    pub fn exp(params: &LieGroup) -> Self {
         const EPSILON: f32 = 1e-8;
 
-        let omega = Vector3::new(xyz_so3[3], xyz_so3[4], xyz_so3[5]);
-        let theta_sq = omega.norm_squared();
+        match params {
+            LieGroup::Se3(xyz_so3) => {
+                let omega = Vector3::new(xyz_so3[3], xyz_so3[4], xyz_so3[5]);
+                let (theta, quat) = Self::exp_so3(&omega);
+                let theta_sq = theta * theta;
+                let xyz = {
+                    let left_jacobian = {
+                        let big_omega = omega.cross_matrix();
 
-        let (theta, quat) = {
-            let (theta, imag_factor, real_factor) = if theta_sq < EPSILON * EPSILON {
-                let theta_po4 = theta_sq * theta_sq;
-                (
-                    0.0,
-                    0.5 - (1.0 / 48.0) * theta_sq + (1.0 / 3840.0) * theta_po4,
-                    1.0 - (1.0 / 8.0) * theta_sq + (1.0 / 384.0) * theta_po4,
-                )
-            } else {
-                let theta = theta_sq.sqrt();
-                let half_theta = 0.5 * theta;
-                (theta, half_theta.sin() / theta, half_theta.cos())
-            };
-            (
-                theta,
-                UnitQuaternion::from_quaternion(nalgebra::Quaternion::new(
-                    real_factor,
-                    imag_factor * omega[0],
-                    imag_factor * omega[1],
-                    imag_factor * omega[2],
-                )),
-            )
-        };
-        let xyz = {
-            let left_jacobian = {
-                // https://github.com/strasdat/Sophus/blob/main-1.x/sophus/so3.hpp
-                let big_omega = omega.cross_matrix();
+                        if theta_sq < EPSILON {
+                            Matrix3::identity() + (big_omega * 0.5)
+                        } else {
+                            let big_omega_squared = big_omega * big_omega;
+                            Matrix3::identity()
+                                + (1.0 - theta.cos()) / theta_sq * big_omega
+                                + (theta - theta.sin()) / (theta_sq * theta) * big_omega_squared
+                        }
+                    };
 
-                if theta_sq < EPSILON {
-                    Matrix3::identity() + (big_omega * 0.5)
-                } else {
-                    let big_omega_squared = big_omega * big_omega;
-                    Matrix3::identity()
-                        + (1.0 - theta.cos()) / theta_sq * big_omega
-                        + (theta - theta.sin()) / (theta_sq * theta) * big_omega_squared
-                }
-            };
-
-            left_jacobian * Vector3::new(xyz_so3[0], xyz_so3[1], xyz_so3[2])
-        };
-
-        Self(Isometry3::<f32>::from_parts(xyz.into(), quat))
+                    left_jacobian * Vector3::new(xyz_so3[0], xyz_so3[1], xyz_so3[2])
+                };
+                Self(Isometry3::<f32>::from_parts(xyz.into(), quat))
+            }
+            &LieGroup::So3(so3) => {
+                let omega = Vector3::new(so3[3], so3[4], so3[5]);
+                let (theta, quat) = Self::exp_so3(&omega);
+                Self(Isometry3::<f32>::from_parts(
+                    Translation3::new(0.0, 0.0, 0.0),
+                    quat,
+                ))
+            }
+        }
     }
 
     /// Create a transform from a 4x4 matrix.
@@ -242,6 +263,8 @@ impl From<&Transform> for Matrix4<f32> {
 
 #[cfg(test)]
 mod tests {
+    use crate::transform::LieGroup;
+
     use super::Transform;
     use nalgebra::Vector6;
     use nalgebra::{Isometry3, Matrix4, Translation3, UnitQuaternion, Vector3, Vector4};
@@ -299,14 +322,14 @@ mod tests {
 
     #[test]
     fn test_exp() {
-        let transform = Transform::se3_exp(&Vector6::new(1.0, 2.0, 3.0, 0.4, 0.5, 0.3));
+        let transform = Transform::exp(&LieGroup::Se3(Vector6::new(1.0, 2.0, 3.0, 0.4, 0.5, 0.3)));
 
         assert!(assert_array(
             &transform.transform(array![[5.5, 6.4, 7.8]]),
             &array![[8.9848175, 6.9635687, 9.880962]]
         ));
 
-        let se3 = Transform::se3_exp(&Vector6::new(1.0, 2.0, 3.0, 0.4, 0.5, 0.3));
+        let se3 = Transform::exp(&LieGroup::Se3(Vector6::new(1.0, 2.0, 3.0, 0.4, 0.5, 0.3)));
         let matrix = Matrix4::from(&se3);
         let test_mult = matrix * Vector4::new(1.0, 2.0, 3.0, 1.0);
         assert_eq!(

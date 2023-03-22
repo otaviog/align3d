@@ -1,3 +1,5 @@
+mod resize;
+
 mod range_image;
 pub use range_image::RangeImage;
 

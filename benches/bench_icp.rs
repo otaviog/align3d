@@ -27,7 +27,7 @@ fn icp_benchmark(c: &mut Criterion) {
     let icp = Icp::new(
         IcpParams {
             max_iterations: 10,
-            weight: 0.01,
+            ..Default::default()
         },
         &pcl0,
     );

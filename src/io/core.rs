@@ -1,7 +1,6 @@
 use image::ImageError;
 
-use super::rgbd_image::RgbdFrame;
-use crate::trajectory::Trajectory;
+use crate::{trajectory::Trajectory, image::RgbdFrame};
 use std::io::Error;
 
 #[derive(Debug)]

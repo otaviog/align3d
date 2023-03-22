@@ -1,11 +1,10 @@
-use image::{imageops::FilterType, ImageBuffer, Rgb};
 use ndarray::{Array2, Array3};
-use nshare::ToNdarray3;
 
-use crate::{
-    camera::Camera, depth_processing::resize_depth, sampling::Downsampleble, Array2Recycle,
-};
+use crate::{camera::Camera, sampling::Downsample, Array2Recycle};
 
+use super::{resize_depth_image, resize_image_rgb8};
+
+/// A convinence struct that holds a color image, a depth image and its depth scale.
 pub struct RgbdImage {
     pub color: Array3<u8>,
     pub depth: Array2<u16>,
@@ -38,32 +37,21 @@ impl RgbdImage {
     }
 }
 
-impl Downsampleble<RgbdImage> for RgbdImage {
+impl Downsample for RgbdImage {
+    type Output = RgbdImage;
     fn downsample(&self, scale: f64) -> RgbdImage {
         let (height, width) = (self.height() as u32, self.width() as u32);
         let (scaled_height, scaled_width) = (
             (height as f64 * scale) as usize,
             (width as f64 * scale) as usize,
         );
-        let resized_color = {
-            let raw = self.color.as_slice().unwrap();
-            let color_buffer = ImageBuffer::<Rgb<u8>, &[u8]>::from_raw(width, height, raw).unwrap();
-            let resized_image = image::imageops::resize(
-                &color_buffer,
-                scaled_width as u32,
-                scaled_height as u32,
-                FilterType::Gaussian,
-            );
-            resized_image
-                .into_ndarray3()
-                .as_standard_layout()
-                .into_owned()
-        };
 
-        let resized_depth = resize_depth(
+        let resized_color = { resize_image_rgb8(&self.color.view(), scaled_width, scaled_height) };
+
+        let resized_depth = resize_depth_image(
             &self.depth.view(),
-            scaled_height,
             scaled_width,
+            scaled_height,
             Array2Recycle::Empty,
         );
 
@@ -78,6 +66,7 @@ impl Downsampleble<RgbdImage> for RgbdImage {
 pub struct RgbdFrame {
     pub camera: Camera,
     pub image: RgbdImage,
+    // pub timestamp: Option<f64>,
 }
 
 impl RgbdFrame {
@@ -88,19 +77,16 @@ impl RgbdFrame {
     pub fn into_parts(self) -> (Camera, RgbdImage) {
         (self.camera, self.image)
     }
+}
 
-    pub fn pyramid(self, levels: usize) -> Vec<RgbdFrame> {
-        let mut pyramid = vec![self];
-        let mut scale = 0.5;
-        for _ in 0..(levels - 1) {
-            let last = pyramid.last().unwrap();
-            pyramid.push(Self::new(
-                last.camera.scale(scale),
-                last.image.downsample(scale),
-            ));
-            scale *= 0.5;
+impl Downsample for RgbdFrame {
+    type Output = RgbdFrame;
+
+    fn downsample(&self, scale: f64) -> RgbdFrame {
+        RgbdFrame {
+            camera: self.camera.scale(scale),
+            image: self.image.downsample(scale),
         }
-        pyramid
     }
 }
 
@@ -108,7 +94,7 @@ impl RgbdFrame {
 mod tests {
     use rstest::rstest;
 
-    use crate::{io::core::RgbdDataset, sampling::Downsampleble, unit_test::sample_rgbd_dataset1};
+    use crate::{io::core::RgbdDataset, unit_test::sample_rgbd_dataset1, sampling::Downsample, image::IntoImageRgb};
 
     #[rstest]
     fn test_downsample(sample_rgbd_dataset1: impl RgbdDataset) {
@@ -118,5 +104,11 @@ mod tests {
         assert_eq!([240, 320], scale_05.depth.shape());
         assert_eq!(320, scale_05.width());
         assert_eq!(240, scale_05.height());
+        scale_05
+            .color
+            .view()
+            .to_image_rgb8()
+            .save("scale_05_color.png")
+            .unwrap();
     }
 }
