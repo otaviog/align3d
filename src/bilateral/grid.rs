@@ -63,6 +63,10 @@ where
                 let grid_col = (col as f64 / sigma_space + 0.5) as usize + space_pad;
 
                 let color = image[(row, col)];
+                if color <= I::min_value() {
+                    continue;
+                }
+
                 let channel = {
                     let diff: I = (color - color_min).into();
                     (diff.to_f64().unwrap() / sigma_color + 0.5) as usize + color_pad

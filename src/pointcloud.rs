@@ -1,7 +1,7 @@
+use crate::io::Geometry;
+use crate::transform::Transform;
 use ndarray::prelude::*;
 use ndarray::{ArcArray2, Array2};
-
-use super::io::Geometry;
 
 pub struct PointCloud {
     pub points: Array2<f32>,
@@ -35,14 +35,6 @@ impl PointCloud {
     }
 }
 
-//impl<Idx> std::ops::Index<Idx> for PointCloud
-//where Idx: std::slice::SliceIndex<[PointCloud]>
-//{
-//    fn index(&self, index: Idx) -> &Self::Output
-//}
-
-use crate::transform::Transform;
-
 impl std::ops::Mul<&PointCloud> for &Transform {
     type Output = PointCloud;
     fn mul(self, rhs: &PointCloud) -> PointCloud {
@@ -66,6 +58,33 @@ impl From<PointCloud> for Geometry {
             faces: None,
             texcoords: None,
         }
+    }
+}
+
+#[cfg(with_rerun)]
+impl PointCloud {
+    pub fn rerun_msg(&self, name: &str) -> Result<rerun::MsgSender, rerun::MsgSenderError> {
+        use rerun::external::glam;
+
+        let mut points = Vec::with_capacity(self.len());
+        let mut colors = Vec::with_capacity(self.len());
+        for (point, color) in self
+            .points
+            .outer_iter()
+            .zip(self.colors.iter().flat_map(|colors| colors.outer_iter()))
+        {
+            points.push(rerun::components::Point3D::from(glam::Vec3::new(
+                point[0], point[1], point[2],
+            )));
+
+            colors.push(rerun::components::ColorRGBA::from_rgb(
+                color[0], color[1], color[2],
+            ));
+        }
+
+        Ok(rerun::MsgSender::new(name)
+            .with_component(&points)?
+            .with_component(&colors)?)
     }
 }
 

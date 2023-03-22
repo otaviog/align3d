@@ -1,12 +1,12 @@
 use std::path::{Path, PathBuf};
 
 use super::{
-    dataset::{DatasetError, RGBDDataset},
-    rgbdimage::RGBDImage,
+    core::{DatasetError, RgbdDataset},
 };
 use crate::{
     camera::{Camera, CameraBuilder},
-    transform::Transform,
+    trajectory::Trajectory,
+    transform::Transform, image::{RgbdFrame, RgbdImage},
 };
 
 use nshare::{ToNdarray2, ToNdarray3};
@@ -41,7 +41,7 @@ mod json {
         pub depth_bias: f64,
         pub depth_max: f64,
         pub rt_cam: RTCam,
-        pub timestamp: usize,
+        pub timestamp: f64,
     }
 
     #[derive(Deserialize, Debug)]
@@ -86,7 +86,7 @@ impl SlamTbDataset {
                     };
 
                     cameras.push(
-                        CameraBuilder::from_simple_intrinsics(fx, fy, cx, cy)
+                        CameraBuilder::from_simple_intrinsic(fx, fy, cx, cy)
                             .camera_to_world(Some(extrinsics))
                             .build(),
                     );
@@ -106,7 +106,7 @@ impl SlamTbDataset {
     }
 }
 
-impl RGBDDataset for SlamTbDataset {
+impl RgbdDataset for SlamTbDataset {
     fn len(&self) -> usize {
         self.rgb_images.len().min(self.depth_images.len())
     }
@@ -115,19 +115,32 @@ impl RGBDDataset for SlamTbDataset {
         self.len() == 0
     }
 
-    fn get_item(&self, index: usize) -> Result<(Camera, RGBDImage), DatasetError> {
+    fn get_item(&self, index: usize) -> Result<RgbdFrame, DatasetError> {
         let rgb_image = image::open(self.base_dir.join(&self.rgb_images[index]))?
             .into_rgb8()
-            .into_ndarray3()
-            .as_standard_layout()
+            .into_ndarray3();
+
+        let rgb_image =  rgb_image.as_standard_layout()
             .into_owned();
         let depth_image = image::open(self.base_dir.join(&self.depth_images[index]))?
             .into_luma16()
             .into_ndarray2();
-        Ok((
+        Ok(RgbdFrame::new(
             self.cameras[index].clone(),
-            RGBDImage::with_depth_scale(rgb_image, depth_image, self.depth_scales[index]),
+            RgbdImage::with_depth_scale(rgb_image, depth_image, self.depth_scales[index]),
         ))
+    }
+
+    fn trajectory(&self) -> Option<Trajectory> {
+        let mut trajectory = Trajectory::new();
+        for (i, cam) in self.cameras.iter().enumerate() {
+            if let Some(transform) = cam.camera_to_world.clone() {
+                trajectory.push(transform, i as f32);
+            } else {
+                return None;
+            }
+        }
+        Some(trajectory)
     }
 }
 
@@ -136,13 +149,13 @@ mod tests {
     //use rstest::*;
 
     use super::*;
-    use crate::io::dataset::RGBDDataset;
+    use crate::io::core::RgbdDataset;
 
     #[test]
     fn test_load() {
         let rgbd_dataset = SlamTbDataset::load("tests/data/rgbd/sample1").unwrap();
 
-        let (camera, image) = rgbd_dataset.get_item(0).unwrap();
+        let (camera, image) = rgbd_dataset.get_item(0).unwrap().into_parts();
 
         assert_eq!(camera.fx, 544.4732666015625);
         assert_eq!(camera.fy, 544.4732666015625);

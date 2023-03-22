@@ -3,8 +3,8 @@ use align3d::viz::{
     Manager, Window,
 };
 
-mod test_data;
-use test_data::sample_teapot;
+mod data;
+use data::sample_teapot;
 
 fn main() {
     let mut manager = Manager::default();

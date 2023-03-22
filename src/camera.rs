@@ -21,7 +21,7 @@ pub struct CameraBuilder(Camera);
 impl CameraBuilder {
     /// Creates a camera using the focal length with pixel
     /// scales (fx, fy) and camera center (cx, cy).
-    pub fn from_simple_intrinsics(fx: f64, fy: f64, cx: f64, cy: f64) -> Self {
+    pub fn from_simple_intrinsic(fx: f64, fy: f64, cx: f64, cy: f64) -> Self {
         Self(Camera {
             fx,
             fy,
@@ -41,6 +41,11 @@ impl CameraBuilder {
     }
 }
 
+pub enum PointSpace {
+    Camera(Vector3<f32>),
+    World(Vector3<f32>),
+}
+
 impl Camera {
     /// Project a 3D point into image space.
     ///
@@ -51,17 +56,20 @@ impl Camera {
     /// # Returns
     ///
     /// * (x and y) coordinates.
-    pub fn intrinsic_project(&self, point: &Vector3<f32>) -> (f32, f32) {
+    pub fn project(&self, point: &Vector3<f32>) -> (f32, f32) {
         (
-            (point.x * self.fx as f32 + self.cx as f32) / point.z,
-            (point.y * self.fy as f32 + self.cy as f32) / point.z,
+            point[0] * self.fx as f32 / point[2] + self.cx as f32,
+            point[1] * self.fy as f32 / point[2] + self.cy as f32
         )
     }
 
-    pub fn project(&self, point: &Vector3<f32>) -> (f32, f32) {
-        match self.camera_to_world.as_ref() {
-            Some(extrinsics) => self.intrinsic_project(point), // self.intrinsic_project(&extrinsics * &point),
-            None => self.intrinsic_project(point),
+    pub fn project_point(&self, point: &PointSpace) -> Option<(f32, f32)> {
+        match (self.camera_to_world.as_ref(), point) {
+            (Some(extrinsics), &PointSpace::World(point)) => {
+                Some(self.project(&extrinsics.transform_vector(&point)))
+            }
+            (_, &PointSpace::Camera(point)) => Some(self.project(&point)),
+            _ => None,
         }
     }
 
@@ -82,11 +90,16 @@ impl Camera {
         )
     }
 
+    /// Scale the camera parameters according to the given scale.
+    /// 
+    /// # Arguments
+    /// 
+    /// * scale: The scale factor.
+    /// 
+    /// # Returns
+    /// 
+    /// * A new camera with scaled parameters.
     pub fn scale(&self, scale: f64) -> Self {
-        if self.camera_to_world.is_some() {
-            panic!("Not implemented: align3d::Camera.scale() with camera_to_world.");
-        }
-
         Self {
             fx: self.fx * scale,
             fy: self.fy * scale,

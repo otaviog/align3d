@@ -1,26 +1,47 @@
-use std::iter::Enumerate;
+use std::rc::Rc;
 
-use super::camera::Camera;
-use super::io::rgbdimage::RGBDImage;
+use crate::camera::Camera;
+
+use crate::image::{resize_image_rgb8, rgb_to_luma_u8, RgbdFrame, RgbdImage, resize_image_rgb82};
+use crate::intensity_map::IntensityMap;
 
 use nalgebra::Vector3;
-use ndarray::iter::AxisIter;
-use ndarray::{ArcArray2, Array2, Array3, ArrayView2, Axis, Array1};
+
+use ndarray::{ArcArray2, Array1, Array2, Array3, Axis};
 
 use crate::io::Geometry;
 use crate::pointcloud::PointCloud;
 
-pub struct ImagePointCloud {
+use super::resize::{resize_range_points, resize_range_normals};
+
+/// A point cloud that comes from an image-based measurement. It representation holds its grid structure.
+pub struct RangeImage {
+    /// 3D points in the camera frame, as array with shape: (height, width, 3)
     pub points: Array3<f32>,
+    /// Mask of valid points, as array with shape: (height, width)
     pub mask: Array2<u8>,
+    /// Normals of the points, as array with shape: (height, width, 3)
     pub normals: Option<Array3<f32>>,
+    /// Colors of the points, as array with shape: (height, width, 3)
     pub colors: Option<Array3<u8>>,
-    pub intensities: Option<Array1<f32>>,
+    /// Camera parameters that originated the image.
+    pub camera: Camera,
+
+    /// Intensities of the points, as array with shape: (height, width)
+    pub intensities: Option<Array1<u8>>,
+
+    intensity_map: Option<Rc<IntensityMap>>,
     valid_points: usize,
 }
 
-impl ImagePointCloud {
-    pub fn from_rgbd_image(camera: &Camera, rgbd_image: &RGBDImage) -> Self {
+impl RangeImage {
+    /// Creates a new range image from a depth image and camera parameters.
+    ///
+    /// # Arguments
+    ///
+    /// * `camera` - Camera parameters.
+    /// * rgbd_image - Rgbd image. Preferably, the depth image should be filtered with bilateral filter.
+    pub fn from_rgbd_image(camera: &Camera, rgbd_image: &RgbdImage) -> Self {
         // TODO produce a warning or return an error
 
         let (width, height) = (rgbd_image.width(), rgbd_image.height());
@@ -54,9 +75,15 @@ impl ImagePointCloud {
             mask,
             normals: None,
             colors: Some(colors),
+            camera: camera.clone(),
             intensities: None,
+            intensity_map: None,
             valid_points,
         }
+    }
+
+    pub fn from_rgbd_frame(frame: &RgbdFrame) -> Self {
+        Self::from_rgbd_image(&frame.camera, &frame.image)
     }
 
     pub fn width(&self) -> usize {
@@ -77,8 +104,7 @@ impl ImagePointCloud {
     }
 
     pub fn get_point(&self, row: usize, col: usize) -> Option<nalgebra::Vector3<f32>> {
-        if col < self.width() && row < self.height() && self.mask[(row as usize, col as usize)] == 1
-        {
+        if col < self.width() && row < self.height() && self.mask[(row, col)] == 1 {
             Some(Vector3::new(
                 self.points[(row, col, 0)],
                 self.points[(row, col, 1)],
@@ -151,7 +177,7 @@ impl ImagePointCloud {
                     top - center
                 };
 
-                let normal = left_to_right.cross(&bottom_to_top);
+                let normal = left_to_right.cross(&bottom_to_top).normalize();
 
                 let normal_magnitude = normal.magnitude();
                 if normal_magnitude > 1e-6_f32 {
@@ -178,64 +204,85 @@ impl ImagePointCloud {
         self.intensities = Some(
             color
                 .axis_iter(Axis(0))
-                .map(|rgb| rgb[0] as f32*0.3 + rgb[1] as f32*0.59 + rgb[2] as f32*0.11)
+                .map(|rgb| rgb_to_luma_u8(rgb[0], rgb[1], rgb[2]))
                 .collect(),
         );
 
         self
     }
-}
 
-pub struct PointView<'a> {
-    points: ArrayView2<'a, f32>,
-    mask: ArrayView2<'a, u8>,
-}
+    pub fn intensity_map(&mut self) -> Rc<IntensityMap> {
+        if self.intensity_map.is_none() {
+            if self.intensities.is_none() {
+                self.compute_intensity();
+            }
+        }
 
-pub struct PointViewIterator<'a> {
-    iter: Enumerate<
-        std::iter::Zip<
-            AxisIter<'a, f32, ndarray::Dim<[usize; 1]>>,
-            AxisIter<'a, u8, ndarray::Dim<[usize; 1]>>,
-        >,
-    >,
-}
+        self.intensity_map = Some(Rc::new(IntensityMap::from_luma_image(
+            &self
+                .intensities
+                .as_ref()
+                .unwrap()
+                .view()
+                .into_shape((self.height(), self.width()))
+                .unwrap(),
+        )));
 
-impl<'a> PointView<'a> {
-    pub fn iter(&'a self) -> PointViewIterator<'a> {
-        PointViewIterator {
-            iter: self
-                .points
-                .axis_iter(Axis(0))
-                .zip(self.mask.axis_iter(Axis(0)))
-                .enumerate(),
+        self.intensity_map.as_ref().unwrap().clone()
+    }
+
+    pub fn downsample(&self, scale: f64) -> RangeImage {
+        let (width, height) = (
+            (self.width() as f32 * 0.5) as usize,
+            (self.height() as f32 * 0.5) as usize,
+        );
+        let (points, mask) =
+            resize_range_points(&self.points.view(), &self.mask.view(), width, height);
+
+        let normals = if let Some(normals) = self.normals.as_ref() {
+            Some(resize_range_normals(&normals.view(), &self.mask.view(), width, height))
+        } else {
+            None
+        };
+
+        let colors = if let Some(colors) = self.colors.as_ref() {
+            // Todo fix:
+            let colors2 = colors
+                .clone()
+                .into_shape((3, self.height(), self.width()))
+                .unwrap();
+            // Some(resize_image_rgb8(&colors2.view(), width, height))
+            Some(resize_image_rgb82(&colors.view(), width, height))
+        } else {
+            None
+        };
+        let valid_points = mask.iter().map(|x| (*x == 1) as usize).sum();
+        RangeImage {
+            points,
+            mask,
+            normals,
+            colors,
+            camera: self.camera.scale(0.5),
+            intensities: None,
+            intensity_map: None,
+            valid_points,
         }
     }
-}
 
-impl<'a> Iterator for PointViewIterator<'a> {
-    type Item = (usize, Vector3<f32>);
+    pub fn pyramid(self, levels: usize) -> Vec<RangeImage> {
+        let mut pyramid = vec![self];
 
-    fn next(&mut self) -> Option<Self::Item> {
-        loop {
-            let (i, (v, m)) = self.iter.next()?;
-            if m[0] > 0 {
-                return Some((i, Vector3::new(v[0], v[1], v[2])));
-            };
+        for _ in 0..levels - 1 {
+            let prev = pyramid.last().unwrap();
+            pyramid.push(prev.downsample(0.5));
         }
+
+        pyramid
     }
 }
 
-impl ImagePointCloud {
-    pub fn point_view<'a>(&'a self) -> PointView<'a> {
-        let total_points = self.len();
-        let points = self.points.view().into_shape((total_points, 3)).unwrap();
-        let mask = self.mask.view().into_shape((total_points, 1)).unwrap();
-        PointView { points, mask }
-    }
-}
-
-impl From<&ImagePointCloud> for PointCloud {
-    fn from(image_pcl: &ImagePointCloud) -> PointCloud {
+impl From<&RangeImage> for PointCloud {
+    fn from(image_pcl: &RangeImage) -> PointCloud {
         let num_total_points = image_pcl.len();
 
         let mask = image_pcl
@@ -298,8 +345,8 @@ impl From<&ImagePointCloud> for PointCloud {
     }
 }
 
-impl From<&ImagePointCloud> for Geometry {
-    fn from(image_pcl: &ImagePointCloud) -> Geometry {
+impl From<&RangeImage> for Geometry {
+    fn from(image_pcl: &RangeImage) -> Geometry {
         let pcl = PointCloud::from(image_pcl);
         pcl.into()
     }
@@ -308,7 +355,11 @@ impl From<&ImagePointCloud> for Geometry {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::io::{dataset::RGBDDataset, slamtb::SlamTbDataset, write_ply};
+    use crate::{
+        image::IntoLumaImage,
+        io::{core::RgbdDataset, slamtb::SlamTbDataset, write_ply},
+    };
+    use nshare::ToNdarray2;
     use rstest::*;
 
     #[fixture]
@@ -320,42 +371,77 @@ mod tests {
     fn should_backproject_rgbd_image(sample1: SlamTbDataset) {
         use crate::io::write_ply;
 
-        let (cam, rgbd_image) = sample1.get_item(0).unwrap();
-        let im_pcl = ImagePointCloud::from_rgbd_image(&cam, &rgbd_image);
+        let (cam, rgbd_image) = sample1.get_item(0).unwrap().into_parts();
+        let im_pcl = RangeImage::from_rgbd_image(&cam, &rgbd_image);
 
         assert_eq!(480, im_pcl.height());
         assert_eq!(640, im_pcl.width());
 
-        write_ply("tests/data/out-backproj.ply", &Geometry::from(&im_pcl))
-            .expect("Error while writing results");
+        write_ply(
+            "tests/outputs/out-back-projection.ply",
+            &Geometry::from(&im_pcl),
+        )
+        .expect("Error while writing results");
     }
 
     #[rstest]
     fn should_compute_normals(sample1: SlamTbDataset) {
-        let (cam, rgbd_image) = sample1.get_item(0).unwrap();
+        let (cam, rgbd_image) = sample1.get_item(0).unwrap().into_parts();
 
-        let mut im_pcl = ImagePointCloud::from_rgbd_image(&cam, &rgbd_image);
+        let mut im_pcl = RangeImage::from_rgbd_image(&cam, &rgbd_image);
         im_pcl.compute_normals();
+        write_ply(
+            "tests/outputs/out-range-image-normals.ply",
+            &Geometry::from(&im_pcl),
+        )
+        .expect("Error while writing the results");
 
         {
             let normals = im_pcl.normals.as_ref().unwrap();
             assert_eq!(480, normals.shape()[0]);
             assert_eq!(640, normals.shape()[1]);
-        }
 
-        write_ply(
-            "tests/data/out-imagepcl-normals.ply",
-            &Geometry::from(&im_pcl),
-        )
-        .expect("Error while writing the results");
+            let v = Vector3::new(
+                normals[[44, 42, 0]],
+                normals[[44, 42, 1]],
+                normals[[44, 42, 2]],
+            );
+            assert_eq!(v.norm(), 1.0);
+        }
     }
 
     #[rstest]
     fn should_convert_into_pointcloud(sample1: SlamTbDataset) {
-        let (cam, rgbd_image) = sample1.get_item(0).unwrap();
-        let im_pcl = ImagePointCloud::from_rgbd_image(&cam, &rgbd_image);
+        let (cam, rgbd_image) = sample1.get_item(0).unwrap().into_parts();
+        let im_pcl = RangeImage::from_rgbd_image(&cam, &rgbd_image);
 
         let pcl = PointCloud::from(&im_pcl);
         assert_eq!(pcl.len(), 270213);
+    }
+
+    #[rstest]
+    fn verify_pyramid(sample1: SlamTbDataset) {
+        let mut pyramid = RangeImage::from_rgbd_frame(&sample1.get_item(0).unwrap()).pyramid(3);
+
+        for im in pyramid.iter_mut() {
+            im.compute_normals();
+            im.compute_intensity();
+        }
+
+        for (i, im) in pyramid.iter().enumerate() {
+            write_ply(
+                format!("tests/outputs/out-range-image-{}.ply", i),
+                &Geometry::from(im),
+            )
+            .expect("Error while writing the results");
+        }
+
+        for (i, im) in pyramid.iter_mut().enumerate() {
+            let imap = im.intensity_map().clone().into_ndarray2();
+            imap.to_luma_image()
+                .save(format!("tests/outputs/out-range-image-{}.png", i))
+                .expect("Error while writing the results");
+        }
+        assert_eq!(pyramid.len(), 3);
     }
 }

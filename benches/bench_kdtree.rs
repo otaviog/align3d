@@ -30,15 +30,15 @@ fn kdtree_benchmark(c: &mut Criterion) {
     };
 
     c.bench_function("kdtree creation", |b| {
-        b.iter(|| KdTree::new(&randomized_points));
+        b.iter(|| KdTree::new(&randomized_points.view()));
     });
 
     c.bench_function("kdtree search", |b| {
-        let tree = KdTree::new(&randomized_points);
+        let tree = KdTree::new(&randomized_points.view());
         b.iter_custom(|iters| {
             let start = Instant::now();
             for _i in 0..iters {
-                tree.nearest::<3>(&ordered_points, Array1Recycle::Empty);
+                tree.nearest::<3>(&ordered_points.view(), Array1Recycle::Empty);
             }
             start.elapsed()
         });

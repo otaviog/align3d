@@ -18,14 +18,21 @@ enum KdNode {
     },
 }
 
+/// KdTree for fast nearest neighbor search.
 pub struct KdTree {
     root: Box<KdNode>,
 }
 
 impl KdTree {
-    pub fn new(points: &Array2<f32>) -> Self {
+    /// Create a new KdTree from a set of points.
+    /// The points are stored in a 2D array, where each row is a point.
+    ///
+    /// # Arguments
+    ///
+    /// * points - 2D array of points.
+    pub fn new(points: &ArrayView2<f32>) -> Self {
         // Recursive creation.
-        fn rec(points: &Array2<f32>, mut indices: Vec<usize>, depth: usize) -> KdNode {
+        fn rec(points: &ArrayView2<f32>, mut indices: Vec<usize>, depth: usize) -> KdNode {
             // Stop recursion if this should be a leaf node.
             if indices.len() <= 16 {
                 return KdNode::Leaf {
@@ -55,9 +62,52 @@ impl KdTree {
         }
     }
 
+    /// Find the nearest neighbor to a query point. This version is for 3D points only.
+    ///
+    /// # Arguments
+    ///
+    /// * point - The query point.
+    ///
+    /// # Returns
+    ///
+    /// A tuple containing the index of the nearest neighbor and the distance to it.
+    pub fn nearest3d(&self, point: &Vector3<f32>) -> (usize, f32) {
+        let mut curr_node = &self.root;
+        let mut depth = 0;
+
+        loop {
+            match curr_node.as_ref() {
+                KdNode::NonLeaf {
+                    middle_value: mid,
+                    left,
+                    right,
+                } => {
+                    curr_node = if point[depth] < *mid { left } else { right };
+                    depth = min(depth + 1, 2);
+                }
+                KdNode::Leaf {
+                    points: leaf_points,
+                    indices,
+                } => {
+                    let mut min_dist = f32::MAX;
+                    let mut min_idx = 0;
+                    for (idx, leaf_point) in leaf_points.rows().into_iter().enumerate() {
+                        let leaf_point = Vector3::new(leaf_point[0], leaf_point[1], leaf_point[2]);
+                        let dist = (point - leaf_point).norm_squared();
+                        if dist < min_dist {
+                            min_dist = dist;
+                            min_idx = idx;
+                        }
+                    }
+                    return (indices[min_idx], min_dist);
+                }
+            }
+        }
+    }
+
     pub fn nearest<const DIM: usize>(
         &self,
-        queries: &Array2<f32>,
+        queries: &ArrayView2<f32>,
         nearest: Array1Recycle,
     ) -> Array1<usize> {
         let queries_shape = queries.shape();
@@ -76,9 +126,6 @@ impl KdTree {
                         left,
                         right,
                     } => {
-                        // let v = point[depth % point_dim];
-                        // curr_node = if v < *mid { left } else { right };
-                        // depth += 1;
                         let v = point[depth];
                         curr_node = if v < *mid { left } else { right };
 
@@ -154,7 +201,7 @@ mod tests {
     #[test]
     fn should_find_nearest_points() {
         let points = array![[1., 2., 3.], [2., 3., 4.], [5., 6., 7.], [8., 9., 1.]];
-        let tree = KdTree::new(&points);
+        let tree = KdTree::new(&points.view());
 
         let queries = array![
             [8., 9.1, 1.3],
@@ -163,7 +210,7 @@ mod tests {
             [2.2, 3.1, 4.2]
         ];
 
-        let found = tree.nearest::<3>(&queries, crate::Array1Recycle::Empty);
+        let found = tree.nearest::<3>(&queries.view(), crate::Array1Recycle::Empty);
         assert_eq!(found, array![3, 2, 0, 1]);
     }
 
@@ -186,9 +233,9 @@ mod tests {
             (random_indices, randomized_points)
         };
 
-        let tree = KdTree::new(&randomized_points);
+        let tree = KdTree::new(&randomized_points.view());
 
-        let found_indices = tree.nearest::<3>(&ordered_points, Array1Recycle::Empty);
+        let found_indices = tree.nearest::<3>(&ordered_points.view(), Array1Recycle::Empty);
         assert_eq!(Array::from_vec(random_indices), found_indices);
     }
 
@@ -212,14 +259,14 @@ mod tests {
             randomized_points.slice_move(s![0..5000, ..])
         };
 
-        let tree = KdTree::new(&randomized_points);
+        let tree = KdTree::new(&randomized_points.view());
 
         let mut sum_millis = 0;
         const M: usize = 10;
         let mut result = Array1Recycle::Empty;
         for _ in 0..M {
             let start = Instant::now();
-            result = Array1Recycle::Recycle(tree.nearest::<3>(&ordered_points, result));
+            result = Array1Recycle::Recycle(tree.nearest::<3>(&ordered_points.view(), result));
             sum_millis += start.elapsed().as_millis();
         }
 

@@ -1,7 +1,7 @@
 use std::{cell::RefCell, rc::Rc, sync::Arc};
 
 use nalgebra::Vector3;
-use nalgebra_glm::Mat3x3;
+
 use ndarray::Axis;
 use vulkano::{
     buffer::{BufferUsage, CpuAccessibleBuffer},
@@ -181,7 +181,7 @@ impl Node for VkPointCloudNode {
         window_state: &FrameStepInfo,
     ) {
         if !self.properties.visible {
-            return ;
+            return;
         }
 
         let pipeline = context
@@ -220,10 +220,16 @@ impl Node for VkPointCloudNode {
             Arc::new(StandardMemoryAllocator::new_default(context.device.clone()));
 
         let uniform_buffer_subbuffer = {
+            let view_matrix = context.view_matrix * self.properties.transformation;
+            let projection_worldview = context.projection_matrix * view_matrix;
+
+            let normal_matrix = view_matrix.try_inverse().unwrap().transpose();
+            let normal_matrix = normal_matrix.fixed_slice::<3, 3>(0, 0);
+
             let uniform_data = vs::ty::Data {
-                normal_worldview: Mat3x3::identity().into(),
-                worldview: context.view_matrix.into(),
-                projection_worldview: (context.projection_matrix * context.view_matrix).into(),
+                normal_worldview: normal_matrix.into(),
+                worldview: view_matrix.into(),
+                projection_worldview: projection_worldview.into(),
                 _dummy0: [0; 12],
             };
 
@@ -294,9 +300,9 @@ mod tests {
         offscreen_renderer: (Manager, OffscreenRenderer),
         sample_teapot_pointcloud: PointCloud,
     ) {
-        let (manager, offscreen_renderer) = offscreen_renderer;
+        let (manager, _offscreen_renderer) = offscreen_renderer;
         let mem_alloc = StandardMemoryAllocator::new_default(manager.device.clone());
-        let node = VkPointCloudNode::new(VkPointCloud::from_pointcloud(
+        let _node = VkPointCloudNode::new(VkPointCloud::from_pointcloud(
             &mem_alloc,
             &sample_teapot_pointcloud,
         ));

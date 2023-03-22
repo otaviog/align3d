@@ -1,51 +1,42 @@
-use std::{cell::RefCell, rc::Rc};
-
 use align3d::{
-    icp::{ICPParams, ICP},
-    imagepointcloud::ImagePointCloud,
-    io::{dataset::RGBDDataset, slamtb::SlamTbDataset},
+    bilateral::BilateralFilter,
+    icp::{Icp, IcpParams},
+    io::{core::RgbdDataset, slamtb::SlamTbDataset},
     pointcloud::PointCloud,
-    viz::{geometry::VkPointCloudNode, scene::Scene, Manager, Window},
+    range_image::RangeImageBuilder,
+    viz::GeoViewer,
 };
-use nalgebra::Matrix4;
 
-pub fn main() {
-    let dataset = SlamTbDataset::load("tests/data/rgbd/sample1").unwrap();
-    let item = dataset.get_item(0).unwrap();
+pub fn main() -> Result<(), Box<dyn std::error::Error>> {
+    const SOURCE_IDX: usize = 0;
+    const TARGET_IDX: usize = 6;
 
-    let pcl0: PointCloud = {
-        let mut pcl = ImagePointCloud::from_rgbd_image(&item.0, &item.1);
-        pcl.compute_normals();
-        PointCloud::from(&pcl)
-    };
+    let dataset = SlamTbDataset::load("tests/data/rgbd/sample2").unwrap();
+    let frame_transform = RangeImageBuilder::default()
+        .with_bilateral_filter(Some(BilateralFilter::default()))
+        .with_normals(true)
+        .pyramid_levels(1);
+    let target_pcl =
+        PointCloud::from(&frame_transform.build(dataset.get_item(TARGET_IDX).unwrap())[0]);
+    let source_pcl =
+        PointCloud::from(&frame_transform.build(dataset.get_item(SOURCE_IDX).unwrap())[0]);
 
-    let item = dataset.get_item(5).unwrap();
-    let pcl1: PointCloud = {
-        let mut pcl = ImagePointCloud::from_rgbd_image(&item.0, &item.1);
-        pcl.compute_normals();
-        PointCloud::from(&pcl)
-    };
-
-    let icp = ICP::new(
-        ICPParams {
-            max_iterations: 10,
-            weight: 0.01,
+    let icp = Icp::new(
+        IcpParams {
+            max_iterations: 15,
+            max_distance: 0.5,
+            max_normal_angle: 25_f32.to_radians(),
+            ..Default::default()
         },
-        &pcl0,
+        &target_pcl,
     );
-    let result = icp.align(&pcl1);
+    let result = icp.align(&source_pcl);
 
-    let mut manager = Manager::default();
-    let node0 = VkPointCloudNode::load(&manager, &pcl0);
-    let node00 = node0.borrow().new_node();
-    node00.borrow_mut().properties.transformation = Matrix4::from(result);
+    let mut viewer = GeoViewer::new();
+    viewer.add_point_cloud(&target_pcl);
+    viewer.add_point_cloud(&source_pcl);
+    viewer.add_point_cloud(&(&result * &source_pcl));
+    viewer.run();
 
-    let mut scene = Scene::default();
-    scene
-        .add(VkPointCloudNode::load(&manager, &pcl1))
-        .add(node0)
-        .add(node00);
-
-    let mut window = Window::create(&mut manager, Rc::new(RefCell::new(scene)));
-    window.show();
+    Ok(())
 }

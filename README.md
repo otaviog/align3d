@@ -2,6 +2,20 @@
 
 A crate for aligning 3D data and other stuff related with point clouds and SLAM. All in Rust.
 
+## How to use
+
+```rust
+let rgbd_dataset = R::load();
+
+fn process_frame(frame: RgbdFrame) {
+    Bilateral()
+}
+let RangeImage
+let source = MsRangeImage::from(rgbd_dataset.get(0).unwrap().pyramid(3)).with_normals().with_luma().with_
+let target = RangeImage::from(rgbd_dataset.get(0).unwrap().pyramid(3));
+
+```
+
 
 ## Learning Rust
 

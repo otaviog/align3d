@@ -1,10 +1,10 @@
-pub mod dataset;
+pub mod core;
 mod off;
 pub use off::read_off;
 mod geometry;
-pub mod rgbdimage;
+
 pub mod slamtb;
-pub use geometry::Geometry;
+pub use geometry::{Geometry, GeometryBuilder};
 mod error;
 pub use error::LoadError;
 mod ply;

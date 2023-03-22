@@ -3,8 +3,8 @@ use align3d::viz::{
     Manager, Window,
 };
 
-mod test_data;
-use test_data::sample_rgbd_pointcloud;
+mod data;
+use data::sample_rgbd_pointcloud;
 
 fn main() {
     let mut manager = Manager::default();
