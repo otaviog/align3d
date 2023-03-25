@@ -134,4 +134,16 @@ where
         grid.slice(image, &mut result);
         result
     }
+
+    pub fn scale_down(&self, image: &Array2<I>) -> Array2<I>
+    where
+        I: num::Zero,
+    {
+        let (src_height, src_width) = image.dim();
+        let image = self.filter(image, Array2Recycle::Empty);
+        let (dst_height, dst_width) = (src_height / 2, src_width / 2);
+        Array2::<I>::from_shape_fn((dst_height, dst_width), |(i_dst, j_dst)| {
+            image[[i_dst * 2, j_dst * 2]]
+        })
+    }
 }

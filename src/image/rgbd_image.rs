@@ -1,8 +1,8 @@
 use ndarray::{Array2, Array3};
 
-use crate::{camera::Camera, sampling::Downsample, Array2Recycle};
+use crate::{camera::Camera, sampling::Downsample, Array2Recycle, bilateral::BilateralFilter};
 
-use super::{resize_depth_image, resize_image_rgb8};
+use super::{scale_down_rgb8, IntoImageRgb8};
 
 /// A convinence struct that holds a color image, a depth image and its depth scale.
 pub struct RgbdImage {
@@ -29,30 +29,26 @@ impl RgbdImage {
     }
 
     pub fn width(&self) -> usize {
-        self.color.shape()[2]
+        self.color.shape()[1]
     }
 
     pub fn height(&self) -> usize {
-        self.color.shape()[1]
+        self.color.shape()[0]
     }
 }
 
 impl Downsample for RgbdImage {
     type Output = RgbdImage;
-    fn downsample(&self, scale: f64) -> RgbdImage {
+    fn downsample(&self, sigma: f32) -> RgbdImage {
         let (height, width) = (self.height() as u32, self.width() as u32);
-        let (scaled_height, scaled_width) = (
-            (height as f64 * scale) as usize,
-            (width as f64 * scale) as usize,
-        );
+        let (scaled_height, scaled_width) = (height / 2, width / 2);
 
-        let resized_color = { resize_image_rgb8(&self.color.view(), scaled_width, scaled_height) };
+        let resized_color = scale_down_rgb8(&self.color.clone().into_image_rgb8(), sigma);
 
-        let resized_depth = resize_depth_image(
-            &self.depth.view(),
-            scaled_width,
-            scaled_height,
-            Array2Recycle::Empty,
+        let depth_filter = BilateralFilter::default();
+
+        let resized_depth = depth_filter.scale_down(
+            &self.depth,
         );
 
         RgbdImage {
@@ -82,9 +78,9 @@ impl RgbdFrame {
 impl Downsample for RgbdFrame {
     type Output = RgbdFrame;
 
-    fn downsample(&self, scale: f64) -> RgbdFrame {
+    fn downsample(&self, scale: f32) -> RgbdFrame {
         RgbdFrame {
-            camera: self.camera.scale(scale),
+            camera: self.camera.scale(0.5),
             image: self.image.downsample(scale),
         }
     }
@@ -94,7 +90,10 @@ impl Downsample for RgbdFrame {
 mod tests {
     use rstest::rstest;
 
-    use crate::{io::core::RgbdDataset, unit_test::sample_rgbd_dataset1, sampling::Downsample, image::IntoImageRgb};
+    use crate::{
+        image::IntoImageRgb8, io::core::RgbdDataset, sampling::Downsample,
+        unit_test::sample_rgbd_dataset1,
+    };
 
     #[rstest]
     fn test_downsample(sample_rgbd_dataset1: impl RgbdDataset) {
@@ -106,8 +105,7 @@ mod tests {
         assert_eq!(240, scale_05.height());
         scale_05
             .color
-            .view()
-            .to_image_rgb8()
+            .into_image_rgb8()
             .save("scale_05_color.png")
             .unwrap();
     }

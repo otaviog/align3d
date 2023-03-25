@@ -1,4 +1,9 @@
 {
+    "ignorePaths": [
+        "target/**",
+        "Cargo.lock",
+        "Cargo.toml"
+    ],
     "words": [
         "backproject",
         "bloei",

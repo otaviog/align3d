@@ -2,12 +2,12 @@ use std::rc::Rc;
 
 use crate::camera::Camera;
 
-use crate::image::{resize_image_rgb8, rgb_to_luma_u8, RgbdFrame, RgbdImage, resize_image_rgb82};
+use crate::image::{scale_down_rgb8, rgb_to_luma_u8, RgbdFrame, RgbdImage, IntoImageRgb8, IntoArray3};
 use crate::intensity_map::IntensityMap;
 
 use nalgebra::Vector3;
 
-use ndarray::{ArcArray2, Array1, Array2, Array3, Axis};
+use ndarray::{ArcArray2, Array1, Array2, Array3, Axis, s};
 
 use crate::io::Geometry;
 use crate::pointcloud::PointCloud;
@@ -64,9 +64,10 @@ impl RangeImage {
                     valid_points += 1;
                 }
 
-                colors[[y, x, 0]] = rgbd_image.color[[0, y, x]];
-                colors[[y, x, 1]] = rgbd_image.color[[1, y, x]];
-                colors[[y, x, 2]] = rgbd_image.color[[2, y, x]];
+                //colors.slice_mut(s![y, x, ..]).assign(&rgbd_image.color.slice(s![y, x, ..]));
+                colors[[y, x, 0]] = rgbd_image.color[[y, x, 0]];
+                colors[[y, x, 1]] = rgbd_image.color[[y, x, 1]];
+                colors[[y, x, 2]] = rgbd_image.color[[y, x, 2]];
             }
         }
 
@@ -231,10 +232,10 @@ impl RangeImage {
         self.intensity_map.as_ref().unwrap().clone()
     }
 
-    pub fn downsample(&self, scale: f64) -> RangeImage {
+    pub fn scale_down(&self) -> RangeImage {
         let (width, height) = (
-            (self.width() as f32 * 0.5) as usize,
-            (self.height() as f32 * 0.5) as usize,
+            self.width() / 2,
+            self.height() / 2
         );
         let (points, mask) =
             resize_range_points(&self.points.view(), &self.mask.view(), width, height);
@@ -245,14 +246,12 @@ impl RangeImage {
             None
         };
 
-        let colors = if let Some(colors) = self.colors.as_ref() {
-            // Todo fix:
-            let colors2 = colors
-                .clone()
-                .into_shape((3, self.height(), self.width()))
-                .unwrap();
-            // Some(resize_image_rgb8(&colors2.view(), width, height))
-            Some(resize_image_rgb82(&colors.view(), width, height))
+        // TODO: Figure out how to not clone the colors, keep all imutable and still convert into_image_rgb8
+        let colors = if let Some(colors) = self.colors.clone() {
+            let colors = colors.into_image_rgb8();
+            let down_colors = scale_down_rgb8(&colors, 1.0);
+            // Some(resize_image_rgb82(&colors.view(), width, height))
+            Some(down_colors)
         } else {
             None
         };
@@ -274,7 +273,7 @@ impl RangeImage {
 
         for _ in 0..levels - 1 {
             let prev = pyramid.last().unwrap();
-            pyramid.push(prev.downsample(0.5));
+            pyramid.push(prev.scale_down());
         }
 
         pyramid

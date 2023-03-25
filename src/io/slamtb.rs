@@ -6,10 +6,10 @@ use super::{
 use crate::{
     camera::{Camera, CameraBuilder},
     trajectory::Trajectory,
-    transform::Transform, image::{RgbdFrame, RgbdImage},
+    transform::Transform, image::{RgbdFrame, RgbdImage, IntoArray3},
 };
 
-use nshare::{ToNdarray2, ToNdarray3};
+use nshare::{ToNdarray2};
 
 pub struct SlamTbDataset {
     cameras: Vec<Camera>,
@@ -118,7 +118,7 @@ impl RgbdDataset for SlamTbDataset {
     fn get_item(&self, index: usize) -> Result<RgbdFrame, DatasetError> {
         let rgb_image = image::open(self.base_dir.join(&self.rgb_images[index]))?
             .into_rgb8()
-            .into_ndarray3();
+            .into_array3();
 
         let rgb_image =  rgb_image.as_standard_layout()
             .into_owned();

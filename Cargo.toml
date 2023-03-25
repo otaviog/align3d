@@ -47,7 +47,9 @@ rstest = "0.15.0"
 test-temp-file = "0.1.2"
 tempfile = "3.3.0"
 criterion = "0.4"
-pprof = { version = "0.11", features = ["flamegraph", "criterion"] }
+
+[target.'cfg(unix)'.dev-dependencies]
+pprof = { version = "0.11", features = ["flamegraph", "criterion"]  }
 
 [[test]]
 name = "viz-point_cloud"

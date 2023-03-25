@@ -16,7 +16,7 @@ fn main() {
     const SOURCE_IDX: usize = 0;
     const TARGET_IDX: usize = 7;
 
-    let dataset = SlamTbDataset::load("tests/data/rgbd/sample2").unwrap();
+    let dataset = SlamTbDataset::load("tests/data/rgbd/sample1").unwrap();
     let rgbd_transform = RangeImageBuilder::default()
         .with_luma(true)
         .with_normals(true)

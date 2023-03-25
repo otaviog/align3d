@@ -1,10 +1,11 @@
-use ndarray::{Array2, Array3, Axis};
+use image::flat::SampleLayout;
+use ndarray::{Array2, Array3, Axis, ShapeBuilder};
 use nshare::{ToNdarray2, ToNdarray3};
 use rstest::*;
 
 use crate::bilateral::BilateralFilter;
 
-use crate::image::RgbdFrame;
+use crate::image::{RgbdFrame, IntoArray3};
 use crate::{
     io::{core::RgbdDataset, read_off, slamtb::SlamTbDataset, Geometry},
     mesh::compute_normals,
@@ -50,7 +51,7 @@ pub fn bloei_rgb() -> Array3<u8> {
         .decode()
         .unwrap()
         .into_rgb8()
-        .into_ndarray3()
+        .into_array3()
 }
 
 #[fixture]
