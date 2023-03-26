@@ -13,10 +13,16 @@ path = "src/lib.rs"
 name = "cli"
 path = "src/bin/main.rs"
 
+[[bin]]
+name = "dataset_viewer"
+path = "src/bin/dataset_viewer.rs"
+
 [features]
-with_rerun = ["dep:rerun"]
+with_rerun = []
 
 [dependencies]
+bytemuck = "1.12.3"
+itertools = "0.10.5"
 ndarray = { version = "0.15.3", features = ["approx", "rayon"] }
 ndarray-rand = "0.14.0"
 nshare = { version = "0.9.0", features = ["ndarray", "nalgebra"] }
@@ -26,7 +32,7 @@ nalgebra-glm = { version = "0.16.0", optional = false }
 num = "*"
 ndarray-linalg = "0.12.0"
 approx = "0.5.1"
-clap = { version = "4.0.18", features = ["cargo"] }
+clap = { version = "4.0.18", features = ["cargo", "derive"] }
 image = "0.24.4"
 serde = "1.0.117"
 serde_derive = "1.0.117"
@@ -35,11 +41,12 @@ ply-rs = "0.1.3"
 vulkano = "0.32.1"
 vulkano-shaders = "0.32.0"
 vulkano-win = "0.32.0"
+egui_winit_vulkano = "0.23.0"
+vulkano-util = "0.32.0"
 winit = "0.27.5"
-bytemuck = "1.12.3"
-itertools = "0.10.5"
-rerun = {version = "0.2.0", optional = true }
+# rerun = {version = "0.2.0", optional = true }
 glob = "0.3.1"
+egui = "0.20.1"
 
 [dev-dependencies]
 rstest = "0.15.0"
@@ -61,10 +68,14 @@ path = "tests/viz/test_window.rs"
 harness = false
 
 [[test]]
+name = "viz-dataset"
+path = "tests/viz/test_dataset.rs"
+harness = false
+
+[[test]]
 name = "test_icp"
 path = "tests/test_icp.rs"
 harness = false
-features = "with_rerun"
 
 [[test]]
 name = "test_image_icp"

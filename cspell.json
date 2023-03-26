@@ -5,6 +5,7 @@
         "Cargo.toml"
     ],
     "words": [
+        "accum",
         "backproject",
         "bloei",
         "bytemuck",

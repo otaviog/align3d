@@ -1,4 +1,4 @@
-use crate::transform::Transform;
+use crate::{error::Error, trajectory::Trajectory, transform::Transform};
 
 /// Metrics for comparing two transforms.
 #[derive(Clone, Debug)]
@@ -7,6 +7,15 @@ pub struct TransformMetrics {
     pub angle: f32,
     /// Translation vector size between the two transforms.
     pub translation: f32,
+}
+
+impl Default for TransformMetrics {
+    fn default() -> Self {
+        Self {
+            angle: 0.0,
+            translation: 0.0,
+        }
+    }
 }
 
 impl TransformMetrics {
@@ -19,6 +28,26 @@ impl TransformMetrics {
             angle: diff.angle(),
             translation: diff.translation().norm(),
         }
+    }
+
+    pub fn mean_trajectory_error(
+        pred_trajectory: &Trajectory,
+        gt_trajectory: &Trajectory,
+    ) -> Result<Self, Error> {
+        if pred_trajectory.len() != gt_trajectory.len() {
+            return Err(Error::invalid_parameter(
+                "Pred and GT trajectories have different lengths.",
+            ));
+        }
+
+        let mut accum_metrics = TransformMetrics::default();
+        for (pred, gt) in pred_trajectory.iter().zip(gt_trajectory.iter()) {
+            let metrics = Self::new(&pred.0, &gt.0);
+            accum_metrics.angle += metrics.angle;
+            accum_metrics.translation += metrics.translation;
+        }
+
+        Ok(accum_metrics)
     }
 
     /// Returns the total error of the two transforms.

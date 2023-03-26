@@ -1,6 +1,6 @@
 use image::ImageError;
 
-use crate::{trajectory::Trajectory, image::RgbdFrame};
+use crate::{image::RgbdFrame, trajectory::Trajectory};
 use std::io::Error;
 
 #[derive(Debug)]
@@ -13,6 +13,26 @@ pub enum DatasetError {
 impl From<Error> for DatasetError {
     fn from(err: Error) -> Self {
         DatasetError::Io(err)
+    }
+}
+
+impl std::error::Error for DatasetError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            DatasetError::Io(err) => Some(err),
+            DatasetError::Parser(_) => None,
+            DatasetError::Image(err) => Some(err),
+        }
+    }
+}
+
+impl std::fmt::Display for DatasetError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            DatasetError::Io(err) => write!(f, "IO error: {}", err),
+            DatasetError::Parser(err) => write!(f, "Parser error: {}", err),
+            DatasetError::Image(err) => write!(f, "Image error: {}", err),
+        }
     }
 }
 
@@ -29,18 +49,18 @@ pub trait RgbdDataset {
     fn trajectory(&self) -> Option<Trajectory>;
 }
 
-pub struct SubsetDataset<D: RgbdDataset> {
-    dataset: D,
+pub struct SubsetDataset {
+    dataset: Box<dyn RgbdDataset>,
     indices: Vec<usize>,
 }
 
-impl<D: RgbdDataset> SubsetDataset<D> {
-    pub fn new(dataset: D, indices: Vec<usize>) -> Self {
+impl SubsetDataset {
+    pub fn new(dataset: Box<dyn RgbdDataset>, indices: Vec<usize>) -> Self {
         Self { dataset, indices }
     }
 }
 
-impl<D: RgbdDataset> RgbdDataset for SubsetDataset<D> {
+impl RgbdDataset for SubsetDataset {
     fn len(&self) -> usize {
         self.indices.len()
     }
