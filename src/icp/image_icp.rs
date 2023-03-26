@@ -17,12 +17,12 @@ use super::{
 
 pub struct ImageIcp<'target_lt> {
     pub params: IcpParams,
-    target: &'target_lt mut RangeImage,
+    target: &'target_lt RangeImage,
     pub initial_transform: Transform,
 }
 
 impl<'target_lt> ImageIcp<'target_lt> {
-    pub fn new(params: IcpParams, target: &'target_lt mut RangeImage) -> Self {
+    pub fn new(params: IcpParams, target: &'target_lt RangeImage) -> Self {
         Self {
             params,
             target,
@@ -31,11 +31,21 @@ impl<'target_lt> ImageIcp<'target_lt> {
     }
 
     /// Aligns the source point cloud to the target point cloud.
-    pub fn align(&mut self, source: &RangeImage) -> Transform {
-        let intensity_map = self.target.intensity_map();
-
-        let target_normals = self.target.normals.as_ref().unwrap();
-        let source_colors = source.intensities.as_ref().unwrap();
+    pub fn align(&self, source: &RangeImage) -> Transform {
+        let intensity_map = self
+            .target
+            .intensity_map
+            .as_ref()
+            .expect("Please, the target image should have a intensity map.");
+        let target_normals = self
+            .target
+            .normals
+            .as_ref()
+            .expect("Please, the target image should have normals.");
+        let source_colors = source
+            .intensities
+            .as_ref()
+            .expect("Please, the source image should have intensity colors.");
 
         let mut optim_transform = self.initial_transform.clone();
 
@@ -158,10 +168,10 @@ mod tests {
 
     #[rstest]
     fn test_align(sample_range_img_ds2: TestRangeImageDataset) {
-        let mut rimage0 = sample_range_img_ds2.get_item(0).unwrap();
+        let rimage0 = sample_range_img_ds2.get_item(0).unwrap();
         let rimage1 = sample_range_img_ds2.get_item(5).unwrap();
 
-        let result = ImageIcp::new(IcpParams::default(), &mut rimage0).align(&rimage1);
+        let result = ImageIcp::new(IcpParams::default(), &rimage0).align(&rimage1);
         println!("Result: {:?}", result);
 
         let expected = Transform::new(

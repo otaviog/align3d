@@ -1,7 +1,11 @@
 use super::cost_function::PointPlaneDistance;
 use super::icp_params::IcpParams;
 use crate::{
-    kdtree::KdTree, optim::GaussNewton, pointcloud::PointCloud, transform::{Transform, LieGroup}, trig,
+    kdtree::KdTree,
+    optim::GaussNewton,
+    pointcloud::PointCloud,
+    transform::{LieGroup, Transform},
+    trig,
 };
 use itertools::izip;
 use nalgebra::Vector3;
@@ -46,10 +50,11 @@ impl<'target_lt> Icp<'target_lt> {
     ///
     /// The transformation that aligns the source point cloud to the target point cloud.
     pub fn align(&self, source: &PointCloud) -> Transform {
-        if let None = self.target.normals {
-            return Transform::eye();
-        }
-
+        let target_normals = self
+            .target
+            .normals
+            .as_ref()
+            .expect("Please, the target point cloud should have normals.");
         let mut optim_transform = Transform::eye();
         let mut optim = GaussNewton::<6>::new();
         let geom_cost = PointPlaneDistance {};
@@ -80,11 +85,7 @@ impl<'target_lt> Icp<'target_lt> {
                     continue;
                 }
 
-                let target_normal = self
-                    .target
-                    .normals
-                    .as_ref()
-                    .unwrap()
+                let target_normal = target_normals
                     .row(found_index)
                     .into_nalgebra()
                     .fixed_slice::<3, 1>(0, 0)
@@ -110,13 +111,12 @@ impl<'target_lt> Icp<'target_lt> {
             }
 
             let residual = optim.mean_squared_residual();
-            println!("Residual: {}", residual);
+            println!("Residual: {residual}");
             optim.weight(self.params.weight);
             let update = optim.solve().unwrap();
-            optim_transform =
-                &Transform::exp(&LieGroup::Se3(update)) * &optim_transform;
+            optim_transform = &Transform::exp(&LieGroup::Se3(update)) * &optim_transform;
             optim.reset();
-            
+
             if residual < best_residual {
                 best_residual = residual;
                 best_transform = optim_transform.clone();
@@ -140,7 +140,7 @@ mod tests {
 
     #[fixture]
     fn sample1() -> (PointCloud, PointCloud) {
-        use crate::io::slamtb::SlamTbDataset;
+        use crate::io::slamtb_dataset::SlamTbDataset;
 
         let dataset = SlamTbDataset::load("tests/data/rgbd/sample1").unwrap();
 

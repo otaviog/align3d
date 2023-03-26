@@ -1,4 +1,4 @@
-use std::{collections::HashMap, sync::Arc};
+use std::{cell::RefCell, collections::HashMap, rc::Rc, sync::Arc};
 
 use crate::bounds::Sphere3Df;
 use nalgebra_glm::{self, Mat3};
@@ -9,15 +9,16 @@ use vulkano::{
     render_pass::RenderPass,
 };
 
-use super::controllers::FrameStepInfo;
+use super::{controllers::FrameStepInfo, Manager};
 
+pub type NodeRef<T> = Rc<RefCell<T>>;
 pub type Mat4x4 = nalgebra_glm::Mat4x4;
 
 #[derive(Clone, Copy)]
 pub struct NodeProperties {
     pub transformation: Mat4x4,
     pub bounding_sphere: Sphere3Df,
-    pub visible: bool
+    pub visible: bool,
 }
 
 impl Default for NodeProperties {
@@ -25,7 +26,7 @@ impl Default for NodeProperties {
         Self {
             transformation: Mat4x4::identity(),
             bounding_sphere: Sphere3Df::empty(),
-            visible: true
+            visible: true,
         }
     }
 }
@@ -94,8 +95,9 @@ pub trait Node {
     );
 }
 
-pub trait IntoNode {
-    fn into_node(&self) -> Box<dyn Node>;
+pub trait MakeNode {
+    type Node;
+    fn make_node(&self, manager: &mut Manager) -> NodeRef<dyn Node>;
 }
 
 #[cfg(test)]

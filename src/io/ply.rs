@@ -64,7 +64,7 @@ impl ply::PropertyAccess for Face {
             ("vertex_index" | "vertex_indices", ply::Property::ListInt(vec)) => {
                 self.vertex_index = vec
             }
-            (k, _) => panic!("Face: Unexpected key/value combination: key: {}", k),
+            (k, _) => panic!("Face: Unexpected key/value combination: key: {k}"),
         }
     }
 }

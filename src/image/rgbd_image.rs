@@ -1,8 +1,8 @@
 use ndarray::{Array2, Array3};
 
-use crate::{camera::Camera, sampling::Downsample, Array2Recycle, bilateral::BilateralFilter};
+use crate::{camera::Camera, sampling::Downsample, bilateral::BilateralFilter};
 
-use super::{scale_down_rgb8, IntoImageRgb8};
+use super::{py_scale_down, IntoImageRgb8};
 
 /// A convinence struct that holds a color image, a depth image and its depth scale.
 pub struct RgbdImage {
@@ -40,11 +40,7 @@ impl RgbdImage {
 impl Downsample for RgbdImage {
     type Output = RgbdImage;
     fn downsample(&self, sigma: f32) -> RgbdImage {
-        let (height, width) = (self.height() as u32, self.width() as u32);
-        let (scaled_height, scaled_width) = (height / 2, width / 2);
-
-        let resized_color = scale_down_rgb8(&self.color.clone().into_image_rgb8(), sigma);
-
+        let resized_color = py_scale_down(&self.color.clone().into_image_rgb8(), sigma);
         let depth_filter = BilateralFilter::default();
 
         let resized_depth = depth_filter.scale_down(

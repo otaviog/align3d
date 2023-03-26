@@ -21,11 +21,7 @@ impl Array1Recycle {
     }
 
     pub fn is_empty(&self) -> bool {
-        if let Self::Empty = self {
-            true
-        } else {
-            false
-        }
+        matches!(self, Self::Empty)
     }
 }
 
@@ -50,11 +46,7 @@ impl<T> Array2Recycle<T> where T: num::Zero + Clone {
     }
 
     pub fn is_empty(&self) -> bool {
-        if let Self::Empty = self {
-            true
-        } else {
-            false
-        }
+        matches!(self, Self::Empty)
     }
 }
 #[cfg(test)]

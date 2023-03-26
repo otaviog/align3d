@@ -1,8 +1,8 @@
-use image::{flat::SampleLayout, RgbImage, imageops::blur};
-use ndarray::{Array3, ArrayView3, ShapeBuilder};
+use image::{flat::SampleLayout, imageops::blur, RgbImage};
+use ndarray::{Array3, ShapeBuilder};
 
-use crate::utils::math::integer_fractional;
-
+/// Trait to convert into ndarray::Array3, this is different than nshare version
+/// because it uses the shape [height, width, channels] instead of [channels, height, width].
 pub trait IntoArray3 {
     fn into_array3(self) -> Array3<u8>;
 }
@@ -23,6 +23,7 @@ impl IntoArray3 for image::RgbImage {
     }
 }
 
+/// Trait to convert objects into image::RgbImage
 pub trait IntoImageRgb8 {
     fn into_image_rgb8(self) -> RgbImage;
 }
@@ -37,47 +38,27 @@ impl IntoImageRgb8 for Array3<u8> {
     }
 }
 
-pub fn scale_down_rgb8(
-    src_img: &RgbImage,
-    sigma: f32
-) -> Array3<u8> {
+pub fn py_scale_down(src_img: &RgbImage, sigma: f32) -> Array3<u8> {
     let (src_height, src_width) = (src_img.height() as usize, src_img.width() as usize);
     let src_img = blur(src_img, sigma).into_array3();
 
     let (dst_height, dst_width) = (src_height / 2, src_width / 2);
     Array3::<u8>::from_shape_fn((dst_height, dst_width, 3), |(i_dst, j_dst, c)| {
-        let v = src_img[[i_dst * 2, j_dst * 2, c]];
-        num::clamp(v as u8, 0, 255)
+        num::clamp(src_img[[i_dst * 2, j_dst * 2, c]], 0, 255)
     })
-
-
-    // let mut target_image = Array3::zeros((dst_height, dst_width, 3));
-    // for i_dst in 0..dst_height {
-    //     let i_src = i_dst * 2;
-    //     for j_dst in 0..dst_width {
-    //         let j_src = j_dst * 2;
-    //         for c in 0..channels {
-    //             let v = src_image[[i_src, j_src, c]]];
-    //             target_image[[i_dst, j_dst, c]] = num::clamp(v as u8, 0, 255);
-    //         }
-    //     }
-    // }
-    // target_image
 }
-
 
 #[cfg(test)]
 mod tests {
-    use image::{ImageBuffer, RgbImage};
     use ndarray::Array3;
     use rstest::rstest;
 
-    use super::{scale_down_rgb8, IntoImageRgb8};
+    use super::{py_scale_down, IntoImageRgb8};
     use crate::unit_test::bloei_rgb;
 
     #[rstest]
     fn verify_downsample_rgb_image(bloei_rgb: Array3<u8>) {
-        let downsample = scale_down_rgb8(&bloei_rgb.into_image_rgb8(), 1.0);
+        let downsample = py_scale_down(&bloei_rgb.into_image_rgb8(), 1.0);
         assert_eq!(downsample.shape(), &[300, 225, 3]);
         downsample
             .into_image_rgb8()

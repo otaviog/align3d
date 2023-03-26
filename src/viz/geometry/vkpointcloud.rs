@@ -24,9 +24,10 @@ use vulkano::{
 use crate::{
     bounds::Sphere3Df,
     pointcloud::PointCloud,
+    range_image::RangeImage,
     viz::{
         controllers::FrameStepInfo,
-        node::{CommandBuffersContext, Node, NodeProperties},
+        node::{CommandBuffersContext, MakeNode, Node, NodeProperties, NodeRef},
         Manager,
     },
 };
@@ -104,7 +105,7 @@ pub struct VkPointCloudNode {
 }
 
 impl VkPointCloudNode {
-    pub fn new(point_cloud: Arc<VkPointCloud>) -> Rc<RefCell<Self>> {
+    pub fn new(point_cloud: Arc<VkPointCloud>) -> NodeRef<Self> {
         let points = point_cloud.points.read().unwrap();
 
         Rc::new(RefCell::new(Self {
@@ -120,14 +121,7 @@ impl VkPointCloudNode {
         }))
     }
 
-    pub fn load(manager: &Manager, point_cloud: &PointCloud) -> Rc<RefCell<Self>> {
-        Self::new(VkPointCloud::from_pointcloud(
-            &manager.memory_allocator,
-            &point_cloud,
-        ))
-    }
-
-    pub fn new_node(&self) -> Rc<RefCell<Self>> {
+    pub fn new_node(&self) -> NodeRef<Self> {
         Rc::new(RefCell::new(Self {
             properties: self.properties,
             point_cloud: self.point_cloud.clone(),
@@ -276,6 +270,28 @@ impl Node for VkPointCloudNode {
     }
 }
 
+impl MakeNode for PointCloud {
+    type Node = VkPointCloudNode;
+
+    fn make_node(&self, manager: &mut Manager) -> NodeRef<dyn Node> {
+        VkPointCloudNode::new(VkPointCloud::from_pointcloud(
+            &manager.memory_allocator,
+            self,
+        ))
+    }
+}
+
+impl MakeNode for RangeImage {
+    type Node = VkPointCloudNode;
+
+    fn make_node(&self, manager: &mut Manager) -> NodeRef<dyn Node> {
+        VkPointCloudNode::new(VkPointCloud::from_pointcloud(
+            &manager.memory_allocator,
+            &PointCloud::from(self),
+        ))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use crate::pointcloud::PointCloud;
@@ -290,7 +306,7 @@ mod tests {
     #[fixture]
     fn offscreen_renderer() -> (Manager, OffscreenRenderer) {
         let mut manager = Manager::default();
-        println!("Using device: {}", manager.get_device_name());
+        println!("Using device: {}", manager.device_name());
         let renderer = OffscreenRenderer::new(&mut manager, 640, 480);
         (manager, renderer)
     }

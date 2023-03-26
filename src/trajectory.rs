@@ -6,6 +6,12 @@ pub struct Trajectory {
     pub times: Vec<f32>,
 }
 
+impl Default for Trajectory {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Trajectory {
     pub fn new() -> Self {
         Self {

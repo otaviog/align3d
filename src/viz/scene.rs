@@ -1,18 +1,18 @@
-use std::{sync::Arc, rc::Rc, cell::RefCell};
+use std::sync::Arc;
 
 use super::{
     controllers::FrameStepInfo,
-    node::{CommandBuffersContext, Node, NodeProperties},
+    node::{CommandBuffersContext, Node, NodeProperties, NodeRef},
 };
 
 #[derive(Clone, Default)]
 pub struct Scene {
     node_properties: NodeProperties,
-    pub nodes: Vec<Rc<RefCell<dyn Node>>>,
+    pub nodes: Vec<NodeRef<dyn Node>>,
 }
 
 impl Scene {
-    pub fn add(&mut self, node: Rc<RefCell<dyn Node>>) -> &mut Self {
+    pub fn add(&mut self, node: NodeRef<dyn Node>) -> &mut Self {
         self.nodes.push(node);
         self
     }
@@ -22,10 +22,11 @@ impl Scene {
     pub fn new() -> Arc<Self> {
         Arc::new(Self {
             node_properties: Default::default(),
-            nodes: Default::default()
+            nodes: Default::default(),
         })
     }
 }
+
 impl Node for Scene {
     fn properties(&self) -> &NodeProperties {
         &self.node_properties

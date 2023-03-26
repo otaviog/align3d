@@ -11,14 +11,10 @@ pub struct PointCloudView<'a> {
     mask: ArrayView2<'a, u8>,
 }
 
+type NdArrayRowIter<'a, T> = AxisIter<'a, T, ndarray::Dim<[usize; 1]>>;
+
 pub struct PointCloudViewIterator<'a> {
-    iter: Zip<
-        Zip<
-            AxisIter<'a, f32, ndarray::Dim<[usize; 1]>>,
-            AxisIter<'a, f32, ndarray::Dim<[usize; 1]>>,
-        >,
-        AxisIter<'a, u8, ndarray::Dim<[usize; 1]>>,
-    >,
+    iter: Zip<Zip<NdArrayRowIter<'a, f32>, NdArrayRowIter<'a, f32>>, NdArrayRowIter<'a, u8>>,
     linear_index: usize,
 }
 
@@ -55,7 +51,7 @@ impl<'a> Iterator for PointCloudViewIterator<'a> {
 }
 
 impl RangeImage {
-    pub fn point_cloud_view<'a>(&'a self) -> PointCloudView<'a> {
+    pub fn point_cloud_view(&'_ self) -> PointCloudView<'_> {
         let total_points = self.len();
         let points = self.points.view().into_shape((total_points, 3)).unwrap();
         let normals = self

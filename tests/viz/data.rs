@@ -2,7 +2,7 @@ use align3d::Array2Recycle;
 use align3d::bilateral::BilateralFilter;
 use align3d::range_image::RangeImage;
 use align3d::io::core::RgbdDataset;
-use align3d::io::slamtb::SlamTbDataset;
+use align3d::io::slamtb_dataset::SlamTbDataset;
 use ndarray::{Array2, Axis};
 use rstest::*;
 

@@ -17,8 +17,8 @@ pub struct Manager {
     pub memory_allocator: StandardMemoryAllocator
 }
 
-impl Manager {
-    pub fn default() -> Self {
+impl Default for Manager {
+    fn default() -> Self {
         let library = VulkanLibrary::new().expect("Vulkan is not supported by this system");
         let required_extensions = vulkano_win::required_extensions(&library);
 
@@ -92,8 +92,10 @@ impl Manager {
             memory_allocator
         }
     }
+}
 
-    pub fn get_device_name(&self) -> String {
+impl Manager {
+    pub fn device_name(&self) -> String {
         self.physical_device.properties().device_name.clone()
     }
 }
@@ -104,6 +106,6 @@ mod tests {
     #[test]
     pub fn test_can_initialize() {
         let manager = Manager::default();
-        println!("Using device {}", manager.get_device_name());
+        println!("Using device {}", manager.device_name());
     }
 }

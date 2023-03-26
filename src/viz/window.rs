@@ -1,4 +1,4 @@
-use std::{cell::RefCell, rc::Rc, sync::Arc, time::Instant};
+use std::{sync::Arc, time::Instant};
 
 use vulkano::{
     command_buffer::{
@@ -19,7 +19,7 @@ use vulkano::{
 };
 use vulkano_win::VkSurfaceBuild;
 use winit::{
-    event::{Event, VirtualKeyCode, WindowEvent, ElementState},
+    event::{ElementState, Event, VirtualKeyCode, WindowEvent},
     event_loop::{ControlFlow, EventLoop},
     platform::run_return::EventLoopExtRunReturn,
     window::{Window as WWindow, WindowBuilder},
@@ -28,19 +28,20 @@ use winit::{
 use super::{
     controllers::{FrameStepInfo, SceneState, VirtualCameraControl, WASDVirtualCameraControl},
     manager::Manager,
-    node::CommandBuffersContext,
+    node::{CommandBuffersContext, NodeRef},
 };
 use super::{node::Node, virtual_camera::VirtualCameraSphericalBuilder};
 use std::collections::HashMap;
 
+pub type KeyCallback = Box<dyn FnMut(VirtualKeyCode, &FrameStepInfo)>;
 pub struct Window {
     surface: Arc<Surface>,
     event_loop: Option<EventLoop<()>>,
     device: Arc<Device>,
     queue: Arc<Queue>,
-    scene: Rc<RefCell<dyn Node>>,
+    scene: NodeRef<dyn Node>,
     command_buffer_allocator: StandardCommandBufferAllocator,
-    pub on_key: Option<Box<dyn FnMut(VirtualKeyCode, &FrameStepInfo)>>,
+    pub on_key: Option<KeyCallback>,
 }
 
 fn window_size_dependent_setup(
@@ -73,7 +74,7 @@ fn window_size_dependent_setup(
 }
 
 impl Window {
-    pub fn create(manager: &mut Manager, scene: Rc<RefCell<dyn Node>>) -> Self {
+    pub fn create(manager: &mut Manager, scene: NodeRef<dyn Node>) -> Self {
         let event_loop = EventLoop::new();
         let surface = WindowBuilder::new()
             .build_vk_surface(&event_loop, manager.instance.clone())
@@ -277,8 +278,8 @@ impl Window {
                         ..
                     } => {
                         camera_control.cursor_moved(
-                            position.x as f64,
-                            position.y as f64,
+                            position.x,
+                            position.y,
                             &window_state,
                             &scene_state,
                         );
@@ -331,7 +332,7 @@ impl Window {
                                     Err(SwapchainCreationError::ImageExtentNotSupported {
                                         ..
                                     }) => return,
-                                    Err(e) => panic!("Failed to recreate swapchain: {:?}", e),
+                                    Err(e) => panic!("Failed to recreate swapchain: {e:?}"),
                                 };
 
                             swapchain = new_swapchain;
@@ -353,7 +354,7 @@ impl Window {
                                     recreate_swapchain = true;
                                     return;
                                 }
-                                Err(e) => panic!("Failed to acquire next image: {:?}", e),
+                                Err(e) => panic!("Failed to acquire next image: {e:?}"),
                             };
 
                         if suboptimal {
@@ -393,7 +394,7 @@ impl Window {
                                 previous_frame_end = Some(sync::now(self.device.clone()).boxed());
                             }
                             Err(e) => {
-                                panic!("Failed to flush future: {:?}", e);
+                                panic!("Failed to flush future: {e:?}");
                             }
                         }
                     }

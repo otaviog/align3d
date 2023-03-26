@@ -1,12 +1,20 @@
 use std::{cell::RefCell, rc::Rc};
 
-use crate::{pointcloud::PointCloud, range_image::RangeImage};
-
-use super::{geometry::VkPointCloudNode, scene::Scene, Manager, Window};
+use super::{
+    node::{MakeNode, Node, NodeRef},
+    scene::Scene,
+    Manager, Window,
+};
 
 pub struct GeoViewer {
-    scene: Rc<RefCell<Scene>>,
+    scene: NodeRef<Scene>,
     manager: Manager,
+}
+
+impl Default for GeoViewer {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl GeoViewer {
@@ -17,14 +25,14 @@ impl GeoViewer {
         }
     }
 
-    pub fn add_point_cloud(&mut self, point_cloud: &PointCloud) -> Rc<RefCell<VkPointCloudNode>> {
-        let node = VkPointCloudNode::load(&self.manager, &point_cloud);
+    pub fn add_node<GeomType>(&mut self, node: &GeomType) -> NodeRef<dyn Node>
+    where
+        GeomType: MakeNode,
+    {
+        let node = node.make_node(&mut self.manager);
         self.scene.borrow_mut().add(node.clone());
-        node
-    }
 
-    pub fn add_range_image(&mut self, range_image: &RangeImage) -> Rc<RefCell<VkPointCloudNode>> {
-        self.add_point_cloud(&PointCloud::from(range_image))
+        node
     }
 
     pub fn run(mut self) {
@@ -33,7 +41,7 @@ impl GeoViewer {
             let num_key = vkeycode as u32;
             if num_key <= 10 {
                 let scene = self.scene.borrow_mut();
-                if let Some(node) = scene.nodes.get(num_key as usize).map(|n| n.clone()) {
+                if let Some(node) = scene.nodes.get(num_key as usize).cloned() {
                     let mut node = node.borrow_mut();
                     let is_visible = node.properties().visible;
                     node.properties_mut().set_visible(!is_visible);

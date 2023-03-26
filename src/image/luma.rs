@@ -20,7 +20,7 @@ impl IntoLumaImage for Array2<f32> {
             .min_by(|x, y| x.abs().partial_cmp(&y.abs()).unwrap())
             .unwrap();
 
-        let u8_image = self.map(|x| (((*x as f32 - min) / (max - min)) * 255.0) as u8);
+        let u8_image = self.map(|x| (((*x - min) / (max - min)) * 255.0) as u8);
 
         GrayImage::from_vec(width as u32, height as u32, u8_image.into_raw_vec()).unwrap()
     }
@@ -49,15 +49,7 @@ impl IntoLumaImage for Array2<u8> {
     }
 }
 
-pub fn rgb_to_luma(r: u8, g: u8, b: u8) -> f32 {
-    const DIV: f32 = 1.0 / 255.0;
-    (r as f32 * 0.3 + g as f32 * 0.59 + b as f32 * 0.11) * DIV
-}
-
-pub fn rgb_to_luma_u8(r: u8, g: u8, b: u8) -> u8 {
-    (r as f32 * 0.3 + g as f32 * 0.59 + b as f32 * 0.11) as u8
-}
-
+/// Trait to convert arrays into luma/grayscale arrays
 pub trait IntoLumaArray<T> {
     fn to_luma_array(&self) -> Array2<T>;
 }
@@ -77,4 +69,15 @@ impl IntoLumaArray<u8> for ArrayView3<'_, u8> {
 
         grayscale.into_shape((h, w)).unwrap()
     }
+}
+
+/// Converts a RGB value into luma/grayscale.
+pub fn rgb_to_luma(r: u8, g: u8, b: u8) -> f32 {
+    const DIV: f32 = 1.0 / 255.0;
+    (r as f32 * 0.3 + g as f32 * 0.59 + b as f32 * 0.11) * DIV
+}
+
+/// Converts a RGB value into luma/grayscale, `u8` version
+pub fn rgb_to_luma_u8(r: u8, g: u8, b: u8) -> u8 {
+    (r as f32 * 0.3 + g as f32 * 0.59 + b as f32 * 0.11) as u8
 }

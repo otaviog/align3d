@@ -1,12 +1,14 @@
-use std::{rc::Rc, cell::RefCell};
-
 use ndarray::{Array2, Axis};
 
-use crate::{io::read_off, mesh::compute_normals, viz::Manager};
+use crate::{
+    io::read_off,
+    mesh::compute_normals,
+    viz::{node::NodeRef, Manager},
+};
 
-use super::{VkMeshNode, VkMesh};
+use super::{VkMesh, VkMeshNode};
 
-pub fn teapot_node(manager: &Manager) -> Rc<RefCell<VkMeshNode>> {
+pub fn teapot_node(manager: &Manager) -> NodeRef<VkMeshNode> {
     let geometry = {
         let mut geometry = read_off("tests/data/teapot.off").unwrap();
 

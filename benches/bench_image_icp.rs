@@ -2,7 +2,7 @@ use align3d::icp::{IcpParams, ImageIcp};
 use align3d::range_image::RangeImage;
 use align3d::io::core::RgbdDataset;
 
-use align3d::io::slamtb::SlamTbDataset;
+use align3d::io::slamtb_dataset::SlamTbDataset;
 use criterion::{criterion_group, criterion_main, Criterion};
 use pprof::criterion::{Output, PProfProfiler};
 

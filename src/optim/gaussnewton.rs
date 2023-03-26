@@ -1,6 +1,6 @@
 use itertools::izip;
 
-use nalgebra::{ArrayStorage, Cholesky, SMatrix, SVector, Const};
+use nalgebra::{ArrayStorage, Cholesky, Const, SMatrix, SVector};
 use ndarray::{Array1, Array2, Axis};
 use num::Zero;
 
@@ -22,10 +22,8 @@ impl GaussNewtonBatch {
     }
 
     pub fn assign(&mut self, i: usize, cost: f32, residual: f32, jacobian: &[f32]) {
-        if !self.dirty[i] {
-            if self.costs[i] < cost {
-                return;
-            }
+        if !self.dirty[i] && self.costs[i] < cost {
+            return;
         }
 
         self.jacobians
@@ -47,6 +45,12 @@ pub struct GaussNewton<const DIM: usize> {
     gradient: SVector<f32, DIM>,
     squared_residual_sum: f32,
     count: usize,
+}
+
+impl <const DIM: usize> Default for  GaussNewton<DIM> {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl<const DIM: usize> GaussNewton<DIM> {
@@ -110,25 +114,25 @@ impl<const DIM: usize> GaussNewton<DIM> {
         }
         let hessian: SMatrix<f64, DIM, DIM> = nalgebra::convert(self.hessian);
         let gradient: SVector<f64, DIM> = nalgebra::convert(self.gradient);
-        
+
         let update = Cholesky::<f64, Const<DIM>>::new(hessian)
-                .unwrap()
-                .solve(&gradient);
+            .unwrap()
+            .solve(&gradient);
         Some(nalgebra::convert(update))
     }
 
     pub fn combine(&mut self, other: &Self, weight1: f32, weight2: f32) {
-        self.hessian = self.hessian * (weight1 * weight1) + &other.hessian * (weight2 * weight2);
-        self.gradient = self.gradient * weight1 + &other.gradient * weight2;
+        self.hessian = self.hessian * (weight1 * weight1) + other.hessian * (weight2 * weight2);
+        self.gradient = self.gradient * weight1 + other.gradient * weight2;
         self.squared_residual_sum =
             self.squared_residual_sum * weight1 + other.squared_residual_sum * weight2;
         self.count += other.count;
     }
 
     pub fn weight(&mut self, weight: f32) {
-        self.hessian = self.hessian * (weight * weight);
-        self.gradient = self.gradient * weight;
-        self.squared_residual_sum = self.squared_residual_sum * weight;
+        self.hessian *= weight * weight;
+        self.gradient *= weight;
+        self.squared_residual_sum *= weight;
     }
 
     pub fn mean_squared_residual(&self) -> f32 {

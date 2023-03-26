@@ -39,17 +39,17 @@ fn read_off_elements<T: Clone + FromStr + Zero + Copy>(
     num_elements: usize,
     parser_context: &mut TextParserContext,
 ) -> Result<Array2<T>, LoadError> {
-    let mut elements = Array2::<T>::zeros((num_elements as usize, 3));
+    let mut elements = Array2::<T>::zeros((num_elements, 3));
     for i in 0..num_elements {
         let line = parser_context.read_line()?;
         if let [Ok(x), Ok(y), Ok(z)] =
             line.split(' ').map(|x| x.parse::<T>()).collect::<Vec<_>>()[..]
         {
-            elements[[i as usize, 0]] = x;
-            elements[[i as usize, 1]] = y;
-            elements[[i as usize, 2]] = z;
+            elements[[i, 0]] = x;
+            elements[[i, 1]] = y;
+            elements[[i, 2]] = z;
         } else {
-            return Err(parser_context.gen_error(format!("Invalid vertex. Got `{}`", line)));
+            return Err(parser_context.gen_error(format!("Invalid vertex. Got `{line}`")));
         }
     }
 
@@ -87,7 +87,7 @@ fn read_off_faces(
                 faces.push(f3);
             }
             _ => {
-                return Err(parser_context.gen_error(format!("Invalid face. Got `{}`", line)));
+                return Err(parser_context.gen_error(format!("Invalid face. Got `{line}`")));
             }
         }
     }
@@ -107,8 +107,7 @@ pub fn read_off(filepath: &str) -> Result<Geometry, LoadError> {
     let header = parser_context.read_line()?;
     if header.trim() != "OFF" {
         return Err(parser_context.gen_error(format!(
-            "file header does not start with 'OFF', got '{}' instead",
-            header
+            "file header does not start with 'OFF', got '{header}' instead"
         )));
     }
 
@@ -121,7 +120,7 @@ pub fn read_off(filepath: &str) -> Result<Geometry, LoadError> {
     let (num_verts, num_faces, _) = if let [Ok(v0), Ok(v1), Ok(v2)] = values[..] {
         (v0, v1, v2)
     } else {
-        return Err(parser_context.gen_error(format!("Invalid size formats. Got `{}`", dims)));
+        return Err(parser_context.gen_error(format!("Invalid size formats. Got `{dims}`")));
     };
 
     let vertices = read_off_elements::<f32>(num_verts, &mut parser_context)?;

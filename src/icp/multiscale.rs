@@ -5,7 +5,7 @@ use itertools::izip;
 /// Multiscale interface for ICP algorithms.
 /// TODO: Make it generic for point cloud ICP.
 pub struct MultiscaleAlign<'pyramid_lt> {
-    target_pyramid: &'pyramid_lt mut Vec<RangeImage>,
+    target_pyramid: &'pyramid_lt Vec<RangeImage>,
     params: MsIcpParams,
 }
 
@@ -24,7 +24,7 @@ impl<'pyramid_lt> MultiscaleAlign<'pyramid_lt> {
     /// * Err(Error(InvalidParameter)) if the number of levels in the target pyramid and the number
     ///   of ICP parameters are equal.
     pub fn new(
-        target_pyramid: &'pyramid_lt mut Vec<RangeImage>,
+        target_pyramid: &'pyramid_lt Vec<RangeImage>,
         params: MsIcpParams,
     ) -> Result<Self, Error> {
         if params.len() != target_pyramid.len() {
@@ -48,17 +48,17 @@ impl<'pyramid_lt> MultiscaleAlign<'pyramid_lt> {
     /// # Returns
     ///
     /// * The optimized transform.
-    pub fn align(&mut self, source_pyramid: &Vec<RangeImage>) -> Transform {
+    pub fn align(&self, source_pyramid: &[RangeImage]) -> Transform {
         let mut optim_transform = Transform::eye();
 
-        for (params, mut target, source) in izip!(
+        for (params, target, source) in izip!(
             self.params.iter(),
-            self.target_pyramid.iter_mut(),
+            self.target_pyramid.iter(),
             source_pyramid.iter()
         )
         .rev()
         {
-            let mut icp = ImageIcp::new(params.clone(), &mut target);
+            let mut icp = ImageIcp::new(*params, target);
             icp.initial_transform = optim_transform;
             optim_transform = icp.align(source);
         }
@@ -82,13 +82,13 @@ mod tests {
     fn test_align(sample_rgbd_frame_dataset1: TestRgbdFrameDataset) {
         let ri_builder = RangeImageBuilder::default()
             .with_bilateral_filter(Some(BilateralFilter::default()))
-            .with_luma(true)
+            .with_intensity(true)
             .with_normals(true);
-        let mut target = ri_builder.build(sample_rgbd_frame_dataset1.get_item(0).unwrap());
+        let target = ri_builder.build(sample_rgbd_frame_dataset1.get_item(0).unwrap());
         let source = ri_builder.build(sample_rgbd_frame_dataset1.get_item(4).unwrap());
 
-        let mut align = super::MultiscaleAlign {
-            target_pyramid: &mut target,
+        let align = super::MultiscaleAlign {
+            target_pyramid: &target,
             params: MsIcpParams::repeat(3, &IcpParams::default()),
         };
         // Just test that it doesn't crash. Use integration tests for more thorough testing.

@@ -1,18 +1,16 @@
-use std::rc::Rc;
-
 use crate::camera::Camera;
 
-use crate::image::{scale_down_rgb8, rgb_to_luma_u8, RgbdFrame, RgbdImage, IntoImageRgb8, IntoArray3};
+use crate::image::{py_scale_down, rgb_to_luma_u8, IntoImageRgb8, RgbdFrame, RgbdImage};
 use crate::intensity_map::IntensityMap;
 
 use nalgebra::Vector3;
 
-use ndarray::{ArcArray2, Array1, Array2, Array3, Axis, s};
+use ndarray::{ArcArray2, Array1, Array2, Array3, Axis};
 
 use crate::io::Geometry;
 use crate::pointcloud::PointCloud;
 
-use super::resize::{resize_range_points, resize_range_normals};
+use super::resize::{resize_range_normals, resize_range_points};
 
 /// A point cloud that comes from an image-based measurement. It representation holds its grid structure.
 pub struct RangeImage {
@@ -26,11 +24,10 @@ pub struct RangeImage {
     pub colors: Option<Array3<u8>>,
     /// Camera parameters that originated the image.
     pub camera: Camera,
-
-    /// Intensities of the points, as array with shape: (height, width)
+    /// Intensities of the points, as array with shape: (height*width)
     pub intensities: Option<Array1<u8>>,
-
-    intensity_map: Option<Rc<IntensityMap>>,
+    /// Intensity map of the points, as array with shape: (height, width)
+    pub intensity_map: Option<IntensityMap>,
     valid_points: usize,
 }
 
@@ -40,10 +37,8 @@ impl RangeImage {
     /// # Arguments
     ///
     /// * `camera` - Camera parameters.
-    /// * rgbd_image - Rgbd image. Preferably, the depth image should be filtered with bilateral filter.
+    /// * rgbd_image - Rgbd image.
     pub fn from_rgbd_image(camera: &Camera, rgbd_image: &RgbdImage) -> Self {
-        // TODO produce a warning or return an error
-
         let (width, height) = (rgbd_image.width(), rgbd_image.height());
         let depth_scale = rgbd_image.depth_scale.unwrap_or(1.0 / 5000.0) as f32;
         let mut points = Array3::zeros((height, width, 3));
@@ -83,27 +78,49 @@ impl RangeImage {
         }
     }
 
+    /// Creates a new range image from a depth image and camera parameters.
     pub fn from_rgbd_frame(frame: &RgbdFrame) -> Self {
         Self::from_rgbd_image(&frame.camera, &frame.image)
     }
 
+    /// Width of the image.
     pub fn width(&self) -> usize {
         self.points.shape()[1]
     }
 
+    /// Height of the image.
     pub fn height(&self) -> usize {
         self.points.shape()[0]
     }
 
+    /// Number of valid points in the image, this is not the same as
+    /// width*height, since some points may be invalid (i.e, 0 valued depth).
     pub fn valid_points_count(&self) -> usize {
         self.valid_points
     }
 
+    /// Returns the number of points in the image, which is width*height.
     pub fn len(&self) -> usize {
         let shape = self.points.shape();
         shape[0] * shape[1]
     }
 
+    /// Returns true if the image is empty, i.e, it has no points.
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
+    /// Returns the 3D point at the given row and column.
+    /// If the point is invalid, returns None.
+    ///
+    /// # Arguments
+    ///
+    /// * `row` - Row of the point.
+    /// * `col` - Column of the point.
+    ///
+    /// # Returns
+    ///
+    /// * `Option<Vector3<f32>>` - 3D point at `row` and `col`.
     pub fn get_point(&self, row: usize, col: usize) -> Option<nalgebra::Vector3<f32>> {
         if col < self.width() && row < self.height() && self.mask[(row, col)] == 1 {
             Some(Vector3::new(
@@ -116,6 +133,7 @@ impl RangeImage {
         }
     }
 
+    /// Updates the image with normals computed from the 3D points.
     pub fn compute_normals(&mut self) -> &mut Self {
         let height = self.height();
         let width = self.width();
@@ -194,6 +212,8 @@ impl RangeImage {
         self
     }
 
+    /// By default, range image have only the RGB colors, this method
+    /// will convert them into luma values, which are used as color optimization term in ICP.
     pub fn compute_intensity(&mut self) -> &mut Self {
         let color = self
             .colors
@@ -212,14 +232,14 @@ impl RangeImage {
         self
     }
 
-    pub fn intensity_map(&mut self) -> Rc<IntensityMap> {
-        if self.intensity_map.is_none() {
-            if self.intensities.is_none() {
-                self.compute_intensity();
-            }
+    /// Generates the intensity map from the intensity array. This method is called by RangeImage
+    /// that are targets in Image ICP.
+    pub fn compute_intensity_map(&mut self) -> &mut Self {
+        if self.intensities.is_none() {
+            self.compute_intensity();
         }
 
-        self.intensity_map = Some(Rc::new(IntensityMap::from_luma_image(
+        self.intensity_map = Some(IntensityMap::from_luma_image(
             &self
                 .intensities
                 .as_ref()
@@ -227,30 +247,36 @@ impl RangeImage {
                 .view()
                 .into_shape((self.height(), self.width()))
                 .unwrap(),
-        )));
+        ));
 
-        self.intensity_map.as_ref().unwrap().clone()
+        self
     }
 
-    pub fn scale_down(&self) -> RangeImage {
-        let (width, height) = (
-            self.width() / 2,
-            self.height() / 2
-        );
+    /// Downscales the range image by a factor of 2 using a Gaussian pyramid for rgb image.
+    /// And a simple averaging for the 3D points and normals.
+    ///
+    /// # Arguments
+    ///
+    /// * `sigma` - The start sigma value for the Gaussian pyramid.
+    ///
+    /// # Returns
+    ///
+    /// A new range image with the downscaled points, normals, and colors by a factor of 2.
+    pub fn pyr_scale_down(&self, sigma: f32) -> RangeImage {
+        let (width, height) = (self.width() / 2, self.height() / 2);
         let (points, mask) =
             resize_range_points(&self.points.view(), &self.mask.view(), width, height);
 
-        let normals = if let Some(normals) = self.normals.as_ref() {
-            Some(resize_range_normals(&normals.view(), &self.mask.view(), width, height))
-        } else {
-            None
-        };
+        let normals = self
+            .normals
+            .as_ref()
+            .map(|normals| resize_range_normals(&normals.view(), &self.mask.view(), width, height));
 
-        // TODO: Figure out how to not clone the colors, keep all imutable and still convert into_image_rgb8
+        // TODO: Figure out how to not clone the colors, keep all immutable
+        // and still convert into_image_rgb8
         let colors = if let Some(colors) = self.colors.clone() {
             let colors = colors.into_image_rgb8();
-            let down_colors = scale_down_rgb8(&colors, 1.0);
-            // Some(resize_image_rgb82(&colors.view(), width, height))
+            let down_colors = py_scale_down(&colors, sigma);
             Some(down_colors)
         } else {
             None
@@ -268,12 +294,12 @@ impl RangeImage {
         }
     }
 
-    pub fn pyramid(self, levels: usize) -> Vec<RangeImage> {
+    pub fn pyramid(self, levels: usize, sigma: f32) -> Vec<RangeImage> {
         let mut pyramid = vec![self];
 
         for _ in 0..levels - 1 {
             let prev = pyramid.last().unwrap();
-            pyramid.push(prev.scale_down());
+            pyramid.push(prev.pyr_scale_down(sigma));
         }
 
         pyramid
@@ -356,7 +382,7 @@ mod tests {
     use super::*;
     use crate::{
         image::IntoLumaImage,
-        io::{core::RgbdDataset, slamtb::SlamTbDataset, write_ply},
+        io::{core::RgbdDataset, slamtb_dataset::SlamTbDataset, write_ply},
     };
     use nshare::ToNdarray2;
     use rstest::*;
@@ -420,7 +446,8 @@ mod tests {
 
     #[rstest]
     fn verify_pyramid(sample1: SlamTbDataset) {
-        let mut pyramid = RangeImage::from_rgbd_frame(&sample1.get_item(0).unwrap()).pyramid(3);
+        let mut pyramid =
+            RangeImage::from_rgbd_frame(&sample1.get_item(0).unwrap()).pyramid(3, 1.0);
 
         for im in pyramid.iter_mut() {
             im.compute_normals();
@@ -436,7 +463,7 @@ mod tests {
         }
 
         for (i, im) in pyramid.iter_mut().enumerate() {
-            let imap = im.intensity_map().clone().into_ndarray2();
+            let imap = im.intensity_map.as_ref().unwrap().clone().into_ndarray2();
             imap.to_luma_image()
                 .save(format!("tests/outputs/out-range-image-{}.png", i))
                 .expect("Error while writing the results");

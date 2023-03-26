@@ -6,10 +6,11 @@ use super::RangeImage;
 /// Builder for multiple range images from RGB-D data.
 pub struct RangeImageBuilder {
     with_normals: bool,
-    with_luma: bool,
+    with_intensity: bool,
     bilateral_filter: Option<BilateralFilter<u16>>,
     // bilateral_data: Array2Recycle<u16>,
     pyramid_levels: usize,
+    blur_sigma: f32,
 }
 
 impl Default for RangeImageBuilder {
@@ -17,10 +18,11 @@ impl Default for RangeImageBuilder {
     fn default() -> Self {
         Self {
             with_normals: false,
-            with_luma: false,
+            with_intensity: false,
             bilateral_filter: None,
             // bilateral_data: Array2Recycle::Empty,
             pyramid_levels: 3,
+            blur_sigma: 1.0
         }
     }
 }
@@ -42,14 +44,23 @@ impl RangeImageBuilder {
 
     /// Computes the intensity of the range image.
     /// See [`RangeImage::compute_intensity`] and [`RangeImage::intensity_map`].
-    pub fn with_luma(mut self, value: bool) -> Self {
-        self.with_luma = value;
+    pub fn with_intensity(mut self, value: bool) -> Self {
+        self.with_intensity = value;
         self
     }
 
+
     /// Sets the number of pyramid levels to use, this corresponds to the output length of [`build`].
+    /// See [`RangeImage::pyramid`].
     pub fn pyramid_levels(mut self, levels: usize) -> Self {
         self.pyramid_levels = levels;
+        self
+    }
+
+    /// Sets the sigma value for the Gaussian blur applied when build a range image pyramid.
+    /// See [`RangeImage::pyramid`].
+    pub fn blur_sigma(mut self, sigma: f32) -> Self {
+        self.blur_sigma = sigma;
         self
     }
 
@@ -70,11 +81,11 @@ impl RangeImageBuilder {
         if self.with_normals {
             first_image.compute_normals();
         }
-        let mut range_images = first_image.pyramid(self.pyramid_levels);
+        let mut range_images = first_image.pyramid(self.pyramid_levels, self.blur_sigma);
         for range_image in range_images.iter_mut() {
-            if self.with_luma {
+            if self.with_intensity {
                 range_image.compute_intensity();
-                range_image.intensity_map();
+                range_image.compute_intensity_map();
             }
         }
 

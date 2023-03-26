@@ -64,7 +64,7 @@ impl MsIcpParams {
 
     pub fn repeat(levels: usize, params: &IcpParams) -> Self {
         Self {
-            pyramid: vec![params.clone(); levels],
+            pyramid: vec![*params; levels],
         }
     }
 

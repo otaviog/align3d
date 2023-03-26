@@ -258,10 +258,10 @@ impl IntensityMap {
 }
 
 
-impl ToNdarray2 for &IntensityMap {
+impl ToNdarray2 for IntensityMap {
     type Out = Array2<f32>;
     fn into_ndarray2(self) -> Self::Out {
-        self.map.clone()
+        self.map
     }
 }
 

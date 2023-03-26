@@ -1,7 +1,7 @@
 use align3d::{
     bilateral::BilateralFilter,
     icp::{Icp, IcpParams},
-    io::{core::RgbdDataset, slamtb::SlamTbDataset},
+    io::{core::RgbdDataset, slamtb_dataset::SlamTbDataset},
     pointcloud::PointCloud,
     range_image::RangeImageBuilder,
     viz::GeoViewer,
@@ -33,9 +33,9 @@ pub fn main() -> Result<(), Box<dyn std::error::Error>> {
     let result = icp.align(&source_pcl);
 
     let mut viewer = GeoViewer::new();
-    viewer.add_point_cloud(&target_pcl);
-    viewer.add_point_cloud(&source_pcl);
-    viewer.add_point_cloud(&(&result * &source_pcl));
+    viewer.add_node(&target_pcl);
+    viewer.add_node(&source_pcl);
+    viewer.add_node(&(&result * &source_pcl));
     viewer.run();
 
     Ok(())

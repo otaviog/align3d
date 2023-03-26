@@ -49,8 +49,7 @@ pub fn resize_range_points(
     dst_width: usize,
     dst_height: usize,
 ) -> (Array3<f32>, Array2<u8>) {
-    // Todo: Make mure rustacean: use iterators, etc.
-
+    // TODO: Make mure rustacean: use iterators, etc.
     let mut dst_points = Array3::zeros((dst_height, dst_width, 3));
     let mut dst_mask = Array2::zeros((dst_height, dst_width));
     let (src_height, src_width) = (src_points.shape()[0], src_points.shape()[1]);
@@ -86,7 +85,7 @@ pub fn resize_range_normals(
     dst_width: usize,
     dst_height: usize,
 ) -> Array3<f32> {
-    // Todo: Make mure rustacean: use iterators, etc.
+    // TODO: Make mure rustacean: use iterators, etc.
 
     let mut dst_points = Array3::zeros((dst_height, dst_width, 3));
     let (src_height, src_width) = (src_normals.shape()[0], src_normals.shape()[1]);

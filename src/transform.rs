@@ -119,7 +119,7 @@ impl Transform {
             }
             &LieGroup::So3(so3) => {
                 let omega = Vector3::new(so3[3], so3[4], so3[5]);
-                let (theta, quat) = Self::exp_so3(&omega);
+                let (_, quat) = Self::exp_so3(&omega);
                 Self(Isometry3::<f32>::from_parts(
                     Translation3::new(0.0, 0.0, 0.0),
                     quat,

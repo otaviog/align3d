@@ -3,7 +3,7 @@ use std::f32::consts::PI;
 use align3d::{
     bilateral::BilateralFilter,
     icp::{multiscale::MultiscaleAlign, IcpParams, MsIcpParams},
-    io::{core::RgbdDataset, slamtb::SlamTbDataset},
+    io::{core::RgbdDataset, slamtb_dataset::SlamTbDataset},
     metrics::TransformMetrics,
     range_image::RangeImageBuilder,
     transform::Transform,
@@ -18,9 +18,9 @@ fn main() {
 
     let dataset = SlamTbDataset::load("tests/data/rgbd/sample1").unwrap();
     let rgbd_transform = RangeImageBuilder::default()
-        .with_luma(true)
+        .with_intensity(true)
         .with_normals(true)
-        // .with_bilateral_filter(Some(BilateralFilter::default()))
+        .with_bilateral_filter(Some(BilateralFilter::default()))
         .pyramid_levels(3);
     let source_pcl = rgbd_transform.build(dataset.get_item(SOURCE_IDX).unwrap());
     let mut target_pcl = rgbd_transform.build(dataset.get_item(TARGET_IDX).unwrap());
@@ -46,7 +46,7 @@ fn main() {
         };
     });
 
-    let mut icp = MultiscaleAlign::new(&mut target_pcl, params).unwrap();
+    let icp = MultiscaleAlign::new(&target_pcl, params).unwrap();
     let result = icp.align(&source_pcl);
 
     let gt_transform = dataset
@@ -64,9 +64,9 @@ fn main() {
     );
 
     let mut viewer = GeoViewer::new();
-    viewer.add_range_image(&source_pcl[0]);
-    viewer.add_range_image(&target_pcl[0]);
-    let source_t_node = viewer.add_range_image(&source_pcl[0]);
-    source_t_node.borrow_mut().properties.transformation = Matrix4::from(&result);
+    viewer.add_node(&source_pcl[0]);
+    viewer.add_node(&target_pcl[0]);
+    let source_t_node = viewer.add_node(&source_pcl[0]);
+    source_t_node.borrow_mut().properties_mut().transformation = Matrix4::from(&result);
     viewer.run();
 }

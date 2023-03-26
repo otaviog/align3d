@@ -19,7 +19,7 @@ impl RobustEstimator for HuberEstimator {
             return squared_residual;
         }
 
-        return 2.0 * (squared_residual * self.delta).sqrt() - self.delta;
+        2.0 * (squared_residual * self.delta).sqrt() - self.delta
     }
 
     fn backward(&self, residual: f32) -> f32 {

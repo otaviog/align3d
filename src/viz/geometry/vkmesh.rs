@@ -1,4 +1,4 @@
-use std::{sync::Arc, cell::RefCell, rc::Rc};
+use std::{cell::RefCell, rc::Rc, sync::Arc};
 
 use ndarray::{Array, Axis};
 use vulkano::{
@@ -24,7 +24,8 @@ use crate::{
     io::Geometry,
     viz::{
         controllers::FrameStepInfo,
-        node::{CommandBuffersContext, Node, NodeProperties},
+        node::{CommandBuffersContext, MakeNode, Node, NodeProperties, NodeRef},
+        Manager,
     },
 };
 
@@ -151,7 +152,7 @@ impl VkMeshNode {
     /// # Arguments
     ///
     /// * `mesh`: The mesh buffer instance.
-    pub fn new(mesh: Arc<VkMesh>) -> Rc<RefCell<Self>> {
+    pub fn new(mesh: Arc<VkMesh>) -> NodeRef<Self> {
         Rc::new(RefCell::new(Self {
             node_properties: NodeProperties {
                 bounding_sphere: *mesh.bounding_sphere(),
@@ -276,6 +277,14 @@ impl Node for VkMeshNode {
             .bind_index_buffer(self.mesh.indices.clone())
             .draw_indexed((self.mesh.len_face() * 3) as u32, 1, 0, 0, 0)
             .unwrap();
+    }
+}
+
+impl MakeNode for Geometry {
+    type Node = VkMeshNode;
+
+    fn make_node(&self, manager: &mut Manager) -> NodeRef<dyn Node> {
+        VkMeshNode::new(VkMesh::from_geometry(&manager.memory_allocator, self))
     }
 }
 
