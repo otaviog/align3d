@@ -1,15 +1,14 @@
-use align3d::icp::{IcpParams, Icp};
-use align3d::range_image::RangeImage;
-use align3d::io::core::RgbdDataset;
+use align3d::icp::{Icp, IcpParams};
+use align3d::io::dataset::{SlamTbDataset, RgbdDataset};
 use align3d::pointcloud::PointCloud;
+use align3d::range_image::RangeImage;
 
-use align3d::io::slamtb_dataset::SlamTbDataset;
 use criterion::{criterion_group, criterion_main, Criterion};
 use pprof::criterion::{Output, PProfProfiler};
 
 fn icp_benchmark(c: &mut Criterion) {
     let dataset = SlamTbDataset::load("tests/data/rgbd/sample1").unwrap();
-    let item = dataset.get_item(0).unwrap();
+    let item = dataset.get(0).unwrap();
 
     let pcl0: PointCloud = {
         let mut pcl = RangeImage::from_rgbd_frame(&item);
@@ -17,7 +16,7 @@ fn icp_benchmark(c: &mut Criterion) {
         PointCloud::from(&pcl)
     };
 
-    let item = dataset.get_item(5).unwrap();
+    let item = dataset.get(5).unwrap();
     let pcl1: PointCloud = {
         let mut pcl = RangeImage::from_rgbd_frame(&item);
         pcl.compute_normals();

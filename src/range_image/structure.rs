@@ -382,7 +382,7 @@ mod tests {
     use super::*;
     use crate::{
         image::IntoLumaImage,
-        io::{core::RgbdDataset, slamtb_dataset::SlamTbDataset, write_ply},
+        io::{dataset::{SlamTbDataset, RgbdDataset}, write_ply},
     };
     use nshare::ToNdarray2;
     use rstest::*;
@@ -396,7 +396,7 @@ mod tests {
     fn should_backproject_rgbd_image(sample1: SlamTbDataset) {
         use crate::io::write_ply;
 
-        let (cam, rgbd_image) = sample1.get_item(0).unwrap().into_parts();
+        let (cam, rgbd_image) = sample1.get(0).unwrap().into_parts();
         let im_pcl = RangeImage::from_rgbd_image(&cam, &rgbd_image);
 
         assert_eq!(480, im_pcl.height());
@@ -411,7 +411,7 @@ mod tests {
 
     #[rstest]
     fn should_compute_normals(sample1: SlamTbDataset) {
-        let (cam, rgbd_image) = sample1.get_item(0).unwrap().into_parts();
+        let (cam, rgbd_image) = sample1.get(0).unwrap().into_parts();
 
         let mut im_pcl = RangeImage::from_rgbd_image(&cam, &rgbd_image);
         im_pcl.compute_normals();
@@ -437,7 +437,7 @@ mod tests {
 
     #[rstest]
     fn should_convert_into_pointcloud(sample1: SlamTbDataset) {
-        let (cam, rgbd_image) = sample1.get_item(0).unwrap().into_parts();
+        let (cam, rgbd_image) = sample1.get(0).unwrap().into_parts();
         let im_pcl = RangeImage::from_rgbd_image(&cam, &rgbd_image);
 
         let pcl = PointCloud::from(&im_pcl);
@@ -446,8 +446,7 @@ mod tests {
 
     #[rstest]
     fn verify_pyramid(sample1: SlamTbDataset) {
-        let mut pyramid =
-            RangeImage::from_rgbd_frame(&sample1.get_item(0).unwrap()).pyramid(3, 1.0);
+        let mut pyramid = RangeImage::from_rgbd_frame(&sample1.get(0).unwrap()).pyramid(3, 1.0);
 
         for im in pyramid.iter_mut() {
             im.compute_normals();

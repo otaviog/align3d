@@ -1,14 +1,12 @@
 use align3d::icp::{IcpParams, ImageIcp};
+use align3d::io::dataset::{SlamTbDataset, RgbdDataset};
 use align3d::range_image::RangeImage;
-use align3d::io::core::RgbdDataset;
-
-use align3d::io::slamtb_dataset::SlamTbDataset;
 use criterion::{criterion_group, criterion_main, Criterion};
 use pprof::criterion::{Output, PProfProfiler};
 
 fn image_icp_benchmark(c: &mut Criterion) {
     let dataset = SlamTbDataset::load("tests/data/rgbd/sample1").unwrap();
-    let item = dataset.get_item(0).unwrap();
+    let item = dataset.get(0).unwrap();
 
     let mut image0 = {
         let mut image = RangeImage::from_rgbd_frame(&item);
@@ -16,7 +14,7 @@ fn image_icp_benchmark(c: &mut Criterion) {
         image
     };
 
-    let item = dataset.get_item(5).unwrap();
+    let item = dataset.get(5).unwrap();
     let image1 = {
         let mut image = RangeImage::from_rgbd_frame(&item);
         image.compute_normals();
@@ -28,7 +26,7 @@ fn image_icp_benchmark(c: &mut Criterion) {
             max_iterations: 10,
             ..Default::default()
         },
-        &mut image0
+        &mut image0,
     );
 
     c.bench_function("icp align", |b| {

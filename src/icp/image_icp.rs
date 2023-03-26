@@ -168,8 +168,8 @@ mod tests {
 
     #[rstest]
     fn test_align(sample_range_img_ds2: TestRangeImageDataset) {
-        let rimage0 = sample_range_img_ds2.get_item(0).unwrap();
-        let rimage1 = sample_range_img_ds2.get_item(5).unwrap();
+        let rimage0 = sample_range_img_ds2.get(0).unwrap();
+        let rimage1 = sample_range_img_ds2.get(5).unwrap();
 
         let result = ImageIcp::new(IcpParams::default(), &rimage0).align(&rimage1);
         println!("Result: {:?}", result);

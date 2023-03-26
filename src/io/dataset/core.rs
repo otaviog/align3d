@@ -25,7 +25,7 @@ impl From<ImageError> for DatasetError {
 pub trait RgbdDataset {
     fn len(&self) -> usize;
     fn is_empty(&self) -> bool;
-    fn get_item(&self, index: usize) -> Result<RgbdFrame, DatasetError>;
+    fn get(&self, index: usize) -> Result<RgbdFrame, DatasetError>;
     fn trajectory(&self) -> Option<Trajectory>;
 }
 
@@ -49,8 +49,8 @@ impl<D: RgbdDataset> RgbdDataset for SubsetDataset<D> {
         self.len() == 0
     }
 
-    fn get_item(&self, index: usize) -> Result<RgbdFrame, DatasetError> {
-        self.dataset.get_item(self.indices[index])
+    fn get(&self, index: usize) -> Result<RgbdFrame, DatasetError> {
+        self.dataset.get(self.indices[index])
     }
 
     fn trajectory(&self) -> Option<Trajectory> {

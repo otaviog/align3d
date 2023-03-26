@@ -1,3 +1,5 @@
+use std::ops::Index;
+
 use crate::transform::Transform;
 
 #[derive(Clone, Debug)]
@@ -49,5 +51,23 @@ impl Trajectory {
             .iter()
             .zip(self.times.iter())
             .map(|(camera_to_world, time)| (camera_to_world.clone(), *time))
+    }
+}
+
+impl FromIterator<(Transform, f32)> for Trajectory {
+    fn from_iter<T: IntoIterator<Item = (Transform, f32)>>(iter: T) -> Self {
+        let mut trajectory = Trajectory::new();
+        for (transform, time) in iter {
+            trajectory.push(transform, time);
+        }
+        trajectory
+    }
+}
+
+impl Index<usize> for Trajectory {
+    type Output = Transform;
+
+    fn index(&self, index: usize) -> &Self::Output {
+        &self.camera_to_world[index]
     }
 }

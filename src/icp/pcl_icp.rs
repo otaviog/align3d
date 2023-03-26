@@ -133,32 +133,15 @@ mod tests {
     use rstest::*;
 
     use crate::{
-        io::{core::RgbdDataset, write_ply},
-        pointcloud::PointCloud,
-        range_image::RangeImage,
+        io::write_ply,
+        unit_test::{sample_pcl_ds1, TestPclDataset},
     };
-
-    #[fixture]
-    fn sample1() -> (PointCloud, PointCloud) {
-        use crate::io::slamtb_dataset::SlamTbDataset;
-
-        let dataset = SlamTbDataset::load("tests/data/rgbd/sample1").unwrap();
-
-        let (cam1, rgbd_image1) = dataset.get_item(0).unwrap().into_parts();
-        let (cam2, rgbd_image2) = dataset.get_item(3).unwrap().into_parts();
-        let mut source = RangeImage::from_rgbd_image(&cam1, &rgbd_image1);
-        let mut target = RangeImage::from_rgbd_image(&cam2, &rgbd_image2);
-
-        source.compute_normals();
-        target.compute_normals();
-
-        (PointCloud::from(&source), PointCloud::from(&target))
-    }
 
     /// Test the ICP algorithm.
     #[rstest]
-    fn test_icp(sample1: (PointCloud, PointCloud)) {
-        let (source_pcl, target_pcl) = sample1;
+    fn test_icp(sample_pcl_ds1: TestPclDataset) {
+        let target_pcl = sample_pcl_ds1.get(0);
+        let source_pcl = sample_pcl_ds1.get(7);
 
         let mut params = IcpParams::default();
         params.weight = 0.25;

@@ -117,7 +117,7 @@ mod tests {
     use rstest::rstest;
 
     use crate::{
-        io::{core::RgbdDataset, write_ply, GeometryBuilder},
+        io::{dataset::RgbdDataset, write_ply, GeometryBuilder},
         range_image::RangeImage,
         unit_test::sample_rgbd_dataset1,
     };
@@ -126,7 +126,7 @@ mod tests {
 
     #[rstest]
     pub fn verify_downsample(sample_rgbd_dataset1: impl RgbdDataset) {
-        let frame = sample_rgbd_dataset1.get_item(0).unwrap();
+        let frame = sample_rgbd_dataset1.get(0).unwrap();
         let mut ri = RangeImage::from_rgbd_frame(&frame);
         ri.compute_normals();
 

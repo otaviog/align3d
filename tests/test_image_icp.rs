@@ -3,11 +3,10 @@ use std::f32::consts::PI;
 use align3d::{
     bilateral::BilateralFilter,
     icp::{multiscale::MultiscaleAlign, IcpParams, MsIcpParams},
-    io::{core::RgbdDataset, slamtb_dataset::SlamTbDataset},
     metrics::TransformMetrics,
     range_image::RangeImageBuilder,
     transform::Transform,
-    viz::GeoViewer,
+    viz::GeoViewer, io::dataset::{SlamTbDataset, RgbdDataset},
 };
 
 use nalgebra::Matrix4;
@@ -22,8 +21,8 @@ fn main() {
         .with_normals(true)
         .with_bilateral_filter(Some(BilateralFilter::default()))
         .pyramid_levels(3);
-    let source_pcl = rgbd_transform.build(dataset.get_item(SOURCE_IDX).unwrap());
-    let mut target_pcl = rgbd_transform.build(dataset.get_item(TARGET_IDX).unwrap());
+    let source_pcl = rgbd_transform.build(dataset.get(SOURCE_IDX).unwrap());
+    let target_pcl = rgbd_transform.build(dataset.get(TARGET_IDX).unwrap());
 
     let params = MsIcpParams::repeat(
         3,

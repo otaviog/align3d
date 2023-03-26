@@ -1,15 +1,14 @@
 use std::path::{Path, PathBuf};
 
-use super::{
-    core::{DatasetError, RgbdDataset},
-};
+use super::core::{DatasetError, RgbdDataset};
 use crate::{
     camera::{Camera, CameraBuilder},
+    image::{IntoArray3, RgbdFrame, RgbdImage},
     trajectory::Trajectory,
-    transform::Transform, image::{RgbdFrame, RgbdImage, IntoArray3},
+    transform::Transform,
 };
 
-use nshare::{ToNdarray2};
+use nshare::ToNdarray2;
 
 pub struct SlamTbDataset {
     cameras: Vec<Camera>,
@@ -115,13 +114,12 @@ impl RgbdDataset for SlamTbDataset {
         self.len() == 0
     }
 
-    fn get_item(&self, index: usize) -> Result<RgbdFrame, DatasetError> {
+    fn get(&self, index: usize) -> Result<RgbdFrame, DatasetError> {
         let rgb_image = image::open(self.base_dir.join(&self.rgb_images[index]))?
             .into_rgb8()
             .into_array3();
 
-        let rgb_image =  rgb_image.as_standard_layout()
-            .into_owned();
+        let rgb_image = rgb_image.as_standard_layout().into_owned();
         let depth_image = image::open(self.base_dir.join(&self.depth_images[index]))?
             .into_luma16()
             .into_ndarray2();
@@ -146,16 +144,13 @@ impl RgbdDataset for SlamTbDataset {
 
 #[cfg(test)]
 mod tests {
-    //use rstest::*;
-
     use super::*;
-    use crate::io::core::RgbdDataset;
 
     #[test]
     fn test_load() {
         let rgbd_dataset = SlamTbDataset::load("tests/data/rgbd/sample1").unwrap();
 
-        let (camera, image) = rgbd_dataset.get_item(0).unwrap().into_parts();
+        let (camera, image) = rgbd_dataset.get(0).unwrap().into_parts();
 
         assert_eq!(camera.fx, 544.4732666015625);
         assert_eq!(camera.fy, 544.4732666015625);

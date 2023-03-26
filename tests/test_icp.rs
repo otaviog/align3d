@@ -1,7 +1,7 @@
 use align3d::{
     bilateral::BilateralFilter,
     icp::{Icp, IcpParams},
-    io::{core::RgbdDataset, slamtb_dataset::SlamTbDataset},
+    io::dataset::{RgbdDataset, SlamTbDataset},
     pointcloud::PointCloud,
     range_image::RangeImageBuilder,
     viz::GeoViewer,
@@ -16,10 +16,8 @@ pub fn main() -> Result<(), Box<dyn std::error::Error>> {
         .with_bilateral_filter(Some(BilateralFilter::default()))
         .with_normals(true)
         .pyramid_levels(1);
-    let target_pcl =
-        PointCloud::from(&frame_transform.build(dataset.get_item(TARGET_IDX).unwrap())[0]);
-    let source_pcl =
-        PointCloud::from(&frame_transform.build(dataset.get_item(SOURCE_IDX).unwrap())[0]);
+    let target_pcl = PointCloud::from(&frame_transform.build(dataset.get(TARGET_IDX).unwrap())[0]);
+    let source_pcl = PointCloud::from(&frame_transform.build(dataset.get(SOURCE_IDX).unwrap())[0]);
 
     let icp = Icp::new(
         IcpParams {

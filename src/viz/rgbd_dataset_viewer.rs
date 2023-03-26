@@ -3,7 +3,7 @@ use std::{cell::RefCell, rc::Rc};
 use nalgebra::Matrix4;
 
 use crate::{
-    bilateral::BilateralFilter, io::core::RgbdDataset, range_image::RangeImage, Array2Recycle,
+    bilateral::BilateralFilter, range_image::RangeImage, Array2Recycle, io::dataset::RgbdDataset,
 };
 
 use super::{node::MakeNode, scene::Scene, Manager, Window};
@@ -24,7 +24,7 @@ impl RgbdDatasetViewer {
 
         for i in 0..self.dataset.len() {
             let transform = trajectory.get_relative_transform(0.0, i as f32).unwrap();
-            let (camera, mut frame) = self.dataset.get_item(i).unwrap().into_parts();
+            let (camera, mut frame) = self.dataset.get(i).unwrap().into_parts();
 
             frame.depth = {
                 let filter = BilateralFilter::default();

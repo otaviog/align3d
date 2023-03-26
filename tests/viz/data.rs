@@ -1,8 +1,7 @@
-use align3d::Array2Recycle;
 use align3d::bilateral::BilateralFilter;
+use align3d::io::dataset::{RgbdDataset, SlamTbDataset};
 use align3d::range_image::RangeImage;
-use align3d::io::core::RgbdDataset;
-use align3d::io::slamtb_dataset::SlamTbDataset;
+use align3d::Array2Recycle;
 use ndarray::{Array2, Axis};
 use rstest::*;
 
@@ -29,15 +28,13 @@ pub fn sample_teapot() -> Geometry {
     geometry
 }
 
-#[fixture]
 pub fn sample_teapot_pointcloud() -> PointCloud {
     PointCloud::from_geometry(sample_teapot())
 }
 
-#[fixture]
 pub fn sample_rgbd_pointcloud() -> PointCloud {
     let dataset = SlamTbDataset::load("tests/data/rgbd/sample1").unwrap();
-    let mut frame = dataset.get_item(0).unwrap();
+    let mut frame = dataset.get(0).unwrap();
 
     frame.image.depth = {
         let filter = BilateralFilter::default();

@@ -1,9 +1,7 @@
-pub mod core;
+pub mod dataset;
 mod off;
 pub use off::read_off;
 mod geometry;
-
-pub mod slamtb_dataset;
 
 pub use geometry::{Geometry, GeometryBuilder};
 mod error;

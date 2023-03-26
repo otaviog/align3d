@@ -87,13 +87,13 @@ mod tests {
     use rstest::rstest;
 
     use crate::{
-        image::IntoImageRgb8, io::core::RgbdDataset, sampling::Downsample,
-        unit_test::sample_rgbd_dataset1,
+        image::IntoImageRgb8, sampling::Downsample,
+        unit_test::sample_rgbd_dataset1, io::dataset::RgbdDataset,
     };
 
     #[rstest]
     fn test_downsample(sample_rgbd_dataset1: impl RgbdDataset) {
-        let image = sample_rgbd_dataset1.get_item(0).unwrap().image;
+        let image = sample_rgbd_dataset1.get(0).unwrap().image;
         let scale_05 = image.downsample(0.5);
         assert_eq!([3, 240, 320], scale_05.color.shape());
         assert_eq!([240, 320], scale_05.depth.shape());
