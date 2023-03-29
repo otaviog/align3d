@@ -1,8 +1,6 @@
-use std::sync::Arc;
-
 use super::{
     controllers::FrameStepInfo,
-    node::{CommandBuffersContext, Node, NodeProperties, NodeRef},
+    node::{node_ref, CommandBuffersContext, Node, NodeProperties, NodeRef},
 };
 
 #[derive(Clone, Default)]
@@ -13,17 +11,12 @@ pub struct Scene {
 
 impl Scene {
     pub fn add(&mut self, node: NodeRef<dyn Node>) -> &mut Self {
+        self.node_properties.bounding_sphere = self
+            .node_properties
+            .bounding_sphere
+            .add(&node.borrow().properties().bounding_sphere);
         self.nodes.push(node);
         self
-    }
-}
-
-impl Scene {
-    pub fn new() -> Arc<Self> {
-        Arc::new(Self {
-            node_properties: Default::default(),
-            nodes: Default::default(),
-        })
     }
 }
 
@@ -34,6 +27,17 @@ impl Node for Scene {
 
     fn properties_mut(&mut self) -> &mut NodeProperties {
         &mut self.node_properties
+    }
+
+    fn new_instance(&self) -> NodeRef<dyn Node> {
+        node_ref(Self {
+            nodes: self
+                .nodes
+                .iter()
+                .map(|node| node.borrow_mut().new_instance())
+                .collect(),
+            node_properties: self.node_properties,
+        })
     }
 
     fn collect_command_buffers(

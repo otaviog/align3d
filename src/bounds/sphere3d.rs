@@ -56,4 +56,14 @@ impl Sphere3Df {
     pub fn is_empty(&self) -> bool {
         self.radius < 0.0
     }
+
+    pub fn add(&self, other: &Self) -> Self {
+        if self.radius < 0.0 {
+            return *other;
+        }
+
+        let center = (self.center + other.center) / 2.0;
+        let radius = (self.center - center).norm() + self.radius.max(other.radius);
+        Self { center, radius }
+    }
 }
