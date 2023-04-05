@@ -53,6 +53,7 @@ fn main() {
         .unwrap()
         .get_relative_transform(SOURCE_IDX as f32, TARGET_IDX as f32)
         .unwrap();
+
     println!(
         "Start with metrics: {:}",
         TransformMetrics::new(&gt_transform, &Transform::eye())
@@ -67,5 +68,8 @@ fn main() {
     viewer.add_node(&target_pcl[0]);
     let source_t_node = viewer.add_node(&source_pcl[0]);
     source_t_node.borrow_mut().properties_mut().transformation = Matrix4::from(&result);
+
+    let source_t_node = viewer.add_node(&source_pcl[0]);
+    source_t_node.borrow_mut().properties_mut().transformation = Matrix4::from(&gt_transform);
     viewer.run();
 }
