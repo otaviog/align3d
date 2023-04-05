@@ -19,7 +19,7 @@ layout(location = 3) out float gs_radius;
 void main() {
   gs_position = position;
   gs_normal = normal;
-  gs_radius = 0.005;
+  gs_radius = 0.0005;
 
   float r = float((rgb >> 16) & 0xff);
   float g = float((rgb >> 8) & 0xff);
