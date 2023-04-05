@@ -1,22 +1,9 @@
+use align3d::bin_utils::dataset::create_dataset_from_string;
 use align3d::{
-    io::dataset::{IndoorLidarDataset, RgbdDataset, SlamTbDataset, SubsetDataset},
+    io::dataset::SubsetDataset,
     viz::rgbd_dataset_viewer::RgbdDatasetViewer,
 };
 use clap::Parser;
-
-#[derive(Debug, PartialEq, Clone, Copy)]
-enum DatasetFormat {
-    SlamTb,
-    IlRgbd,
-}
-
-fn validate_format(format: String) -> Result<DatasetFormat, String> {
-    match format.as_str() {
-        "slamtb" => Ok(DatasetFormat::SlamTb),
-        "ilrgbd" => Ok(DatasetFormat::IlRgbd),
-        _ => Err(String::from(format!("Invalid dataset format: {format}"))),
-    }
-}
 
 #[derive(Parser)]
 struct CommandLine {
@@ -32,20 +19,11 @@ struct CommandLine {
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // TODO: finish this example
     let args = CommandLine::parse();
 
-    let format = validate_format(args.format)?;
-    let dataset: Box<dyn RgbdDataset> = match format {
-        DatasetFormat::SlamTb => Box::new(SlamTbDataset::load(&args.dataset)?),
-        DatasetFormat::IlRgbd => Box::new(IndoorLidarDataset::load(&args.dataset)?),
-    };
-
-    //let len_ds = dataset.len();
-
-    let dataset = Box::new(SubsetDataset::new(
-        dataset,
-        [0, 15, 30].into(),
-    ));
+    let dataset = create_dataset_from_string(args.format, args.dataset).unwrap();
+    let dataset = Box::new(SubsetDataset::new(dataset, [0, 15, 30, 45, 60, 75, 90, 120, 160, 250].into()));
 
     let dataset_viewer = RgbdDatasetViewer::new(dataset);
     dataset_viewer.run();

@@ -1,12 +1,14 @@
 use std::{cell::RefCell, rc::Rc};
 
-use nalgebra::Matrix4;
-
 use crate::{
-    bilateral::BilateralFilter, range_image::RangeImage, Array2Recycle, io::dataset::RgbdDataset,
+    io::dataset::RgbdDataset, pointcloud::PointCloud, range_image::RangeImage,
 };
 
-use super::{node::MakeNode, scene::Scene, Manager, Window};
+use super::{
+    node::{IntoVulkanWorldSpace, MakeNode},
+    scene::Scene,
+    Manager, Window,
+};
 
 pub struct RgbdDatasetViewer {
     pub dataset: Box<dyn RgbdDataset>,
@@ -20,25 +22,19 @@ impl RgbdDatasetViewer {
     pub fn run(&self) {
         let mut manager = Manager::default();
         let mut scene = Scene::default();
-        let trajectory = self.dataset.trajectory().unwrap();
+        let trajectory = self.dataset.trajectory().unwrap().first_frame_at_origin();
 
         for i in 0..self.dataset.len() {
-            let transform = trajectory.get_relative_transform(0.0, i as f32).unwrap();
-            let (camera, mut frame) = self.dataset.get(i).unwrap().into_parts();
+            let rgbd_frame = self.dataset.get(i as usize).unwrap();
+            let mut ri = RangeImage::from_rgbd_frame(&rgbd_frame);
+            ri.compute_normals();
+            let pcl: PointCloud = PointCloud::from(&ri);
+            let node = pcl.make_node(&mut manager);
 
-            frame.depth = {
-                let filter = BilateralFilter::default();
-                filter.filter(&frame.depth, Array2Recycle::Empty)
-            };
+            let transform = trajectory[i as usize].clone();
+            node.borrow_mut().properties_mut().transformation =
+                transform.into_vulkan_coordinate_system();
 
-            let mut point_cloud = RangeImage::from_rgbd_image(&camera, &frame);
-
-            point_cloud.compute_normals();
-            point_cloud.compute_intensity();
-
-            let node = point_cloud.make_node(&mut manager);
-
-            node.borrow_mut().properties_mut().transformation = Matrix4::from(&transform);
             scene.add(node.clone());
         }
 

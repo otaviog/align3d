@@ -40,7 +40,7 @@ impl RangeImage {
     /// * rgbd_image - Rgbd image.
     pub fn from_rgbd_image(camera: &Camera, rgbd_image: &RgbdImage) -> Self {
         let (width, height) = (rgbd_image.width(), rgbd_image.height());
-        let depth_scale = rgbd_image.depth_scale.unwrap_or(1.0 / 5000.0) as f32;
+        let depth_scale = rgbd_image.depth_scale.unwrap() as f32;
         let mut points = Array3::zeros((height, width, 3));
         let mut mask = Array2::<u8>::zeros((height, width));
         let mut colors = Array3::<u8>::zeros((height, width, 3));

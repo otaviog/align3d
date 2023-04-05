@@ -1,7 +1,8 @@
-use crate::io::Geometry;
-use crate::transform::Transform;
-use ndarray::prelude::*;
-use ndarray::{ArcArray2, Array2};
+use crate::{
+    io::Geometry,
+    transform::{Transform, Transformable},
+};
+use ndarray::{prelude::*, ArcArray2, Array2};
 
 pub struct PointCloud {
     pub points: Array2<f32>,
@@ -39,12 +40,25 @@ impl std::ops::Mul<&PointCloud> for &Transform {
     type Output = PointCloud;
     fn mul(self, rhs: &PointCloud) -> PointCloud {
         PointCloud {
-            points: self * &rhs.points,
+            points: self.transform_vectors(rhs.points.clone()),
             normals: rhs
                 .normals
                 .as_ref()
-                .map(|normal| &self.ortho_rotation() * normal),
+                .map(|normals| self.transform_normals(normals.clone())),
             colors: rhs.colors.clone(),
+        }
+    }
+}
+
+impl Transformable<PointCloud> for Transform {
+    fn transform(&self, pcl: &PointCloud) -> PointCloud {
+        PointCloud {
+            points: self.transform_vectors(pcl.points.clone()),
+            normals: pcl
+                .normals
+                .as_ref()
+                .map(|normals| self.transform_normals(normals.clone())),
+            colors: pcl.colors.clone(),
         }
     }
 }

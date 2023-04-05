@@ -52,6 +52,24 @@ impl Trajectory {
             .zip(self.times.iter())
             .map(|(camera_to_world, time)| (camera_to_world.clone(), *time))
     }
+
+    pub fn first_frame_at_origin(&self) -> Self {
+        if self.camera_to_world.is_empty() {
+            return self.clone();
+        }
+
+        let first_inv = self.camera_to_world[0].inverse();
+        Self {
+            camera_to_world: self
+                .camera_to_world
+                .iter()
+                .map(|transform| {
+                    &first_inv * transform
+                })
+                .collect::<Vec<Transform>>(),
+            times: self.times.clone(),
+        }
+    }
 }
 
 impl FromIterator<(Transform, f32)> for Trajectory {

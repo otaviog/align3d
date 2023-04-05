@@ -5,6 +5,8 @@ use crate::bounds::Sphere3Df;
 
 use super::{virtual_projection::PerspectiveVirtualProjectionBuilder, VirtualProjection};
 
+const VULKAN_UP: Vector3<f32> = Vector3::new(0.0, -1.0, 0.0);
+
 /// Virtual camera to move around in the visualization.
 pub struct VirtualCamera {
     /// Camera position point.
@@ -20,9 +22,9 @@ pub struct VirtualCamera {
 impl Default for VirtualCamera {
     fn default() -> VirtualCamera {
         Self {
-            eye: Vec3::new(0.0, 0.0, 1.0),
-            view: Vec3::new(0.0, 0.0, -1.0),
-            up: Vec3::new(0.0, 1.0, 0.0),
+            eye: Vec3::new(0.0, 0.0, -1.0),
+            view: Vec3::new(0.0, 0.0, 1.0),
+            up: VULKAN_UP,
             projection: VirtualProjection::default(),
         }
     }
@@ -40,8 +42,8 @@ impl VirtualCamera {
             &self.view,
         )
         .normalize();
-        
-        let right_vec = self.view.cross(&Vector3::new(0.0, 1.0, 0.0));
+
+        let right_vec = self.view.cross(&VULKAN_UP);
         self.up = right_vec.cross(&self.view).normalize();
     }
 
@@ -97,6 +99,9 @@ impl Default for VirtualCameraSphericalBuilder {
 
 impl VirtualCameraSphericalBuilder {
     pub fn fit(sphere: &Sphere3Df, fov_y: f32) -> Self {
+        if sphere.is_empty() {
+            panic!("Cannot fit empty sphere.");
+        }
         let fov_y = fov_y / 2.0;
         let alpha = fov_y;
         let theta = std::f32::consts::FRAC_PI_2 - fov_y;
@@ -153,15 +158,14 @@ impl VirtualCameraSphericalBuilder {
         let theta = self.elevation;
         let phi = self.azimuth + std::f32::consts::PI * 1.5;
 
-        let mut position = Vec3::new(
+        let position = Vec3::new(
             phi.cos() * self.distance * theta.cos(),
             theta.sin() * self.distance,
-            -phi.sin() * self.distance * theta.cos(),
-        );
-        position += &self.sphere.center;
+            phi.sin() * self.distance * theta.cos(),
+        ) + &self.sphere.center;
 
         let view = (self.sphere.center - position).normalize();
-        let right = view.cross(&Vec3::new(0.0, 1.0, 0.0)).normalize();
+        let right = view.cross(&Vec3::new(0.0, -1.0, 0.0)).normalize();
         let up = right.cross(&view).normalize();
 
         VirtualCamera {

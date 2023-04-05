@@ -11,10 +11,12 @@ pub struct Scene {
 
 impl Scene {
     pub fn add(&mut self, node: NodeRef<dyn Node>) -> &mut Self {
-        self.node_properties.bounding_sphere = self
+        let new_sphere = self
             .node_properties
-            .bounding_sphere
-            .add(&node.borrow().properties().bounding_sphere);
+            .get_bounding_sphere()
+            .add(&node.borrow().properties().get_bounding_sphere());
+
+        self.node_properties.bounding_sphere(new_sphere);
         self.nodes.push(node);
         self
     }

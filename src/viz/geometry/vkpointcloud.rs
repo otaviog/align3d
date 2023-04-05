@@ -1,7 +1,6 @@
 use std::{cell::RefCell, rc::Rc, sync::Arc};
 
 use nalgebra::Vector3;
-
 use ndarray::Axis;
 use vulkano::{
     buffer::{BufferUsage, CpuAccessibleBuffer},
@@ -27,7 +26,7 @@ use crate::{
     range_image::RangeImage,
     viz::{
         controllers::FrameStepInfo,
-        node::{CommandBuffersContext, MakeNode, Node, NodeProperties, NodeRef},
+        node::{CommandBuffersContext, MakeNode, Node, NodeProperties, NodeRef, node_ref},
         Manager,
     },
 };
@@ -167,6 +166,13 @@ impl Node for VkPointCloudNode {
 
     fn properties_mut(&mut self) -> &mut NodeProperties {
         &mut self.properties
+    }
+
+    fn new_instance(&self) -> NodeRef<dyn Node> {
+        node_ref(VkPointCloudNode {
+            properties: self.properties,
+            point_cloud: self.point_cloud.clone(),
+        })
     }
 
     fn collect_command_buffers(

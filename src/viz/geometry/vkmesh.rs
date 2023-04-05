@@ -24,7 +24,7 @@ use crate::{
     io::Geometry,
     viz::{
         controllers::FrameStepInfo,
-        node::{CommandBuffersContext, MakeNode, Node, NodeProperties, NodeRef},
+        node::{CommandBuffersContext, MakeNode, Node, NodeProperties, NodeRef, node_ref},
         Manager,
     },
 };
@@ -183,6 +183,14 @@ mod fs {
 }
 
 impl Node for VkMeshNode {
+
+    fn new_instance(&self) -> NodeRef<dyn Node> {
+        node_ref(VkMeshNode {
+            node_properties: self.node_properties,
+            mesh: self.mesh.clone(),
+        })   
+    }
+
     fn properties(&self) -> &NodeProperties {
         &self.node_properties
     }

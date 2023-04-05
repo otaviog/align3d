@@ -1,6 +1,11 @@
 use nalgebra::Vector3;
 use ndarray::{Array2, Axis};
 
+use crate::{
+    transform::{Transform, Transformable},
+    viz::node::Mat4x4,
+};
+
 #[derive(Clone, Copy)]
 pub struct Sphere3Df {
     pub center: Vector3<f32>,
@@ -35,7 +40,7 @@ impl Sphere3Df {
 
     pub fn from_point_iter<I>(point_iter: I) -> Self
     where
-        I: Iterator<Item = Vector3<f32>> + Clone
+        I: Iterator<Item = Vector3<f32>> + Clone,
     {
         let mut count = 0;
         let center = point_iter.clone().fold(Vector3::zeros(), |sum, p| {
@@ -65,5 +70,23 @@ impl Sphere3Df {
         let center = (self.center + other.center) / 2.0;
         let radius = (self.center - center).norm() + self.radius.max(other.radius);
         Self { center, radius }
+    }
+}
+
+impl Transformable<Sphere3Df> for Transform {
+    fn transform(&self, sphere: &Sphere3Df) -> Sphere3Df {
+        Sphere3Df {
+            center: self.transform_vector(&sphere.center),
+            radius: sphere.radius,
+        }
+    }
+}
+
+impl Transformable<Sphere3Df> for Mat4x4 {
+    fn transform(&self, sphere: &Sphere3Df) -> Sphere3Df {
+        Sphere3Df {
+            center: self.transform_vector(&sphere.center),
+            radius: sphere.radius,
+        }
     }
 }

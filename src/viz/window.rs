@@ -141,8 +141,7 @@ impl Window {
         builder.build().unwrap()
     }
 
-    pub fn show(&mut self, //: Arc<Self>
-    ) {
+    pub fn show(&mut self) {
         let dimensions = {
             let window = self
                 .surface
@@ -231,12 +230,13 @@ impl Window {
         let mut previous_frame_end = Some(sync::now(self.device.clone()).boxed());
         let mut pipelines = HashMap::<String, Arc<GraphicsPipeline>>::new();
 
-        let scene_sphere = (self.scene).borrow().properties().bounding_sphere;
+        let scene_sphere = (self.scene).borrow().properties().get_bounding_sphere();
 
         let mut camera_control = WASDVirtualCameraControl::new(
             VirtualCameraSphericalBuilder::fit(&scene_sphere, std::f32::consts::FRAC_PI_2)
                 .near_plane(0.05)
                 .build(),
+            
             0.05,
         );
 

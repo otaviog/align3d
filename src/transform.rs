@@ -1,30 +1,10 @@
-use nalgebra::{self, Matrix3, Rotation3};
-
-use nalgebra::{Isometry3, Matrix4, Quaternion, Translation3, UnitQuaternion, Vector3, Vector6};
-use ndarray::Axis;
-use ndarray::{self, Array2};
+use nalgebra::{
+    Isometry3, Matrix3, Matrix4, Quaternion, Rotation3, Translation3, UnitQuaternion, UnitVector3,
+    Vector3, Vector6,
+};
+use ndarray::{Array2, Axis};
 
 use std::ops;
-
-/// A rotation in 3D space.
-pub struct Rotation(Rotation3<f32>);
-
-impl ops::Mul<&ndarray::Array2<f32>> for &Rotation {
-    type Output = ndarray::Array2<f32>;
-
-    fn mul(self, rhs: &ndarray::Array2<f32>) -> Self::Output {
-        let mut result = ndarray::Array2::<f32>::zeros((rhs.len_of(Axis(0)), 3));
-
-        for (in_iter, mut out_iter) in rhs.axis_iter(Axis(0)).zip(result.axis_iter_mut(Axis(0))) {
-            let v = self.0 * Vector3::new(in_iter[0], in_iter[1], in_iter[2]);
-            out_iter[0] = v[0];
-            out_iter[1] = v[1];
-            out_iter[2] = v[2];
-        }
-
-        result
-    }
-}
 
 pub enum LieGroup {
     Se3(Vector6<f32>),
@@ -137,6 +117,13 @@ impl Transform {
         Self(Isometry3::<f32>::from_parts(translation, so3))
     }
 
+    pub fn from_translation(translation: &Vector3<f32>) -> Self {
+        Self(Isometry3::<f32>::from_parts(
+            Translation3::new(translation[0], translation[1], translation[2]),
+            UnitQuaternion::default(),
+        ))
+    }
+
     /// Transforms a 3D point.
     ///
     /// # Arguments
@@ -163,16 +150,16 @@ impl Transform {
         self.0.rotation * rhs
     }
 
-    /// Transforms an array of 3D points.
+    /// Transforms an array of 3D vectors/points.
     ///
     /// # Arguments
     ///
-    /// * rhs - Array of 3D points of shape (N, 3).
+    /// * rhs - Array of 3D vectors/points of shape (N, 3).
     ///
     /// # Returns
     ///[[1.4409556, 4.278638, 10.567257]]
     /// * Array of 3D points of shape (N, 3) transformed.
-    pub fn transform(&self, mut rhs: Array2<f32>) -> Array2<f32> {
+    pub fn transform_vectors(&self, mut rhs: Array2<f32>) -> Array2<f32> {
         for mut point in rhs.axis_iter_mut(Axis(0)) {
             let v = self.transform_vector(&Vector3::new(point[0], point[1], point[2]));
 
@@ -184,13 +171,16 @@ impl Transform {
         rhs
     }
 
-    /// Returns the rotation part.
-    ///
-    /// # Returns
-    ///
-    /// * Rotation
-    pub fn ortho_rotation(&self) -> Rotation {
-        Rotation(self.0.rotation.to_rotation_matrix())
+    pub fn transform_normals(&self, mut rhs: Array2<f32>) -> Array2<f32> {
+        for mut point in rhs.axis_iter_mut(Axis(0)) {
+            let v = self.transform_normal(&Vector3::new(point[0], point[1], point[2]));
+
+            point[0] = v[0];
+            point[1] = v[1];
+            point[2] = v[2];
+        }
+
+        rhs
     }
 
     /// Inverts the transform.
@@ -211,32 +201,6 @@ impl Transform {
     }
 }
 
-impl ops::Mul<&ndarray::Array2<f32>> for &Transform {
-    type Output = ndarray::Array2<f32>;
-
-    /// Transforms an array of 3D points.
-    ///
-    /// # Arguments
-    ///
-    /// * rhs - Array of 3D points of shape (N, 3).
-    ///
-    /// # Returns
-    ///
-    /// * Array of 3D points of shape (N, 3) transformed.
-    fn mul(self, rhs: &ndarray::Array2<f32>) -> Self::Output {
-        let mut result = ndarray::Array2::<f32>::zeros((rhs.len_of(Axis(0)), 3));
-
-        for (in_iter, mut out_iter) in rhs.axis_iter(Axis(0)).zip(result.axis_iter_mut(Axis(0))) {
-            let v = self.transform_vector(&Vector3::new(in_iter[0], in_iter[1], in_iter[2]));
-            out_iter[0] = v[0];
-            out_iter[1] = v[1];
-            out_iter[2] = v[2];
-        }
-
-        result
-    }
-}
-
 impl ops::Mul<&Transform> for &Transform {
     type Output = Transform;
 
@@ -254,11 +218,55 @@ impl ops::Mul<&Transform> for &Transform {
     }
 }
 
+impl Into<Matrix4<f32>> for Transform {
+    /// Converts a transform to a 4x4 matrix.
+    fn into(self) -> Matrix4<f32> {
+        self.0.into()
+    }
+}
+
 impl From<&Transform> for Matrix4<f32> {
     /// Converts a transform to a 4x4 matrix.
     fn from(transform: &Transform) -> Self {
         transform.0.into()
     }
+}
+
+impl From<&Matrix4<f32>> for Transform {
+    /// Converts a 4x4 matrix to a transform.
+    fn from(matrix: &Matrix4<f32>) -> Self {
+        Transform::from_matrix4(matrix)
+    }
+}
+
+pub struct TransformBuilder {
+    translation: Vector3<f32>,
+    rotation: UnitQuaternion<f32>,
+}
+
+impl Default for TransformBuilder {
+    fn default() -> Self {
+        Self {
+            translation: Vector3::new(0.0, 0.0, 0.0),
+            rotation: UnitQuaternion::default(),
+        }
+    }
+}
+
+impl TransformBuilder {
+    pub fn translation(&mut self, translation: Vector3<f32>) -> &mut Self {
+        self.translation = translation;
+        self
+    }
+
+    pub fn axis_angle(&mut self, axis: UnitVector3<f32>, angle: f32) -> &mut Self {
+        self.rotation = UnitQuaternion::from_axis_angle(&axis, angle);
+        self
+    }
+}
+
+pub trait Transformable<Type> {
+    fn transform(&self, value: &Type) -> Type;
 }
 
 #[cfg(test)]
@@ -312,7 +320,7 @@ mod tests {
             UnitQuaternion::<f32>::from_scaled_axis(Vector3::y() * std::f32::consts::PI),
         ));
         let mut points = array![[1.0, 2.0, 3.0], [1.0, 2.0, 3.0]];
-        points = transform.transform(points);
+        points = transform.transform_vectors(points);
 
         assert!(assert_array(
             &points,
@@ -325,7 +333,7 @@ mod tests {
         let transform = Transform::exp(&LieGroup::Se3(Vector6::new(1.0, 2.0, 3.0, 0.4, 0.5, 0.3)));
 
         assert!(assert_array(
-            &transform.transform(array![[5.5, 6.4, 7.8]]),
+            &transform.transform_vectors(array![[5.5, 6.4, 7.8]]),
             &array![[8.9848175, 6.9635687, 9.880962]]
         ));
 
@@ -356,7 +364,7 @@ mod tests {
 
         let transform = &transform1 * &transform2;
         assert!(assert_array(
-            &transform.transform(array![[1.0, 2.0, 3.0], [1.0, 2.0, 3.0]]),
+            &transform.transform_vectors(array![[1.0, 2.0, 3.0], [1.0, 2.0, 3.0]]),
             &array![[2.9999998, 2.0, 5.0], [2.9999998, 2.0, 5.0]]
         ));
     }

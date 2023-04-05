@@ -27,3 +27,5 @@ pub mod trig;
 
 pub mod utils;
 pub mod image;
+
+pub mod bin_utils;

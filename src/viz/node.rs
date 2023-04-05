@@ -1,6 +1,7 @@
 use std::{cell::RefCell, collections::HashMap, rc::Rc, sync::Arc};
 
-use crate::bounds::Sphere3Df;
+use crate::{bounds::Sphere3Df, transform::{Transformable, Transform}};
+use nalgebra::Matrix4;
 use nalgebra_glm::{self, Mat3};
 use vulkano::{
     command_buffer::{AutoCommandBufferBuilder, PrimaryAutoCommandBuffer},
@@ -12,12 +13,36 @@ use vulkano::{
 use super::{controllers::FrameStepInfo, Manager};
 
 pub type NodeRef<T> = Rc<RefCell<T>>;
+pub fn node_ref<T>(node: T) -> NodeRef<T>
+where
+    T: Node,
+{
+    Rc::new(RefCell::new(node))
+}
+
 pub type Mat4x4 = nalgebra_glm::Mat4x4;
+
+pub trait IntoVulkanWorldSpace {
+    fn into_vulkan_coordinate_system(self) -> Mat4x4;
+}
+
+impl IntoVulkanWorldSpace for Transform {
+    fn into_vulkan_coordinate_system(self) -> Mat4x4 {
+        let matrix: Matrix4<f32> = self.into();
+        let inv_axis_matrix = Matrix4::new(
+            1.0, 0.0, 0.0, 0.0, 
+            0.0, -1.0, 0.0, 0.0, 
+            0.0, 0.0, 1.0, 0.0, 
+            0.0, 0.0, 0.0, 1.0,
+        );
+        (inv_axis_matrix * matrix).into()
+    }
+}
 
 #[derive(Clone, Copy)]
 pub struct NodeProperties {
     pub transformation: Mat4x4,
-    pub bounding_sphere: Sphere3Df,
+    pub bounding_sphere: Sphere3Df, // TODO transform it into private
     pub visible: bool,
 }
 
@@ -40,6 +65,10 @@ impl NodeProperties {
     pub fn bounding_sphere(&mut self, value: Sphere3Df) -> &mut Self {
         self.bounding_sphere = value;
         self
+    }
+
+    pub fn get_bounding_sphere(&self) -> Sphere3Df {
+        self.transformation.transform(&self.bounding_sphere)
     }
 
     pub fn set_visible(&mut self, value: bool) -> &mut Self {
@@ -83,7 +112,8 @@ impl<'a> CommandBuffersContext<'a> {
 }
 
 pub trait Node {
-    /// .
+    fn new_instance(&self) -> NodeRef<dyn Node>;
+
     fn properties_mut(&mut self) -> &mut NodeProperties;
 
     fn properties(&self) -> &NodeProperties;
