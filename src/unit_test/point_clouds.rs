@@ -2,7 +2,7 @@ use ndarray::Array2;
 use rstest::fixture;
 
 use crate::{
-    io::{dataset::RgbdDataset, read_off},
+    io::read_off,
     pointcloud::PointCloud,
 };
 
@@ -28,7 +28,7 @@ impl TestPclDataset {
             .dataset
             .get(index)
             .expect("Error when loading range image to point cloud.");
-        let mut pointcloud = PointCloud::from(&range_image);
+        let pointcloud = PointCloud::from(&range_image);
         pointcloud
     }
 

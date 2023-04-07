@@ -5,7 +5,6 @@ use align3d::{
 
 pub fn main() {
     let dataset = SlamTbDataset::load("tests/data/rgbd/sample2").unwrap();
-    let dataset = SlamTbDataset::load("tests/data/rgbd/sample2").unwrap();
     let len_ds = dataset.len();
     let dataset = SubsetDataset::new(Box::new(dataset), [0, len_ds / 2, len_ds - 1].into());
     RgbdDatasetViewer::new(Box::new(dataset)).run();
