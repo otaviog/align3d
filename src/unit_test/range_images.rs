@@ -21,6 +21,7 @@ impl TestRangeImageDataset {
         let mut range_img = RangeImage::from_rgbd_image(&cam, &rgbd_image);
         range_img.compute_normals();
         range_img.compute_intensity();
+        range_img.compute_intensity_map();
         Ok(range_img)
     }
 
