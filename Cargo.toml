@@ -17,6 +17,10 @@ path = "src/bin/main.rs"
 name = "dataset_viewer"
 path = "src/bin/dataset_viewer.rs"
 
+[[bin]]
+name = "odometry"
+path = "src/bin/odometry.rs"
+
 [features]
 with_rerun = []
 
@@ -47,6 +51,7 @@ winit = "0.27.5"
 # rerun = {version = "0.2.0", optional = true }
 glob = "0.3.1"
 egui = "0.20.1"
+kdam = "0.3.0"
 
 [dev-dependencies]
 rstest = "0.15.0"
