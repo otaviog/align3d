@@ -50,7 +50,7 @@ fn main() {
     let gt_transform = dataset
         .trajectory()
         .unwrap()
-        .get_relative_transform(SOURCE_IDX as f32, TARGET_IDX as f32)
+        .get_relative_transform(SOURCE_IDX, TARGET_IDX)
         .unwrap();
 
     println!(
