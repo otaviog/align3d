@@ -12,11 +12,11 @@ pub mod pointcloud;
 pub mod range_image;
 pub mod sampling;
 pub mod transform;
-// mod se3;
+
 pub use memory::{Array1Recycle, Array2Recycle};
 pub mod error;
-// #[cfg(feature="viz")]
 pub mod trajectory;
+pub mod trajectory_builder;
 #[cfg(test)]
 pub mod unit_test;
 pub mod viz;
