@@ -25,7 +25,7 @@ pub mod metrics;
 pub mod optim;
 pub mod trig;
 
-pub mod utils;
 pub mod image;
+pub mod utils;
 
 pub mod bin_utils;

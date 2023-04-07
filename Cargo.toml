@@ -21,6 +21,10 @@ path = "src/bin/dataset_viewer.rs"
 name = "odometry"
 path = "src/bin/odometry.rs"
 
+[[bin]]
+name = "readme_sample"
+path = "src/bin/readme_sample.rs"
+
 [features]
 with_rerun = []
 
