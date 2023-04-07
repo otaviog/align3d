@@ -1,4 +1,4 @@
-use crate::{error::Error, trajectory::Trajectory, transform::Transform};
+use crate::{error::A3dError, trajectory::Trajectory, transform::Transform};
 
 /// Metrics for comparing two transforms.
 #[derive(Clone, Debug)]
@@ -33,9 +33,9 @@ impl TransformMetrics {
     pub fn mean_trajectory_error(
         pred_trajectory: &Trajectory,
         gt_trajectory: &Trajectory,
-    ) -> Result<Self, Error> {
+    ) -> Result<Self, A3dError> {
         if pred_trajectory.len() != gt_trajectory.len() {
-            return Err(Error::invalid_parameter(
+            return Err(A3dError::invalid_parameter(
                 "Pred and GT trajectories have different lengths.",
             ));
         }

@@ -1,5 +1,5 @@
 use super::{ImageIcp, MsIcpParams};
-use crate::{error::Error, range_image::RangeImage, transform::Transform};
+use crate::{error::A3dError, range_image::RangeImage, transform::Transform};
 use itertools::izip;
 
 /// Multiscale interface for ICP algorithms.
@@ -26,9 +26,9 @@ impl<'pyramid_lt> MultiscaleAlign<'pyramid_lt> {
     pub fn new(
         params: MsIcpParams,
         target_pyramid: &'pyramid_lt Vec<RangeImage>
-    ) -> Result<Self, Error> {
+    ) -> Result<Self, A3dError> {
         if params.len() != target_pyramid.len() {
-            return Err(Error::invalid_parameter(
+            return Err(A3dError::invalid_parameter(
                 "The number of range images pyramid levels and ICP parameters must be equal.",
             ));
         }
