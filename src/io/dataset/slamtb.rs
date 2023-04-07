@@ -130,7 +130,7 @@ impl RgbdDataset for SlamTbDataset {
     }
 
     fn trajectory(&self) -> Option<Trajectory> {
-        let mut trajectory = Trajectory::new();
+        let mut trajectory = Trajectory::default();
         for (i, cam) in self.cameras.iter().enumerate() {
             if let Some(transform) = cam.camera_to_world.clone() {
                 trajectory.push(transform, i as f32);

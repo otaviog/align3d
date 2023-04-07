@@ -69,7 +69,6 @@ impl IndoorLidarDataset {
                 (Transform::from_matrix4(&matrix), n as f32)
             })
             .collect::<Trajectory>();
-
         Ok(IndoorLidarDataset {
             rgb_images,
             depth_images,
@@ -95,8 +94,7 @@ impl RgbdDataset for IndoorLidarDataset {
         let depth_image = image::open(&self.depth_images[idx])?
             .into_luma16()
             .into_ndarray2();
-        let rgbd_image = RgbdImage::new(rgb_image, depth_image);
-
+        let rgbd_image = RgbdImage::with_depth_scale(rgb_image, depth_image, 0.001);
         let camera = Camera {
             fx: 525.0,
             fy: 525.0,

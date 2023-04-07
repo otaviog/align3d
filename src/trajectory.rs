@@ -2,50 +2,57 @@ use std::ops::Index;
 
 use crate::transform::Transform;
 
+/// Trajectory of camera poses.
 #[derive(Clone, Debug)]
 pub struct Trajectory {
+    /// Camera poses, transforms points from camera to world.
     pub camera_to_world: Vec<Transform>,
+    /// Timestamps of each pose.
     pub times: Vec<f32>,
 }
 
 impl Default for Trajectory {
+    /// Empty trajectory.
     fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl Trajectory {
-    pub fn new() -> Self {
         Self {
             camera_to_world: Vec::new(),
             times: Vec::new(),
         }
     }
+}
 
+impl Trajectory {
+    /// Adds a new pose to the trajectory.
+    ///
+    /// # Arguments
+    ///
+    /// * `camera_to_world` - Transform from camera to world.
+    /// * `time` - Timestamp of the pose.
     pub fn push(&mut self, camera_to_world: Transform, time: f32) {
         self.camera_to_world.push(camera_to_world);
         self.times.push(time);
     }
 
+    /// Returns the number of poses in the trajectory.
     pub fn len(&self) -> usize {
         self.camera_to_world.len()
     }
 
+    /// Returns true if the trajectory is empty.
     pub fn is_empty(&self) -> bool {
         self.camera_to_world.is_empty()
     }
 
-    pub fn get_relative_transform(&self, from_time: f32, to_time: f32) -> Option<Transform> {
-        let (i_src, i_dst) = self.get_indices(from_time, to_time)?;
-        Some(&self.camera_to_world[i_dst].inverse() * &self.camera_to_world[i_src])
+    /// Returns the relative transform between two poses.
+    pub fn get_relative_transform(
+        &self,
+        from_index: usize,
+        dest_index: usize,
+    ) -> Option<Transform> {
+        Some(&self.camera_to_world[dest_index].inverse() * &self.camera_to_world[from_index])
     }
 
-    pub fn get_indices(&self, time_src: f32, time_dst: f32) -> Option<(usize, usize)> {
-        let i_src = self.times.iter().position(|t| *t == time_src)?;
-        let i_dst = self.times.iter().position(|t| *t == time_dst)?;
-        Some((i_src, i_dst))
-    }
-
+    /// Returns the iterator over poses and timestamps.
     pub fn iter(&self) -> impl Iterator<Item = (Transform, f32)> + '_ {
         self.camera_to_world
             .iter()
@@ -53,6 +60,7 @@ impl Trajectory {
             .map(|(camera_to_world, time)| (camera_to_world.clone(), *time))
     }
 
+    /// Creates a new trajectory with the poses transformed in such a way that the first pose is at origin.
     pub fn first_frame_at_origin(&self) -> Self {
         if self.camera_to_world.is_empty() {
             return self.clone();
@@ -63,18 +71,35 @@ impl Trajectory {
             camera_to_world: self
                 .camera_to_world
                 .iter()
-                .map(|transform| {
-                    &first_inv * transform
-                })
+                .map(|transform| &first_inv * transform)
                 .collect::<Vec<Transform>>(),
             times: self.times.clone(),
+        }
+    }
+
+    /// Creates a new trajectory with the given range.
+    ///
+    /// # Arguments
+    ///
+    /// * `start` - Inclusive start index of the range.
+    /// * `end` - Exclusive end index of the range.
+    ///
+    /// # Returns
+    ///
+    /// New trajectory with the poses in the given range.
+    pub fn slice(&self, start: usize, end: usize) -> Self {
+        Self {
+            camera_to_world: self.camera_to_world[start..end].to_vec(),
+            times: self.times[start..end].to_vec(),
         }
     }
 }
 
 impl FromIterator<(Transform, f32)> for Trajectory {
+    /// Creates a new trajectory from the `(Transform, f32)` iterator.
+    /// Use with the `collect::<Trajectory>` method.
     fn from_iter<T: IntoIterator<Item = (Transform, f32)>>(iter: T) -> Self {
-        let mut trajectory = Trajectory::new();
+        let mut trajectory = Trajectory::default();
         for (transform, time) in iter {
             trajectory.push(transform, time);
         }
@@ -84,7 +109,7 @@ impl FromIterator<(Transform, f32)> for Trajectory {
 
 impl Index<usize> for Trajectory {
     type Output = Transform;
-
+    /// Returns the pose at the given index.
     fn index(&self, index: usize) -> &Self::Output {
         &self.camera_to_world[index]
     }
