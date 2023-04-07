@@ -8,6 +8,6 @@ pub enum LoadError {
 
 impl From<io::Error> for LoadError {
     fn from(err: io::Error) -> Self {
-        return LoadError::IO(err);
+        LoadError::IO(err)
     }
 }

@@ -64,7 +64,7 @@ impl ply::PropertyAccess for Face {
             ("vertex_index" | "vertex_indices", ply::Property::ListInt(vec)) => {
                 self.vertex_index = vec
             }
-            (k, _) => panic!("Face: Unexpected key/value combination: key: {}", k),
+            (k, _) => panic!("Face: Unexpected key/value combination: key: {k}"),
         }
     }
 }
@@ -135,7 +135,7 @@ where
         points: point_array.unwrap(),
         colors: color_array,
         normals: normal_array,
-        indices: face_array,
+        faces: face_array,
         texcoords: None,
     })
 }
@@ -205,14 +205,14 @@ where
         ply.header.elements.add(vertex_element);
         ply.payload.insert("vertex".to_string(), vertex_array);
 
-        if let Some(indices) = &geom.indices {
+        if let Some(indices) = &geom.faces {
             let mut indice_element = ElementDef::new("face".to_string());
 
             indice_element.properties.add(PropertyDef::new(
                 "vertex_indices".to_string(),
                 PropertyType::List(ScalarType::UChar, ScalarType::Int),
             ));
-            let mut indice_array: Vec<DefaultElement> = indices
+            let indice_array: Vec<DefaultElement> = indices
                 .axis_iter(Axis(0))
                 .map(|face| {
                     let mut elem = DefaultElement::new();

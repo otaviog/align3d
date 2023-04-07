@@ -1,7 +1,8 @@
-use ndarray::prelude::*;
-use ndarray::{ArcArray2, Array2};
-
-use super::io::Geometry;
+use crate::{
+    io::Geometry,
+    transform::{Transform, Transformable},
+};
+use ndarray::{prelude::*, ArcArray2, Array2};
 
 pub struct PointCloud {
     pub points: Array2<f32>,
@@ -29,39 +30,75 @@ impl PointCloud {
     pub fn len(&self) -> usize {
         self.points.len_of(Axis(0))
     }
+
+    pub fn is_empty(&self) -> bool {
+        self.points.is_empty()
+    }
 }
-
-//impl<Idx> std::ops::Index<Idx> for PointCloud
-//where Idx: std::slice::SliceIndex<[PointCloud]>
-//{
-//    fn index(&self, index: Idx) -> &Self::Output
-//}
-
-use crate::transform::Transform;
 
 impl std::ops::Mul<&PointCloud> for &Transform {
     type Output = PointCloud;
     fn mul(self, rhs: &PointCloud) -> PointCloud {
         PointCloud {
-            points: self * &rhs.points,
+            points: self.transform_vectors(rhs.points.clone()),
             normals: rhs
                 .normals
                 .as_ref()
-                .map(|normals| &self.ortho_rotation() * &normals),
+                .map(|normals| self.transform_normals(normals.clone())),
             colors: rhs.colors.clone(),
         }
     }
 }
 
-impl Into<Geometry> for PointCloud {
-    fn into(self) -> Geometry {
+impl Transformable<PointCloud> for Transform {
+    fn transform(&self, pcl: &PointCloud) -> PointCloud {
+        PointCloud {
+            points: self.transform_vectors(pcl.points.clone()),
+            normals: pcl
+                .normals
+                .as_ref()
+                .map(|normals| self.transform_normals(normals.clone())),
+            colors: pcl.colors.clone(),
+        }
+    }
+}
+
+impl From<PointCloud> for Geometry {
+    fn from(pcl: PointCloud) -> Geometry {
         Geometry {
-            points: self.points,
-            normals: self.normals.map(|normals| normals),
-            colors: self.colors.map(|colors| colors.into_owned()),
-            indices: None,
+            points: pcl.points,
+            normals: pcl.normals,
+            colors: pcl.colors.map(|colors| colors.into_owned()),
+            faces: None,
             texcoords: None,
         }
+    }
+}
+
+#[cfg(with_rerun)]
+impl PointCloud {
+    pub fn rerun_msg(&self, name: &str) -> Result<rerun::MsgSender, rerun::MsgSenderError> {
+        use rerun::external::glam;
+
+        let mut points = Vec::with_capacity(self.len());
+        let mut colors = Vec::with_capacity(self.len());
+        for (point, color) in self
+            .points
+            .outer_iter()
+            .zip(self.colors.iter().flat_map(|colors| colors.outer_iter()))
+        {
+            points.push(rerun::components::Point3D::from(glam::Vec3::new(
+                point[0], point[1], point[2],
+            )));
+
+            colors.push(rerun::components::ColorRGBA::from_rgb(
+                color[0], color[1], color[2],
+            ));
+        }
+
+        Ok(rerun::MsgSender::new(name)
+            .with_component(&points)?
+            .with_component(&colors)?)
     }
 }
 
