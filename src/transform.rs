@@ -12,9 +12,17 @@ pub enum LieGroup {
 }
 
 /// A Rigid Body Transform in 3D space.
+/// This wraps Isometry3 from nalgebra and provides methods for working with 
+/// Align3d's data structures.
 #[derive(Clone, Debug)]
-// #[display(fmt = "Transform: {}", _0)]
-pub struct Transform(Isometry3<f32>);
+pub struct Transform(pub Isometry3<f32>);
+
+impl Default for Transform {
+    /// Create a new transform with zero translation and zero rotation.
+    fn default() -> Self {
+        Self::eye()
+    }
+}
 
 impl Transform {
     /// Create a new transform with zero translation and zero rotation.
@@ -25,10 +33,11 @@ impl Transform {
         ))
     }
 
-    pub fn new(xyz: &Vector3<f32>, rotation: Quaternion<f32>) -> Self {
+    /// Create a new transform from a translation vector and a rotation quaternion.
+    pub fn new(xyz: &Vector3<f32>, rotation: &Quaternion<f32>) -> Self {
         Self(Isometry3::<f32>::from_parts(
             Translation3::new(xyz[0], xyz[1], xyz[2]),
-            UnitQuaternion::from_quaternion(rotation),
+            UnitQuaternion::from_quaternion(rotation.clone()),
         ))
     }
 
@@ -108,20 +117,13 @@ impl Transform {
         }
     }
 
-    /// Create a transform from a 4x4 matrix.
+    /// Create a transform from a 4x4 matrix homogeneous matrix.
     pub fn from_matrix4(matrix: &Matrix4<f32>) -> Self {
         let translation = Translation3::new(matrix[(0, 3)], matrix[(1, 3)], matrix[(2, 3)]);
         let so3 = UnitQuaternion::from_rotation_matrix(&Rotation3::from_matrix(
             &matrix.fixed_slice::<3, 3>(0, 0).into_owned(),
         ));
         Self(Isometry3::<f32>::from_parts(translation, so3))
-    }
-
-    pub fn from_translation(translation: &Vector3<f32>) -> Self {
-        Self(Isometry3::<f32>::from_parts(
-            Translation3::new(translation[0], translation[1], translation[2]),
-            UnitQuaternion::default(),
-        ))
     }
 
     /// Transforms a 3D point.
@@ -154,10 +156,10 @@ impl Transform {
     ///
     /// # Arguments
     ///
-    /// * rhs - Array of 3D vectors/points of shape (N, 3).
+    /// * rhs - Array of 3D vectors/points of shape (N, 3). It'll reuse this array as result's storage.
     ///
     /// # Returns
-    ///[[1.4409556, 4.278638, 10.567257]]
+    /// 
     /// * Array of 3D points of shape (N, 3) transformed.
     pub fn transform_vectors(&self, mut rhs: Array2<f32>) -> Array2<f32> {
         for mut point in rhs.axis_iter_mut(Axis(0)) {
@@ -171,6 +173,15 @@ impl Transform {
         rhs
     }
 
+    /// Transforms an array of 3D normals, i.e., it only uses the rotation part of the transform.
+    /// 
+    /// # Arguments
+    /// 
+    /// * rhs - Array of 3D normals of shape (N, 3). It'll reuse this array as result's storage.
+    /// 
+    /// # Returns
+    /// 
+    /// * Array of 3D normals of shape (N, 3) transformed.
     pub fn transform_normals(&self, mut rhs: Array2<f32>) -> Array2<f32> {
         for mut point in rhs.axis_iter_mut(Axis(0)) {
             let v = self.transform_normal(&Vector3::new(point[0], point[1], point[2]));
@@ -188,16 +199,14 @@ impl Transform {
         Self(self.0.inverse())
     }
 
+    /// Returns the rotation angle in radians.
     pub fn angle(&self) -> f32 {
         self.0.rotation.angle()
     }
 
+    /// Returns the translation part.
     pub fn translation(&self) -> Vector3<f32> {
         self.0.translation.vector
-    }
-
-    pub fn scale_translation(&mut self, scale: f32) {
-        self.0.translation.vector *= scale;
     }
 }
 
@@ -240,8 +249,8 @@ impl From<&Matrix4<f32>> for Transform {
 }
 
 pub struct TransformBuilder {
-    translation: Vector3<f32>,
-    rotation: UnitQuaternion<f32>,
+    pub translation: Vector3<f32>,
+    pub rotation: UnitQuaternion<f32>,
 }
 
 impl Default for TransformBuilder {
@@ -253,18 +262,36 @@ impl Default for TransformBuilder {
     }
 }
 
+/// Easy to use builder for transforms.
 impl TransformBuilder {
+
+    /// Sets the translation.
     pub fn translation(&mut self, translation: Vector3<f32>) -> &mut Self {
         self.translation = translation;
         self
     }
 
+    /// Sets the rotation.
+    /// 
+    /// # Arguments
+    /// 
+    /// * axis - Rotation axis.
+    /// * angle - Rotation angle in radians.
     pub fn axis_angle(&mut self, axis: UnitVector3<f32>, angle: f32) -> &mut Self {
         self.rotation = UnitQuaternion::from_axis_angle(&axis, angle);
         self
     }
+
+    /// Generates a transform from the builder.
+    pub fn build(&self) -> Transform {
+        Transform(Isometry3::from_parts(
+            Translation3::from(self.translation),
+            self.rotation,
+        ))
+    }
 }
 
+/// A trait for any object that can be transform stuff (i.e., bounding spheres, point clouds).
 pub trait Transformable<Type> {
     fn transform(&self, value: &Type) -> Type;
 }
@@ -298,7 +325,7 @@ mod tests {
     fn test_mul_op() {
         let transform = Transform::eye();
         let points = array![[1., 2., 3.], [4., 5., 6.], [7., 8., 9.]];
-        let mult_result = &transform * &points;
+        let mult_result = transform.transform_vectors(points.clone());
 
         assert_eq!(mult_result, points);
 
@@ -308,7 +335,7 @@ mod tests {
         ));
 
         assert!(assert_array(
-            &(&transform * &array![[1.0, 2.0, 3.0], [1.0, 2.0, 3.0]]),
+            &(&transform.transform_vectors(array![[1.0, 2.0, 3.0], [1.0, 2.0, 3.0]])),
             &array![[-1.0, 2.0, 0.0], [-1.0, 2.0, 0.0]]
         ));
     }

@@ -77,11 +77,11 @@ mod tests {
     fn test_transform_metrics() {
         let sample0 = Transform::new(
             &Vector3::new(0.00022050377, 7.3633055e-5, -1.51071e-5),
-            Quaternion::new(2.059626e-5, 0.00888227, 0.0008264509, 0.99996024),
+            &Quaternion::new(2.059626e-5, 0.00888227, 0.0008264509, 0.99996024),
         );
         let sample1 = Transform::new(
             &Vector3::new(0.00022050377, 7.3633055e-5, -1.51071e-5),
-            Quaternion::new(2.059626e-5, 0.00888227, 0.0008264509, 0.99996024),
+            &Quaternion::new(2.059626e-5, 0.00888227, 0.0008264509, 0.99996024),
         );
 
         let metrics = TransformMetrics::new(&sample0, &sample1);
