@@ -5,8 +5,8 @@ use itertools::izip;
 /// Multiscale interface for ICP algorithms.
 /// TODO: Make it generic for point cloud ICP.
 pub struct MultiscaleAlign<'pyramid_lt> {
-    target_pyramid: &'pyramid_lt Vec<RangeImage>,
     params: MsIcpParams,
+    target_pyramid: &'pyramid_lt Vec<RangeImage>,
 }
 
 impl<'pyramid_lt> MultiscaleAlign<'pyramid_lt> {
@@ -24,8 +24,8 @@ impl<'pyramid_lt> MultiscaleAlign<'pyramid_lt> {
     /// * Err(Error(InvalidParameter)) if the number of levels in the target pyramid and the number
     ///   of ICP parameters are equal.
     pub fn new(
-        target_pyramid: &'pyramid_lt Vec<RangeImage>,
         params: MsIcpParams,
+        target_pyramid: &'pyramid_lt Vec<RangeImage>
     ) -> Result<Self, Error> {
         if params.len() != target_pyramid.len() {
             return Err(Error::invalid_parameter(

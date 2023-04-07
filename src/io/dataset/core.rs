@@ -75,7 +75,7 @@ impl RgbdDataset for SubsetDataset {
 
     fn trajectory(&self) -> Option<Trajectory> {
         let orig_trajectory = self.dataset.trajectory()?;
-        let mut trajectory = Trajectory::new();
+        let mut trajectory = Trajectory::default();
         for (i, index) in self.indices.iter().enumerate() {
             trajectory.push(orig_trajectory.camera_to_world[*index].clone(), i as f32);
         }

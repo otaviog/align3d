@@ -1,4 +1,7 @@
-use std::ops::{Index, IndexMut};
+use std::{
+    f32::consts::PI,
+    ops::{Index, IndexMut},
+};
 
 /// ICP parameters
 #[derive(Debug, Clone, Copy)]
@@ -103,5 +106,29 @@ impl Index<usize> for MsIcpParams {
 impl IndexMut<usize> for MsIcpParams {
     fn index_mut(&mut self, index: usize) -> &mut Self::Output {
         &mut self.pyramid[index]
+    }
+}
+
+impl Default for MsIcpParams {
+    fn default() -> Self {
+        Self::repeat(
+            3,
+            &IcpParams {
+                weight: 1.0,
+                color_weight: 1.0,
+                max_normal_angle: PI / 10.0,
+                max_color_distance: 2.75,
+                max_distance: 0.5,
+                ..Default::default()
+            },
+        )
+        .customize(|level, mut params| {
+            match level {
+                0 => params.max_iterations = 20, // 0 is the last level run
+                1 => params.max_iterations = 20,
+                2 => params.max_iterations = 30,
+                _ => {}
+            };
+        })
     }
 }

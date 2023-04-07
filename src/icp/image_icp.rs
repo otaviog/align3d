@@ -176,7 +176,7 @@ mod tests {
 
         let expected = Transform::new(
             &Vector3::new(0.00838648, 0.0061255624, 0.00545656),
-            Quaternion::new(-0.0002255599, 0.00024208902, 0.99999976, 0.0005938519),
+            &Quaternion::new(-0.0002255599, 0.00024208902, 0.99999976, 0.0005938519),
         );
         assert_eq!(TransformMetrics::new(&result, &expected).angle, 0.0);
     }

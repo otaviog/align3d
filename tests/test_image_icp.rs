@@ -40,12 +40,11 @@ fn main() {
             0 => params.max_iterations = 20, // 0 is the last level run
             1 => params.max_iterations = 10,
             2 => params.max_iterations = 5,
-            3 => params.max_iterations = 5,
             _ => {}
         };
     });
 
-    let icp = MultiscaleAlign::new(&target_pcl, params).unwrap();
+    let icp = MultiscaleAlign::new(params, &target_pcl).unwrap();
     let result = icp.align(&source_pcl);
 
     let gt_transform = dataset
