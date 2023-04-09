@@ -309,7 +309,6 @@ mod tests {
 
     use super::*;
 
-    #[ignore]
     #[fixture]
     fn offscreen_renderer() -> (Manager, OffscreenRenderer) {
         let mut manager = Manager::default();
@@ -318,17 +317,18 @@ mod tests {
         (manager, renderer)
     }
 
+    #[ignore]
     #[rstest]
     fn test_creation(
         offscreen_renderer: (Manager, OffscreenRenderer),
         sample_teapot_pointcloud: PointCloud,
     ) {
-        let (manager, _offscreen_renderer) = offscreen_renderer;
+        let (manager, mut offscreen_renderer) = offscreen_renderer;
         let mem_alloc = StandardMemoryAllocator::new_default(manager.device.clone());
-        let _node = VkPointCloudNode::new(VkPointCloud::from_pointcloud(
+        let node = VkPointCloudNode::new(VkPointCloud::from_pointcloud(
             &mem_alloc,
             &sample_teapot_pointcloud,
         ));
-        //offscreen_renderer.render(node);
+        offscreen_renderer.render(node);
     }
 }
