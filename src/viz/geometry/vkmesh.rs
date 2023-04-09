@@ -24,7 +24,7 @@ use crate::{
     io::Geometry,
     viz::{
         controllers::FrameStepInfo,
-        node::{CommandBuffersContext, MakeNode, Node, NodeProperties, NodeRef, node_ref},
+        node::{node_ref, CommandBuffersContext, MakeNode, Node, NodeProperties, NodeRef},
         Manager,
     },
 };
@@ -183,12 +183,11 @@ mod fs {
 }
 
 impl Node for VkMeshNode {
-
     fn new_instance(&self) -> NodeRef<dyn Node> {
         node_ref(VkMeshNode {
             node_properties: self.node_properties,
             mesh: self.mesh.clone(),
-        })   
+        })
     }
 
     fn properties(&self) -> &NodeProperties {
@@ -306,13 +305,9 @@ mod tests {
 
     use super::*;
 
-    #[fixture]
-    fn vk_manager() -> Manager {
-        Manager::default()
-    }
-
     #[rstest]
-    fn test_creation(mut vk_manager: Manager, sample_teapot_geometry: Geometry) {
+    fn test_creation(sample_teapot_geometry: Geometry) {
+        let mut vk_manager = Manager::default();
         let mem_alloc = StandardMemoryAllocator::new_default(vk_manager.device.clone());
         let mut render = OffscreenRenderer::new(&mut vk_manager, 640, 480);
 

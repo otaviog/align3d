@@ -33,10 +33,10 @@ fn main() -> Result<(), Box<dyn std::error::Error + 'static>> {
         .trajectory()
         .expect("Dataset has no trajectory")
         .first_frame_at_origin();
-    let metrics = TransformMetrics::mean_trajectory_error(&pred_trajectory, &gt_trajectory)?;
-    println!("Mean trajectory error: {}", metrics);
+    let metrics = TransformMetrics::mean_trajectory_error(&pred_trajectory, gt_trajectory)?;
+    println!("Mean trajectory error: {metrics}");
     RgbdDatasetViewer::new(dataset)
-        .with_trajectory(pred_trajectory.clone())
+        .with_trajectory(pred_trajectory)
         .run();
 
     Ok(())

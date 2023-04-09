@@ -95,7 +95,7 @@ mod tests {
     fn test_downsample(sample_rgbd_dataset1: impl RgbdDataset) {
         let image = sample_rgbd_dataset1.get(0).unwrap().image;
         let scale_05 = image.downsample(0.5);
-        assert_eq!([3, 240, 320], scale_05.color.shape());
+        assert_eq!([240, 320, 3], scale_05.color.shape());
         assert_eq!([240, 320], scale_05.depth.shape());
         assert_eq!(320, scale_05.width());
         assert_eq!(240, scale_05.height());

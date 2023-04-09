@@ -4,6 +4,7 @@ use crate::{
     bilateral::BilateralFilter,
     io::dataset::{DatasetError, RgbdDataset, SlamTbDataset},
     range_image::RangeImage,
+    transform::Transform,
     Array2Recycle,
 };
 
@@ -31,6 +32,14 @@ impl TestRangeImageDataset {
 
     pub fn is_empty(&self) -> bool {
         self.dataset.is_empty()
+    }
+
+    pub fn get_ground_truth(&self, source_index: usize, target_index: usize) -> Transform {
+        self.dataset
+            .trajectory()
+            .unwrap()
+            .get_relative_transform(source_index, target_index)
+            .unwrap()
     }
 }
 

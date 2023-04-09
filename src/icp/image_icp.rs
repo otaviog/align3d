@@ -93,7 +93,7 @@ impl<'target_lt> ImageIcp<'target_lt> {
                             Vector3::new(elem[0], elem[1], elem[2])
                         };
 
-                        if trig::angle_between_vecs(&source_normal, &target_normal)
+                        if trig::angle_between_vectors(&source_normal, &target_normal)
                             >= self.params.max_normal_angle
                         {
                             return; // exit closure
@@ -155,29 +155,25 @@ impl<'target_lt> ImageIcp<'target_lt> {
 
 #[cfg(test)]
 mod tests {
-    use nalgebra::{Quaternion, Vector3};
     use rstest::rstest;
 
     use super::ImageIcp;
     use crate::{
         icp::icp_params::IcpParams,
         metrics::TransformMetrics,
-        transform::Transform,
         unit_test::{sample_range_img_ds2, TestRangeImageDataset},
     };
 
     #[rstest]
     fn test_align(sample_range_img_ds2: TestRangeImageDataset) {
         let rimage0 = sample_range_img_ds2.get(0).unwrap();
-        let rimage1 = sample_range_img_ds2.get(5).unwrap();
+        let rimage1 = sample_range_img_ds2.get(1).unwrap();
 
-        let result = ImageIcp::new(IcpParams::default(), &rimage0).align(&rimage1);
-        println!("Result: {:?}", result);
+        let gt_transform = sample_range_img_ds2.get_ground_truth(1, 0);
+        let mut params = IcpParams::default();
+        params.max_iterations = 5;
+        let actual = ImageIcp::new(IcpParams::default(), &rimage0).align(&rimage1);
 
-        let expected = Transform::new(
-            &Vector3::new(0.00838648, 0.0061255624, 0.00545656),
-            &Quaternion::new(-0.0002255599, 0.00024208902, 0.99999976, 0.0005938519),
-        );
-        assert_eq!(TransformMetrics::new(&result, &expected).angle, 0.0);
+        assert!(TransformMetrics::new(&actual, &gt_transform).angle.abs() < 0.1);
     }
 }

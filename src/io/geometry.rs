@@ -8,7 +8,7 @@ pub struct Geometry {
     pub colors: Option<Array2<u8>>,
     /// Per vertices normals. Shape is (Nx3)
     pub normals: Option<Array2<f32>>,
-    /// The indices to conect vertices that make faces in the geometry.
+    /// The indices to connect vertices that make faces in the geometry.
     /// Shape is (Nx3), we always convert to triangles.
     pub faces: Option<Array2<usize>>,
     /// The texture coordinates.

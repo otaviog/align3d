@@ -33,6 +33,6 @@ impl TrajectoryBuilder {
 
     /// Creates the trajectory at its current state.
     pub fn build(self) -> Trajectory {
-        self.trajectory.clone()
+        self.trajectory
     }
 }

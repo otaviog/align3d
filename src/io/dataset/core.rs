@@ -29,9 +29,9 @@ impl std::error::Error for DatasetError {
 impl std::fmt::Display for DatasetError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            DatasetError::Io(err) => write!(f, "IO error: {}", err),
-            DatasetError::Parser(err) => write!(f, "Parser error: {}", err),
-            DatasetError::Image(err) => write!(f, "Image error: {}", err),
+            DatasetError::Io(err) => write!(f, "IO error: {err}"),
+            DatasetError::Parser(err) => write!(f, "Parser error: {err}"),
+            DatasetError::Image(err) => write!(f, "Image error: {err}"),
         }
     }
 }

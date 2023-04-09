@@ -55,6 +55,10 @@ impl<'target_lt> Icp<'target_lt> {
             .normals
             .as_ref()
             .expect("Please, the target point cloud should have normals.");
+        let source_normals = source
+            .normals
+            .as_ref()
+            .expect("Please, the source point cloud should have normals.");
         let mut optim_transform = Transform::eye();
         let mut optim = GaussNewton::<6>::new();
         let geom_cost = PointPlaneDistance {};
@@ -66,7 +70,7 @@ impl<'target_lt> Icp<'target_lt> {
         for _ in 0..self.params.max_iterations {
             for (source_point, source_normal) in izip!(
                 source.points.axis_iter(Axis(0)),
-                source.normals.as_ref().unwrap().axis_iter(Axis(0))
+                source_normals.axis_iter(Axis(0))
             ) {
                 let source_point = optim_transform.transform_vector(&Vector3::new(
                     source_point[0],
@@ -90,7 +94,7 @@ impl<'target_lt> Icp<'target_lt> {
                     .into_nalgebra()
                     .fixed_slice::<3, 1>(0, 0)
                     .into_owned();
-                if trig::angle_between_normals(&source_normal, &target_normal)
+                if trig::angle_between_vectors(&source_normal, &target_normal)
                     > self.params.max_normal_angle
                 {
                     continue;
@@ -132,23 +136,16 @@ mod tests {
     use super::*;
     use rstest::*;
 
-    use crate::{
-        io::write_ply,
-        unit_test::{sample_pcl_ds1, TestPclDataset},
-    };
+    use crate::unit_test::{sample_pcl_ds1, TestPclDataset};
 
     /// Test the ICP algorithm.
     #[rstest]
     fn test_icp(sample_pcl_ds1: TestPclDataset) {
         let target_pcl = sample_pcl_ds1.get(0);
-        let source_pcl = sample_pcl_ds1.get(7);
-
+        let source_pcl = sample_pcl_ds1.get(1);
         let mut params = IcpParams::default();
-        params.weight = 0.25;
-        let transform = Icp::new(params, &target_pcl).align(&source_pcl);
-
-        let aligned_source_pcl = &transform * &source_pcl;
-        write_ply("tests/data/out-icp1.ply", &aligned_source_pcl.into())
-            .expect("Unable to write result");
+        params.max_iterations = 5;
+        let _transform = Icp::new(params, &target_pcl).align(&source_pcl);
+        // TODO: Check the result.
     }
 }

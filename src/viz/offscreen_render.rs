@@ -1,4 +1,4 @@
-use std::{collections::HashMap, sync::Arc, rc::Rc, cell::RefCell};
+use std::{cell::RefCell, collections::HashMap, rc::Rc, sync::Arc};
 
 use image::{ImageBuffer, Rgba, RgbaImage};
 use vulkano::{
@@ -133,6 +133,21 @@ impl OffscreenRenderer {
     ///
     /// ```
     pub fn render(&mut self, scene: Rc<RefCell<dyn Node>>) -> RenderImage {
+        let (width, height) = (
+            self.viewport.dimensions[0] as usize,
+            self.viewport.dimensions[1] as usize,
+        );
+        let image_buffer = CpuAccessibleBuffer::from_iter(
+            &self.memory_allocator,
+            BufferUsage {
+                transfer_dst: true,
+                ..Default::default()
+            },
+            false,
+            (0..height * width * 4).map(|_| 0u8),
+        )
+        .expect("failed to create buffer");
+
         let mut builder = AutoCommandBufferBuilder::primary(
             &self.command_buffer_allocator,
             self.queue.queue_family_index(),
@@ -163,21 +178,6 @@ impl OffscreenRenderer {
             &FrameStepInfo::new(self.viewport.dimensions),
         );
 
-        let (width, height) = (
-            self.viewport.dimensions[0] as usize,
-            self.viewport.dimensions[1] as usize,
-        );
-        let image_buffer = CpuAccessibleBuffer::from_iter(
-            &self.memory_allocator,
-            BufferUsage {
-                transfer_dst: true,
-                ..Default::default()
-            },
-            false,
-            (0..height * width * 4).map(|_| 0u8),
-        )
-        .expect("failed to create buffer");
-
         builder
             .end_render_pass()
             .unwrap()
@@ -189,7 +189,7 @@ impl OffscreenRenderer {
 
         let command_buffer = builder.build().unwrap();
         let future = sync::now(self.device.clone())
-            .then_execute_same_queue(command_buffer)
+            .then_execute(self.queue.clone(), command_buffer)
             .unwrap()
             .then_signal_fence_and_flush()
             .unwrap();

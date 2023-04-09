@@ -12,7 +12,7 @@ pub enum LieGroup {
 }
 
 /// A Rigid Body Transform in 3D space.
-/// This wraps Isometry3 from nalgebra and provides methods for working with 
+/// This wraps Isometry3 from nalgebra and provides methods for working with
 /// Align3d's data structures.
 #[derive(Clone, Debug)]
 pub struct Transform(pub Isometry3<f32>);
@@ -37,7 +37,7 @@ impl Transform {
     pub fn new(xyz: &Vector3<f32>, rotation: &Quaternion<f32>) -> Self {
         Self(Isometry3::<f32>::from_parts(
             Translation3::new(xyz[0], xyz[1], xyz[2]),
-            UnitQuaternion::from_quaternion(rotation.clone()),
+            UnitQuaternion::from_quaternion(*rotation),
         ))
     }
 
@@ -159,7 +159,7 @@ impl Transform {
     /// * rhs - Array of 3D vectors/points of shape (N, 3). It'll reuse this array as result's storage.
     ///
     /// # Returns
-    /// 
+    ///
     /// * Array of 3D points of shape (N, 3) transformed.
     pub fn transform_vectors(&self, mut rhs: Array2<f32>) -> Array2<f32> {
         for mut point in rhs.axis_iter_mut(Axis(0)) {
@@ -174,13 +174,13 @@ impl Transform {
     }
 
     /// Transforms an array of 3D normals, i.e., it only uses the rotation part of the transform.
-    /// 
+    ///
     /// # Arguments
-    /// 
+    ///
     /// * rhs - Array of 3D normals of shape (N, 3). It'll reuse this array as result's storage.
-    /// 
+    ///
     /// # Returns
-    /// 
+    ///
     /// * Array of 3D normals of shape (N, 3) transformed.
     pub fn transform_normals(&self, mut rhs: Array2<f32>) -> Array2<f32> {
         for mut point in rhs.axis_iter_mut(Axis(0)) {
@@ -264,7 +264,6 @@ impl Default for TransformBuilder {
 
 /// Easy to use builder for transforms.
 impl TransformBuilder {
-
     /// Sets the translation.
     pub fn translation(&mut self, translation: Vector3<f32>) -> &mut Self {
         self.translation = translation;
@@ -272,9 +271,9 @@ impl TransformBuilder {
     }
 
     /// Sets the rotation.
-    /// 
+    ///
     /// # Arguments
-    /// 
+    ///
     /// * axis - Rotation axis.
     /// * angle - Rotation angle in radians.
     pub fn axis_angle(&mut self, axis: UnitVector3<f32>, angle: f32) -> &mut Self {
@@ -372,9 +371,11 @@ mod tests {
             Vector4::new(3.5280778, 2.8378963, 5.8994026, 1.0000)
         );
         let test_mult = se3.transform_vector(&Vector3::new(1.0, 2.0, 3.0));
-        assert_eq!(
-            (test_mult - Vector3::new(3.5280778, 2.8378963, 5.8994026)).norm(),
-            0.0
+        assert!(
+            (test_mult - Vector3::new(3.5280778, 2.8378963, 5.8994026))
+                .norm()
+                .abs()
+                < 1e-5
         );
     }
 

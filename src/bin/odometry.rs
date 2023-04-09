@@ -47,7 +47,7 @@ fn main() {
         total = dataset.len() - 1,
         desc = "Processing frames"
     ) {
-        let current_frame = range_processing.build(dataset.get(i as usize).unwrap());
+        let current_frame = range_processing.build(dataset.get(i).unwrap());
         let icp = MultiscaleAlign::new(icp_params.clone(), &last_frame).unwrap();
         let transform = icp.align(&current_frame);
         traj_builder.accumulate(&transform, Some(i as f32));
@@ -62,12 +62,12 @@ fn main() {
 
     
     let metrics =
-        TransformMetrics::mean_trajectory_error(&pred_trajectory, &gt_trajectory).unwrap();
-    println!("Mean trajectory error: {}", metrics);
+        TransformMetrics::mean_trajectory_error(&pred_trajectory, gt_trajectory).unwrap();
+    println!("Mean trajectory error: {metrics}");
 
     if args.show {
         RgbdDatasetViewer::new(dataset)
-            .with_trajectory(pred_trajectory.clone())
+            .with_trajectory(pred_trajectory)
             .run();
     }
 }

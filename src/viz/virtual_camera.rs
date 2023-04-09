@@ -162,7 +162,7 @@ impl VirtualCameraSphericalBuilder {
             phi.cos() * self.distance * theta.cos(),
             theta.sin() * self.distance,
             phi.sin() * self.distance * theta.cos(),
-        ) + &self.sphere.center;
+        ) + self.sphere.center;
 
         let view = (self.sphere.center - position).normalize();
         let right = view.cross(&Vec3::new(0.0, -1.0, 0.0)).normalize();

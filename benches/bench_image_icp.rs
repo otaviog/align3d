@@ -21,7 +21,7 @@ fn image_icp_benchmark(c: &mut Criterion) {
         image
     };
 
-    let mut icp = ImageIcp::new(
+    let icp = ImageIcp::new(
         IcpParams {
             max_iterations: 10,
             ..Default::default()

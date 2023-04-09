@@ -38,7 +38,7 @@ fn kdtree_benchmark(c: &mut Criterion) {
         b.iter_custom(|iters| {
             let start = Instant::now();
             for _i in 0..iters {
-                tree.nearest::<3>(&ordered_points.view(), Array1Recycle::Empty);
+                tree.nearest(&ordered_points.view(), Array1Recycle::Empty);
             }
             start.elapsed()
         });

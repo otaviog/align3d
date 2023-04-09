@@ -451,6 +451,7 @@ mod tests {
         for im in pyramid.iter_mut() {
             im.compute_normals();
             im.compute_intensity();
+            im.compute_intensity_map();
         }
 
         for (i, im) in pyramid.iter().enumerate() {

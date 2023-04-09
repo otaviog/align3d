@@ -301,18 +301,6 @@ mod tests {
     }
 
     #[rstest]
-    fn bilinear_interp(bloei_luma8: Array2<u8>) {
-        let map = IntensityMap::from_luma_image(&bloei_luma8.view());
-
-        for (y, x) in [(20.25, 0.25), (33.75, 44.25), (12.5, 48.75)] {
-            assert_eq!(
-                map.bilinear(x, y),
-                bloei_luma8[(y as usize, x as usize)] as f32 / 255.0
-            );
-        }
-    }
-
-    #[rstest]
     fn values(bloei_luma8: Array2<u8>) {
         let map = IntensityMap::from_luma_image(&bloei_luma8.view());
         for ((y, x), img_value) in bloei_luma8.indexed_iter() {

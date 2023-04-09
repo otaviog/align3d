@@ -11,10 +11,10 @@ pub enum A3dError {
 impl std::fmt::Display for A3dError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            A3dError::Io(err) => write!(f, "IO error: {}", err),
-            A3dError::Parser(err) => write!(f, "Parser error: {}", err),
-            A3dError::InvalidParameter(err) => write!(f, "Parameter error: {}", err),
-            A3dError::Assertion(err) => write!(f, "Assertion err,or: {}", err)
+            A3dError::Io(err) => write!(f, "IO error: {err}"),
+            A3dError::Parser(err) => write!(f, "Parser error: {err}"),
+            A3dError::InvalidParameter(err) => write!(f, "Parameter error: {err}"),
+            A3dError::Assertion(err) => write!(f, "Assertion err,or: {err}")
         }
     }
 }

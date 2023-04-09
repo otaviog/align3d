@@ -117,13 +117,13 @@ pub fn read_off(filepath: &str) -> Result<Geometry, LoadError> {
         .map(|x| x.parse::<usize>())
         .collect::<Vec<Result<usize, ParseIntError>>>();
 
-    let (num_verts, num_faces, _) = if let [Ok(v0), Ok(v1), Ok(v2)] = values[..] {
+    let (num_vertices, num_faces, _) = if let [Ok(v0), Ok(v1), Ok(v2)] = values[..] {
         (v0, v1, v2)
     } else {
         return Err(parser_context.gen_error(format!("Invalid size formats. Got `{dims}`")));
     };
 
-    let vertices = read_off_elements::<f32>(num_verts, &mut parser_context)?;
+    let vertices = read_off_elements::<f32>(num_vertices, &mut parser_context)?;
     let faces = read_off_faces(num_faces, &mut parser_context)?;
 
     Ok(Geometry {
@@ -137,12 +137,10 @@ pub fn read_off(filepath: &str) -> Result<Geometry, LoadError> {
 
 #[cfg(test)]
 mod tests {
-    use ndarray::Axis;
-
     #[test]
     fn test_read_off() {
         use super::read_off;
         let geom = read_off("tests/data/teapot.off").expect("Unable to read .off file");
-        assert_eq!(geom.points.len_of(Axis(0)), 400);
+        assert_eq!(geom.len_vertices(), 480);
     }
 }

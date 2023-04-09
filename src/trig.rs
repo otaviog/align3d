@@ -14,6 +14,6 @@ pub fn angle_between_normals<T: RealField>(lfs: &Vector3<T>, rfs: &Vector3<T>) -
     lfs.dot(rfs).acos().abs()
 }
 
-pub fn angle_between_vecs(lfs: &Vector3<f32>, rfs: &Vector3<f32>) -> f32 {
+pub fn angle_between_vectors(lfs: &Vector3<f32>, rfs: &Vector3<f32>) -> f32 {
     (lfs.dot(rfs) / (lfs.norm() * rfs.norm())).acos().abs()
 }

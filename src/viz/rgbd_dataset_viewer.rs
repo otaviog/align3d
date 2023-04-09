@@ -42,12 +42,12 @@ impl MakeNode for RgbdDatasetViewer {
         let mut scene = Scene::default();
 
         for i in 0..self.dataset.len() {
-            let rgbd_frame = self.dataset.get(i as usize).unwrap();
+            let rgbd_frame = self.dataset.get(i).unwrap();
             let mut ri = RangeImage::from_rgbd_frame(&rgbd_frame);
             ri.compute_normals();
             let node = ri.make_node(manager);
 
-            let transform = self.trajectory[i as usize].clone();
+            let transform = self.trajectory[i].clone();
             node.borrow_mut().properties_mut().transformation =
                 transform.into_vulkan_coordinate_system();
 

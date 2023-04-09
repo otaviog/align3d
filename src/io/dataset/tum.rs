@@ -25,7 +25,7 @@ fn read_file_list(filepath: &PathBuf) -> Result<Vec<(f64, String)>, DatasetError
     let file_list: Vec<(f64, String)> = reader
         .lines()
         .filter_map(|line| line.ok())
-        .filter(|line| !line.trim().starts_with("#"))
+        .filter(|line| !line.trim().starts_with('#'))
         .map(|line| {
             let tokens: Vec<&str> = line.split(&[',', '\t', ' ']).collect();
             (
@@ -39,33 +39,31 @@ fn read_file_list(filepath: &PathBuf) -> Result<Vec<(f64, String)>, DatasetError
 }
 
 fn associate<T1: Clone, T2: Clone>(
-    first_list: &Vec<(f64, T1)>,
-    second_list: &Vec<(f64, T2)>,
+    first_list: &[(f64, T1)],
+    second_list: &[(f64, T2)],
 ) -> Vec<(f64, T1, f64, T2)> {
-    let mut first_list = first_list.into_iter().peekable();
-    let mut second_list = second_list.into_iter().peekable();
+    let mut first_list = first_list.iter().peekable();
+    let mut second_list = second_list.iter().peekable();
     let mut result = Vec::<(f64, T1, f64, T2)>::new();
-    loop {
-        match (first_list.peek(), second_list.peek()) {
-            (Some((first_time, first_value)), Some((second_time, second_value))) => {
-                if (first_time - second_time).abs() < 0.02 {
-                    result.push((
-                        *first_time,
-                        first_value.clone(),
-                        *second_time,
-                        second_value.clone(),
-                    ));
-                    first_list.next();
-                    second_list.next();
-                } else if first_time < second_time {
-                    first_list.next();
-                } else {
-                    second_list.next();
-                }
-            }
-            _ => break,
+    while let (Some((first_time, first_value)), Some((second_time, second_value))) =
+        (first_list.peek(), second_list.peek())
+    {
+        if (first_time - second_time).abs() < 0.02 {
+            result.push((
+                *first_time,
+                first_value.clone(),
+                *second_time,
+                second_value.clone(),
+            ));
+            first_list.next();
+            second_list.next();
+        } else if first_time < second_time {
+            first_list.next();
+        } else {
+            second_list.next();
         }
     }
+
     result
 }
 
@@ -75,7 +73,7 @@ fn load_trajectory(filepath: &str) -> Result<Vec<(f64, Transform)>, DatasetError
     let trajectory = reader
         .lines()
         .filter_map(|line| line.ok())
-        .filter(|line| !line.trim().starts_with("#"))
+        .filter(|line| !line.trim().starts_with('#'))
         .map(|line| {
             let tokens: Vec<f64> = line
                 .split_whitespace()
@@ -138,11 +136,11 @@ impl TumRgbdDataset {
 
 impl RgbdDataset for TumRgbdDataset {
     fn get(&self, index: usize) -> Result<RgbdFrame, DatasetError> {
-        let rgb_image = image::open(&self.base_dir.join(&self.rgb_images[index]))?
+        let rgb_image = image::open(self.base_dir.join(&self.rgb_images[index]))?
             .into_rgb8()
             .into_array3();
 
-        let depth_image = image::open(&self.base_dir.join(&self.depth_images[index]))?
+        let depth_image = image::open(self.base_dir.join(&self.depth_images[index]))?
             .into_luma16()
             .into_ndarray2();
         let mut rgbd_image = RgbdImage::new(rgb_image, depth_image);
@@ -175,8 +173,10 @@ impl RgbdDataset for TumRgbdDataset {
 mod test {
     use super::*;
 
+    #[ignore]
     #[test]
     fn test_load() {
+        // Ignored: requires the TUM RGB-D dataset to be downloaded.
         let dataset = TumRgbdDataset::load("tests/data/rgbd_dataset_freiburg1_xyz").expect("
         Please, link the folder data/rgbd_dataset_freiburg1_xyz to the corresponding in the TUM RGB-D dataset folder");
         assert_eq!(dataset.len(), 797);

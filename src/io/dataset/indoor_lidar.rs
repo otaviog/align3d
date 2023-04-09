@@ -15,9 +15,9 @@ use crate::{
 use super::core::{DatasetError, RgbdDataset};
 
 /// Parser for the IndoorLidar dataset. Available at:
-///  http://redwood-data.org/indoor_lidar_rgbd/index.html.
-///	 Jaesik Park and Qian-Yi Zhou and Vladlen Koltun,
-///	 Colored Point Cloud Registration Revisited. ICCV, 2017.
+/// http://redwood-data.org/indoor_lidar_rgbd/index.html.
+/// Jaesik Park and Qian-Yi Zhou and Vladlen Koltun,
+/// Colored Point Cloud Registration Revisited. ICCV, 2017.
 pub struct IndoorLidarDataset {
     rgb_images: Vec<String>,
     depth_images: Vec<String>,

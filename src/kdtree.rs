@@ -105,14 +105,13 @@ impl KdTree {
         }
     }
 
-    pub fn nearest<const DIM: usize>(
+    pub fn nearest(
         &self,
         queries: &ArrayView2<f32>,
         nearest: Array1Recycle,
     ) -> Array1<usize> {
         let queries_shape = queries.shape();
         let point_dim = queries_shape[1];
-        //let mut nearest = Array1::from_elem((queries_shape[0],), 0);
 
         let mut nearest = nearest.get(queries_shape[0]);
         for (point_idx, point) in queries.rows().into_iter().enumerate() {
@@ -135,12 +134,7 @@ impl KdTree {
                         points: leaf_points,
                         indices: leaf_indices,
                     } => {
-                        let v = if DIM == 3 {
-                            smallest_diff3(leaf_points, point)
-                        } else {
-                            smallest_diff(leaf_points, point)
-                        };
-
+                        let v = smallest_diff(leaf_points, point);
                         nearest[point_idx] = leaf_indices[v];
                         break;
                     }
@@ -167,29 +161,12 @@ fn smallest_diff(
     v.unwrap_or(0)
 }
 
-fn smallest_diff3(
-    leaf_points: &ArrayBase<ndarray::OwnedRepr<f32>, Dim<[usize; 2]>>,
-    point: ArrayBase<ndarray::ViewRepr<&f32>, Dim<[usize; 1]>>,
-) -> usize {
-    let point = Vector3::new(point[0], point[1], point[2]);
-
-    let mut min_dist = std::f32::INFINITY;
-    let mut min_idx = 0;
-    for (i, leaf_point) in leaf_points.axis_iter(Axis(0)).enumerate() {
-        let leaf_point = Vector3::new(leaf_point[0], leaf_point[1], leaf_point[2]);
-        let prod = leaf_point.dot(&point);
-        if prod < min_dist {
-            min_dist = prod;
-            min_idx = i;
-        }
-    }
-    min_idx
-}
 
 #[cfg(test)]
 mod tests {
     use std::time::Instant;
 
+    use nalgebra::Vector3;
     use ndarray::prelude::*;
     use rand::rngs::SmallRng;
     use rand::seq::SliceRandom;
@@ -210,8 +187,14 @@ mod tests {
             [2.2, 3.1, 4.2]
         ];
 
-        let found = tree.nearest::<3>(&queries.view(), crate::Array1Recycle::Empty);
+        let found = tree.nearest(&queries.view(), crate::Array1Recycle::Empty);
         assert_eq!(found, array![3, 2, 0, 1]);
+
+        for (query, expected) in queries.outer_iter().zip(&[3, 2, 0, 1]) {
+            let query = Vector3::new(query[0], query[1], query[2]);
+            let (idx, _) = tree.nearest3d(&query);
+            assert_eq!(idx, *expected);
+        }
     }
 
     #[test]
@@ -235,8 +218,15 @@ mod tests {
 
         let tree = KdTree::new(&randomized_points.view());
 
-        let found_indices = tree.nearest::<3>(&ordered_points.view(), Array1Recycle::Empty);
-        assert_eq!(Array::from_vec(random_indices), found_indices);
+        let found_indices = tree.nearest(&ordered_points.view(), Array1Recycle::Empty);
+        assert_eq!(Array::from_vec(random_indices.clone()), found_indices);
+
+
+        for (query, expected) in ordered_points.outer_iter().zip(random_indices.iter()) {
+            let query = Vector3::new(query[0], query[1], query[2]);
+            let (idx, _) = tree.nearest3d(&query);
+            assert_eq!(idx, *expected);
+        }
     }
 
     #[test]
@@ -266,7 +256,7 @@ mod tests {
         let mut result = Array1Recycle::Empty;
         for _ in 0..M {
             let start = Instant::now();
-            result = Array1Recycle::Recycle(tree.nearest::<3>(&ordered_points.view(), result));
+            result = Array1Recycle::Recycle(tree.nearest(&ordered_points.view(), result));
             sum_millis += start.elapsed().as_millis();
         }
 

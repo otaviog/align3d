@@ -35,7 +35,7 @@ impl IntoVulkanWorldSpace for Transform {
             0.0, 0.0, 1.0, 0.0, 
             0.0, 0.0, 0.0, 1.0,
         );
-        (inv_axis_matrix * matrix).into()
+        inv_axis_matrix * matrix
     }
 }
 
