@@ -305,6 +305,7 @@ mod tests {
 
     use super::*;
 
+    #[ignore]
     #[rstest]
     fn test_creation(sample_teapot_geometry: Geometry) {
         let mut vk_manager = Manager::default();

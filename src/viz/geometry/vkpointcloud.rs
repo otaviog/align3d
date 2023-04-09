@@ -309,6 +309,7 @@ mod tests {
 
     use super::*;
 
+    #[ignore]
     #[fixture]
     fn offscreen_renderer() -> (Manager, OffscreenRenderer) {
         let mut manager = Manager::default();

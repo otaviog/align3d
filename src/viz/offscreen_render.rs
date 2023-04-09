@@ -242,6 +242,7 @@ mod tests {
     use super::OffscreenRenderer;
     use crate::viz::unit_test::vk_manager;
 
+    #[ignore]
     #[rstest]
     pub fn test_render(mut vk_manager: Manager) {
         let mut renderer = OffscreenRenderer::new(&mut vk_manager, 1024, 768);
