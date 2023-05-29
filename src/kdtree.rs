@@ -73,7 +73,7 @@ impl KdTree {
     /// A tuple containing the index of the nearest neighbor and the distance to it.
     pub fn nearest3d(&self, point: &Vector3<f32>) -> (usize, f32) {
         let mut curr_node = &self.root;
-        let mut depth = 0;
+        let mut current_dim = 0;
 
         loop {
             match curr_node.as_ref() {
@@ -82,8 +82,8 @@ impl KdTree {
                     left,
                     right,
                 } => {
-                    curr_node = if point[depth] < *mid { left } else { right };
-                    depth = min(depth + 1, 2);
+                    curr_node = if point[current_dim] < *mid { left } else { right };
+                    current_dim = (current_dim + 1) % 3;
                 }
                 KdNode::Leaf {
                     points: leaf_points,
@@ -105,11 +105,13 @@ impl KdTree {
         }
     }
 
-    pub fn nearest(
-        &self,
-        queries: &ArrayView2<f32>,
-        nearest: Array1Recycle,
-    ) -> Array1<usize> {
+    /// Find the nearest neighbor to a query point. N-Dimensional version.
+    ///
+    /// # Arguments
+    ///
+    /// * queries - The queries point.
+    ///
+    pub fn nearest(&self, queries: &ArrayView2<f32>, nearest: Array1Recycle) -> Array1<usize> {
         let queries_shape = queries.shape();
         let point_dim = queries_shape[1];
 
@@ -128,7 +130,7 @@ impl KdTree {
                         let v = point[depth];
                         curr_node = if v < *mid { left } else { right };
 
-                        depth = min(depth + 1, point_dim - 1);
+                        depth = (depth + 1) % point_dim;
                     }
                     KdNode::Leaf {
                         points: leaf_points,
@@ -160,7 +162,6 @@ fn smallest_diff(
         .map(|(idx, _)| idx);
     v.unwrap_or(0)
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -220,7 +221,6 @@ mod tests {
 
         let found_indices = tree.nearest(&ordered_points.view(), Array1Recycle::Empty);
         assert_eq!(Array::from_vec(random_indices.clone()), found_indices);
-
 
         for (query, expected) in ordered_points.outer_iter().zip(random_indices.iter()) {
             let query = Vector3::new(query[0], query[1], query[2]);
