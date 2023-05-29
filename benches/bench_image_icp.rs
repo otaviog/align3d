@@ -1,5 +1,5 @@
 use align3d::icp::{IcpParams, ImageIcp};
-use align3d::io::dataset::{SlamTbDataset, RgbdDataset};
+use align3d::io::dataset::{RgbdDataset, SlamTbDataset};
 use align3d::range_image::RangeImage;
 use criterion::{criterion_group, criterion_main, Criterion};
 use pprof::criterion::{Output, PProfProfiler};

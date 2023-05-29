@@ -31,7 +31,10 @@ pub enum Array2Recycle<T> {
     Recycle(Array2<T>),
 }
 
-impl<T> Array2Recycle<T> where T: num::Zero + Clone {
+impl<T> Array2Recycle<T>
+where
+    T: num::Zero + Clone,
+{
     pub fn get(self, required_dim: (usize, usize)) -> Array2<T> {
         match self {
             Self::Empty => Array2::<T>::zeros(required_dim),

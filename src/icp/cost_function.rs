@@ -14,8 +14,6 @@ fn se3_jacobian(source_point: &Vector3<f32>, target_normal: &Vector3<f32>) -> [f
     ]
 }
 
-
-
 impl PointPlaneDistance {
     /// Computes the residual and the Jacobian of the point-plane distance.
     ///

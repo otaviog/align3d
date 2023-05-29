@@ -16,7 +16,6 @@ pub struct Geometry {
 }
 
 impl Geometry {
-        
     /// Number of vertices.
     pub fn len_vertices(&self) -> usize {
         self.points.nrows()
@@ -29,19 +28,19 @@ impl Geometry {
 }
 
 pub struct GeometryBuilder {
-    geometry: Geometry
+    geometry: Geometry,
 }
 
 impl GeometryBuilder {
     pub fn new(points: Array2<f32>) -> Self {
         Self {
             geometry: Geometry {
-                points, 
+                points,
                 colors: None,
                 normals: None,
                 faces: None,
                 texcoords: None,
-            }
+            },
         }
     }
 

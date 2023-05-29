@@ -26,7 +26,7 @@ use crate::{
     range_image::RangeImage,
     viz::{
         controllers::FrameStepInfo,
-        node::{CommandBuffersContext, MakeNode, Node, NodeProperties, NodeRef, node_ref},
+        node::{node_ref, CommandBuffersContext, MakeNode, Node, NodeProperties, NodeRef},
         Manager,
     },
 };

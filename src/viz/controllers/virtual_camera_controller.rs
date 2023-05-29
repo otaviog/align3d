@@ -81,7 +81,7 @@ impl VirtualCameraControl for WASDVirtualCameraControl {
             let mut difference = self.cursor_last_position - current_positon;
             difference[0] /= window_state.viewport_size[0] * self.rotation_sensitivity[0];
             difference[1] /= window_state.viewport_size[0] * self.rotation_sensitivity[1];
-            
+
             self.camera.rotate_right_axis(-difference[1]);
             self.camera.rotate_up_axis(difference[0]);
         }

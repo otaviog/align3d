@@ -81,7 +81,11 @@ impl KdTree {
                     left,
                     right,
                 } => {
-                    curr_node = if point[current_dim] < *mid { left } else { right };
+                    curr_node = if point[current_dim] < *mid {
+                        left
+                    } else {
+                        right
+                    };
                     current_dim = (current_dim + 1) % 3;
                 }
                 KdNode::Leaf {

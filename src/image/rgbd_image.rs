@@ -1,6 +1,6 @@
 use ndarray::{Array2, Array3};
 
-use crate::{camera::Camera, sampling::Downsample, bilateral::BilateralFilter};
+use crate::{bilateral::BilateralFilter, camera::Camera, sampling::Downsample};
 
 use super::{py_scale_down, IntoImageRgb8};
 
@@ -43,9 +43,7 @@ impl Downsample for RgbdImage {
         let resized_color = py_scale_down(&self.color.clone().into_image_rgb8(), sigma);
         let depth_filter = BilateralFilter::default();
 
-        let resized_depth = depth_filter.scale_down(
-            &self.depth,
-        );
+        let resized_depth = depth_filter.scale_down(&self.depth);
 
         RgbdImage {
             color: resized_color,
@@ -87,8 +85,8 @@ mod tests {
     use rstest::rstest;
 
     use crate::{
-        image::IntoImageRgb8, sampling::Downsample,
-        unit_test::sample_rgbd_dataset1, io::dataset::RgbdDataset,
+        image::IntoImageRgb8, io::dataset::RgbdDataset, sampling::Downsample,
+        unit_test::sample_rgbd_dataset1,
     };
 
     #[rstest]

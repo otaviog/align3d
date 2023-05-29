@@ -47,7 +47,7 @@ pub struct GaussNewton<const DIM: usize> {
     count: usize,
 }
 
-impl <const DIM: usize> Default for  GaussNewton<DIM> {
+impl<const DIM: usize> Default for GaussNewton<DIM> {
     fn default() -> Self {
         Self::new()
     }

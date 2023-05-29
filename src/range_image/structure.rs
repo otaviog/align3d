@@ -382,7 +382,10 @@ mod tests {
     use super::*;
     use crate::{
         image::IntoLumaImage,
-        io::{dataset::{SlamTbDataset, RgbdDataset}, write_ply},
+        io::{
+            dataset::{RgbdDataset, SlamTbDataset},
+            write_ply,
+        },
     };
     use nshare::ToNdarray2;
     use rstest::*;

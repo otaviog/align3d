@@ -1,4 +1,7 @@
-use align3d::{bilateral::{BilateralFilter, BilateralGrid}, Array2Recycle};
+use align3d::{
+    bilateral::{BilateralFilter, BilateralGrid},
+    Array2Recycle,
+};
 
 use criterion::{criterion_group, criterion_main, Criterion};
 use nshare::ToNdarray2;

@@ -1,10 +1,7 @@
 use ndarray::Array2;
 use rstest::fixture;
 
-use crate::{
-    io::read_off,
-    pointcloud::PointCloud, transform::Transform,
-};
+use crate::{io::read_off, pointcloud::PointCloud, transform::Transform};
 
 use super::{sample_range_img_ds1, TestRangeImageDataset};
 

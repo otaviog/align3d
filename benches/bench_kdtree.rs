@@ -4,10 +4,10 @@ use align3d::kdtree::KdTree;
 use align3d::Array1Recycle;
 use criterion::{criterion_group, criterion_main, Criterion};
 use ndarray::{s, Array};
+use pprof::criterion::{Output, PProfProfiler};
 use rand::rngs::SmallRng;
 use rand::seq::SliceRandom;
 use rand::SeedableRng;
-use pprof::criterion::{PProfProfiler, Output};
 
 fn kdtree_benchmark(c: &mut Criterion) {
     const N: usize = 500000;

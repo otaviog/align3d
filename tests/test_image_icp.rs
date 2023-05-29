@@ -3,10 +3,11 @@ use std::f32::consts::PI;
 use align3d::{
     bilateral::BilateralFilter,
     icp::{multiscale::MultiscaleAlign, IcpParams, MsIcpParams},
+    io::dataset::{RgbdDataset, SlamTbDataset},
     metrics::TransformMetrics,
     range_image::RangeImageBuilder,
     transform::Transform,
-    viz::GeoViewer, io::dataset::{SlamTbDataset, RgbdDataset},
+    viz::GeoViewer,
 };
 
 use nalgebra::Matrix4;
