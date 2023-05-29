@@ -9,7 +9,7 @@ use align3d::{
 
 pub fn main() -> Result<(), Box<dyn std::error::Error>> {
     const SOURCE_IDX: usize = 0;
-    const TARGET_IDX: usize = 6;
+    const TARGET_IDX: usize = 4;
 
     let dataset = SlamTbDataset::load("tests/data/rgbd/sample2").unwrap();
     let frame_transform = RangeImageBuilder::default()

@@ -60,7 +60,7 @@ impl<'target_lt> Icp<'target_lt> {
             .as_ref()
             .expect("Please, the source point cloud should have normals.");
         let mut optim_transform = Transform::eye();
-        let mut optim = GaussNewton::<6>::new();
+        let mut optimizer = GaussNewton::<6>::new();
         let geom_cost = PointPlaneDistance {};
 
         let max_distance_sqr = self.params.max_distance * self.params.max_distance;
@@ -84,7 +84,6 @@ impl<'target_lt> Icp<'target_lt> {
                 ));
 
                 let (found_index, found_sqr_distance) = self.kdtree.nearest3d(&source_point);
-
                 if found_sqr_distance > max_distance_sqr {
                     continue;
                 }
@@ -111,15 +110,14 @@ impl<'target_lt> Icp<'target_lt> {
                 let (residual, jacobian) =
                     geom_cost.jacobian(&source_point, &target_point, &target_normal);
 
-                optim.step(residual, &jacobian);
+                optimizer.step(residual, &jacobian);
             }
 
-            let residual = optim.mean_squared_residual();
-            println!("Residual: {residual}");
-            optim.weight(self.params.weight);
-            let update = optim.solve().unwrap();
+            let residual = optimizer.mean_squared_residual();
+            optimizer.weight(self.params.weight);
+            let update = optimizer.solve().unwrap();
             optim_transform = &Transform::exp(&LieGroup::Se3(update)) * &optim_transform;
-            optim.reset();
+            optimizer.reset();
 
             if residual < best_residual {
                 best_residual = residual;
@@ -136,7 +134,10 @@ mod tests {
     use super::*;
     use rstest::*;
 
-    use crate::unit_test::{sample_pcl_ds1, TestPclDataset};
+    use crate::{
+        metrics::TransformMetrics,
+        unit_test::{sample_pcl_ds1, TestPclDataset},
+    };
 
     /// Test the ICP algorithm.
     #[rstest]
@@ -145,7 +146,12 @@ mod tests {
         let source_pcl = sample_pcl_ds1.get(1);
         let mut params = IcpParams::default();
         params.max_iterations = 5;
-        let _transform = Icp::new(params, &target_pcl).align(&source_pcl);
-        // TODO: Check the result.
+        let actual = Icp::new(params, &target_pcl).align(&source_pcl);
+
+        let gt_transform = sample_pcl_ds1.get_ground_truth(1, 0);
+        let mut params = IcpParams::default();
+        params.max_iterations = 5;
+
+        assert!(TransformMetrics::new(&actual, &gt_transform).angle.abs() < 0.1);
     }
 }

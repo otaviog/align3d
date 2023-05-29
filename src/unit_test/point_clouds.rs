@@ -3,7 +3,7 @@ use rstest::fixture;
 
 use crate::{
     io::read_off,
-    pointcloud::PointCloud,
+    pointcloud::PointCloud, transform::Transform,
 };
 
 use super::{sample_range_img_ds1, TestRangeImageDataset};
@@ -38,6 +38,10 @@ impl TestPclDataset {
 
     pub fn is_empty(&self) -> bool {
         self.dataset.is_empty()
+    }
+
+    pub fn get_ground_truth(&self, source_index: usize, target_index: usize) -> Transform {
+        self.dataset.get_ground_truth(source_index, target_index)
     }
 }
 
