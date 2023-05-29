@@ -94,6 +94,7 @@ impl Window {
         }
     }
 
+    #[allow(clippy::too_many_arguments)] 
     fn get_command_buffers(
         &self,
         framebuffer: Arc<Framebuffer>,
