@@ -28,7 +28,7 @@ pub trait IntoVulkanWorldSpace {
 
 impl IntoVulkanWorldSpace for Transform {
     fn into_vulkan_coordinate_system(self) -> Mat4x4 {
-        let matrix: Matrix4<f32> = self.into();
+        let matrix = Matrix4::from(&self);
         let inv_axis_matrix = Matrix4::new(
             1.0, 0.0, 0.0, 0.0, 
             0.0, -1.0, 0.0, 0.0, 

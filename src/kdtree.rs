@@ -1,7 +1,6 @@
 use nalgebra::Vector3;
 use ndarray::prelude::*;
 
-use std::cmp::min;
 use std::cmp::Ordering;
 
 use crate::Array1Recycle;
