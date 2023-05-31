@@ -8,7 +8,7 @@ fn image_icp_benchmark(c: &mut Criterion) {
     let dataset = SlamTbDataset::load("tests/data/rgbd/sample1").unwrap();
     let item = dataset.get(0).unwrap();
 
-    let mut image0 = {
+    let image0 = {
         let mut image = RangeImage::from_rgbd_frame(&item);
         image.compute_normals();
         image
@@ -26,7 +26,7 @@ fn image_icp_benchmark(c: &mut Criterion) {
             max_iterations: 10,
             ..Default::default()
         },
-        &mut image0,
+        &image0,
     );
 
     c.bench_function("icp align", |b| {
