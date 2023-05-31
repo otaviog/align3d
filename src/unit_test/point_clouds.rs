@@ -25,8 +25,7 @@ impl TestPclDataset {
             .dataset
             .get(index)
             .expect("Error when loading range image to point cloud.");
-        let pointcloud = PointCloud::from(&range_image);
-        pointcloud
+        PointCloud::from(&range_image)
     }
 
     pub fn len(&self) -> usize {

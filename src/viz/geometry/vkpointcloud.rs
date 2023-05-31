@@ -324,7 +324,7 @@ mod tests {
         sample_teapot_pointcloud: PointCloud,
     ) {
         let (manager, mut offscreen_renderer) = offscreen_renderer;
-        let mem_alloc = StandardMemoryAllocator::new_default(manager.device.clone());
+        let mem_alloc = StandardMemoryAllocator::new_default(manager.device);
         let node = VkPointCloudNode::new(VkPointCloud::from_pointcloud(
             &mem_alloc,
             &sample_teapot_pointcloud,

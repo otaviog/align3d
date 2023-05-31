@@ -144,14 +144,16 @@ mod tests {
     fn test_icp(sample_pcl_ds1: TestPclDataset) {
         let target_pcl = sample_pcl_ds1.get(0);
         let source_pcl = sample_pcl_ds1.get(1);
-        let mut params = IcpParams::default();
-        params.max_iterations = 5;
-        let actual = Icp::new(params, &target_pcl).align(&source_pcl);
 
+        let actual = Icp::new(
+            IcpParams {
+                max_iterations: 5,
+                ..Default::default()
+            },
+            &target_pcl,
+        )
+        .align(&source_pcl);
         let gt_transform = sample_pcl_ds1.get_ground_truth(1, 0);
-        let mut params = IcpParams::default();
-        params.max_iterations = 5;
-
         assert!(TransformMetrics::new(&actual, &gt_transform).angle.abs() < 0.1);
     }
 }

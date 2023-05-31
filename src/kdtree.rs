@@ -212,9 +212,10 @@ mod tests {
             random_indices.shuffle(&mut SmallRng::from_seed(seed));
 
             let mut randomized_points = ordered_points.clone();
-            for i in 0..500 as usize {
+            for (i, rand_index) in random_indices.iter().enumerate().take(500_usize) {
+                //for i in 0..500 as usize {
                 randomized_points
-                    .slice_mut(s![random_indices[i], ..])
+                    .slice_mut(s![*rand_index, ..])
                     .assign(&ordered_points.slice(s![i, ..]).view());
             }
             (random_indices, randomized_points)
@@ -244,9 +245,9 @@ mod tests {
             random_indices.shuffle(&mut SmallRng::from_seed(seed));
 
             let mut randomized_points = ordered_points.clone();
-            for i in 0..N as usize {
+            for (i, rand_index) in random_indices.iter().enumerate().take(N) {
                 randomized_points
-                    .slice_mut(s![random_indices[i], ..])
+                    .slice_mut(s![*rand_index, ..])
                     .assign(&ordered_points.slice(s![i, ..]).view());
             }
             randomized_points.slice_move(s![0..5000, ..])

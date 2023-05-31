@@ -65,7 +65,7 @@ mod tests {
             if let Array1Recycle::Recycle(rr) = &r {
                 assert_eq!(rr.dim(), 1000);
             } else {
-                assert!(false, "reuse still empty")
+                panic!("reuse still empty")
             }
         }
 

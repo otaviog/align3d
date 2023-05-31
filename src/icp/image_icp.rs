@@ -170,9 +170,14 @@ mod tests {
         let rimage1 = sample_range_img_ds2.get(1).unwrap();
 
         let gt_transform = sample_range_img_ds2.get_ground_truth(1, 0);
-        let mut params = IcpParams::default();
-        params.max_iterations = 5;
-        let actual = ImageIcp::new(IcpParams::default(), &rimage0).align(&rimage1);
+        let actual = ImageIcp::new(
+            IcpParams {
+                max_iterations: 5,
+                ..Default::default()
+            },
+            &rimage0,
+        )
+        .align(&rimage1);
 
         assert!(TransformMetrics::new(&actual, &gt_transform).angle.abs() < 0.1);
     }
