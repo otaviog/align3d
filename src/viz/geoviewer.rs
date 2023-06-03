@@ -25,6 +25,13 @@ impl GeoViewer {
         }
     }
 
+    pub fn from_manager(manager: Manager) -> Self {
+        Self {
+            scene: Rc::new(RefCell::new(Scene::default())),
+            manager,
+        }
+    }
+
     pub fn add_node<GeomType>(&mut self, node: &GeomType) -> NodeRef<dyn Node>
     where
         GeomType: MakeNode,

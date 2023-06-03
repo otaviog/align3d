@@ -6,7 +6,7 @@ use nalgebra::Matrix4;
 use nshare::ToNdarray2;
 
 use crate::{
-    camera::Camera,
+    camera::CameraIntrinsics,
     image::{IntoArray3, RgbdFrame, RgbdImage},
     trajectory::Trajectory,
     transform::Transform,
@@ -95,15 +95,21 @@ impl RgbdDataset for IndoorLidarDataset {
             .into_luma16()
             .into_ndarray2();
         let rgbd_image = RgbdImage::with_depth_scale(rgb_image, depth_image, 0.001);
-        let camera = Camera {
+        let camera = CameraIntrinsics {
             fx: 525.0,
             fy: 525.0,
             cx: 319.5,
             cy: 239.5,
-            camera_to_world: Some(self.trajectory[idx].clone()),
+
+            width: Some(640),
+            height: Some(480),
         };
 
-        Ok(RgbdFrame::new(camera, rgbd_image))
+        Ok(RgbdFrame::new(
+            camera,
+            rgbd_image,
+            Some(self.trajectory[idx].clone()),
+        ))
     }
 
     fn trajectory(&self) -> Option<Trajectory> {

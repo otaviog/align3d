@@ -1,6 +1,11 @@
 use ndarray::{Array2, Array3};
 
-use crate::{camera::Camera, sampling::Downsample, bilateral::BilateralFilter};
+use crate::{
+    bilateral::BilateralFilter,
+    camera::{CameraIntrinsics, PinholeCamera},
+    sampling::Downsample,
+    transform::Transform,
+};
 
 use super::{py_scale_down, IntoImageRgb8};
 
@@ -43,9 +48,7 @@ impl Downsample for RgbdImage {
         let resized_color = py_scale_down(&self.color.clone().into_image_rgb8(), sigma);
         let depth_filter = BilateralFilter::default();
 
-        let resized_depth = depth_filter.scale_down(
-            &self.depth,
-        );
+        let resized_depth = depth_filter.scale_down(&self.depth);
 
         RgbdImage {
             color: resized_color,
@@ -55,19 +58,44 @@ impl Downsample for RgbdImage {
     }
 }
 
+/// A struct that holds a camera intrinsics, a camera pose and an RGB-D image. Used by RGBD dataset readers.
 pub struct RgbdFrame {
-    pub camera: Camera,
+    /// The camera intrinsics.
+    pub camera: CameraIntrinsics,
+    /// The camera pose in the world coordinate system. None if the dataset has no ground truth.
+    pub camera_to_world: Option<Transform>,
+    /// The RGB-D image.
     pub image: RgbdImage,
     // pub timestamp: Option<f64>,
 }
 
 impl RgbdFrame {
-    pub fn new(camera: Camera, image: RgbdImage) -> Self {
-        Self { camera, image }
+    pub fn new(
+        camera: CameraIntrinsics,
+        image: RgbdImage,
+        camera_to_world: Option<Transform>,
+    ) -> Self {
+        Self {
+            camera,
+            image,
+            camera_to_world,
+        }
     }
 
-    pub fn into_parts(self) -> (Camera, RgbdImage) {
+    pub fn into_parts(self) -> (CameraIntrinsics, RgbdImage) {
         (self.camera, self.image)
+    }
+
+    pub fn get_pinhole_camera(&self) -> Option<PinholeCamera> {
+        match self.camera_to_world {
+            Some(ref camera_to_world) => Some(PinholeCamera::new(
+                self.camera.clone(),
+                camera_to_world.clone(),
+                self.image.width(),
+                self.image.height(),
+            )),
+            None => None,
+        }
     }
 }
 
@@ -78,6 +106,7 @@ impl Downsample for RgbdFrame {
         RgbdFrame {
             camera: self.camera.scale(0.5),
             image: self.image.downsample(scale),
+            camera_to_world: self.camera_to_world.clone(),
         }
     }
 }
@@ -87,8 +116,8 @@ mod tests {
     use rstest::rstest;
 
     use crate::{
-        image::IntoImageRgb8, sampling::Downsample,
-        unit_test::sample_rgbd_dataset1, io::dataset::RgbdDataset,
+        image::IntoImageRgb8, io::dataset::RgbdDataset, sampling::Downsample,
+        unit_test::sample_rgbd_dataset1,
     };
 
     #[rstest]

@@ -32,7 +32,7 @@ impl PositionF32 {
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default, Zeroable, Pod)]
 pub struct NormalF32 {
-    normal: [f32; 3],
+    pub normal: [f32; 3],
 }
 impl_vertex!(NormalF32, normal);
 
@@ -55,7 +55,30 @@ impl ColorU8 {
             rgb: ((r as u32) << 16) | ((g as u32) << 8) | (b as u32),
         }
     }
+
+    pub fn into_parts(&self) -> (u8, u8, u8) {
+        return (
+            ((self.rgb >> 16) & 0xff) as u8,
+            ((self.rgb >> 8) & 0xff) as u8,
+            (self.rgb & 0xff) as u8)
+    }
 }
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default, Zeroable, Pod)]
+pub struct ScalarF32 {
+    pub value: f32,
+}
+
+impl_vertex!(ScalarF32, value);
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default, Zeroable, Pod)]
+pub struct ScalarI32 {
+    pub value: i32,
+}
+
+impl_vertex!(ScalarI32, value);
 
 #[cfg(test)]
 mod tests {

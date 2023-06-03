@@ -69,8 +69,8 @@ impl<'target_lt> ImageIcp<'target_lt> {
                     let (u, v) = self
                         .target
                         .camera
-                        .project_point(&PointSpace::Camera(source_point))
-                        .unwrap();
+                        .project(&source_point);
+
                     let (u_int, v_int) = ((u + 0.5) as i32, (v + 0.5) as i32);
                     if u_int < 0
                         || u_int >= self.target.width() as i32

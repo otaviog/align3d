@@ -2,7 +2,7 @@ use std::path::{Path, PathBuf};
 
 use super::core::{DatasetError, RgbdDataset};
 use crate::{
-    camera::{Camera, CameraBuilder},
+    camera::{CameraIntrinsics},
     image::{IntoArray3, RgbdFrame, RgbdImage},
     trajectory::Trajectory,
     transform::Transform,
@@ -11,7 +11,8 @@ use crate::{
 use nshare::ToNdarray2;
 
 pub struct SlamTbDataset {
-    cameras: Vec<Camera>,
+    cameras: Vec<CameraIntrinsics>,
+    extrinsic_cameras: Vec<Transform>,
     rgb_images: Vec<String>,
     depth_images: Vec<String>,
     depth_scales: Vec<f64>,
@@ -64,6 +65,7 @@ impl SlamTbDataset {
         serde_json::from_reader(buffer)
             .map(|doc: json::Document| {
                 let mut cameras = Vec::new();
+                let mut extrinsic_cameras = Vec::new();
                 let mut rgb_images = Vec::new();
                 let mut depth_images = Vec::new();
                 let mut depth_scales = Vec::new();
@@ -85,16 +87,16 @@ impl SlamTbDataset {
                     };
 
                     cameras.push(
-                        CameraBuilder::from_simple_intrinsic(fx, fy, cx, cy)
-                            .camera_to_world(Some(extrinsics))
-                            .build(),
+                        CameraIntrinsics::from_simple_intrinsic(fx, fy, cx, cy)
                     );
+                    extrinsic_cameras.push(extrinsics);
                     rgb_images.push(frame.rgb_image.clone());
                     depth_images.push(frame.depth_image.clone());
                     depth_scales.push(info.depth_scale);
                 }
                 Self {
                     cameras,
+                    extrinsic_cameras,
                     rgb_images,
                     depth_images,
                     depth_scales,
@@ -126,17 +128,14 @@ impl RgbdDataset for SlamTbDataset {
         Ok(RgbdFrame::new(
             self.cameras[index].clone(),
             RgbdImage::with_depth_scale(rgb_image, depth_image, self.depth_scales[index]),
-        ))
+            Some(self.extrinsic_cameras[index].clone())))
+        
     }
 
     fn trajectory(&self) -> Option<Trajectory> {
         let mut trajectory = Trajectory::default();
-        for (i, cam) in self.cameras.iter().enumerate() {
-            if let Some(transform) = cam.camera_to_world.clone() {
-                trajectory.push(transform, i as f32);
-            } else {
-                return None;
-            }
+        for (i, cam) in self.extrinsic_cameras.iter().enumerate() {
+                trajectory.push(cam.clone(), i as f32);
         }
         Some(trajectory)
     }

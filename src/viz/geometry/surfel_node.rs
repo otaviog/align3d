@@ -1,13 +1,10 @@
-use std::{cell::RefCell, rc::Rc, sync::Arc};
-
 use nalgebra::Vector3;
-use ndarray::Axis;
 use vulkano::{
     buffer::{BufferUsage, CpuAccessibleBuffer},
     descriptor_set::{
         allocator::StandardDescriptorSetAllocator, PersistentDescriptorSet, WriteDescriptorSet,
     },
-    memory::allocator::{MemoryAllocator, StandardMemoryAllocator},
+    memory::allocator::StandardMemoryAllocator,
     pipeline::{
         graphics::{
             depth_stencil::DepthStencilState,
@@ -22,117 +19,54 @@ use vulkano::{
 
 use crate::{
     bounds::Sphere3Df,
-    pointcloud::PointCloud,
-    range_image::RangeImage,
+    surfel::SurfelModel,
     viz::{
         controllers::FrameStepInfo,
-        node::{CommandBuffersContext, MakeNode, Node, NodeProperties, NodeRef, node_ref},
+        node::{node_ref, CommandBuffersContext, MakeNode, Node, NodeProperties, NodeRef, Mat4x4},
         Manager,
     },
 };
+use std::sync::Arc;
 
-use super::datatypes::{ColorU8, NormalF32, PositionF32};
+use super::{
+    datatypes::{ScalarF32, ScalarI32},
+    ColorU8, NormalF32, PositionF32,
+};
 
-pub struct VkPointCloud {
-    pub points: Arc<CpuAccessibleBuffer<[PositionF32]>>,
-    pub normals: Arc<CpuAccessibleBuffer<[NormalF32]>>,
-    pub colors: Arc<CpuAccessibleBuffer<[ColorU8]>>,
-    number_of_points: usize,
+pub struct SurfelNode {
+    pub properties: NodeProperties,
+    model: SurfelModel,
 }
 
-impl VkPointCloud {
-    pub fn from_pointcloud(
-        memory_allocator: &(impl MemoryAllocator + ?Sized),
-        pointcloud: &PointCloud,
-    ) -> Arc<Self> {
-        let buffer_usage = BufferUsage {
-            vertex_buffer: true,
-            ..Default::default()
-        };
-
-        let number_of_points = pointcloud.len();
-        Arc::new(Self {
-            points: CpuAccessibleBuffer::from_iter(
-                memory_allocator,
-                buffer_usage,
-                false,
-                pointcloud
-                    .points
-                    .axis_iter(Axis(0))
-                    .map(|v| PositionF32::new(v[0], v[1], v[2])),
-            )
-            .unwrap(),
-            normals: CpuAccessibleBuffer::from_iter(
-                memory_allocator,
-                buffer_usage,
-                false,
-                pointcloud
-                    .normals
-                    .as_ref()
-                    .unwrap()
-                    .axis_iter(Axis(0))
-                    .map(|v| NormalF32::new(v[0], v[1], v[2])),
-            )
-            .unwrap(),
-            colors: CpuAccessibleBuffer::from_iter(
-                memory_allocator,
-                buffer_usage,
-                false,
-                pointcloud
-                    .colors
-                    .as_ref()
-                    .unwrap()
-                    .axis_iter(Axis(0))
-                    .map(|v| ColorU8::new(v[2], v[1], v[0])),
-            )
-            .unwrap(),
-            number_of_points,
+impl SurfelNode {
+    pub fn new(surfel_model: SurfelModel) -> NodeRef<Self> {
+        node_ref(Self {
+            properties: NodeProperties {
+                bounding_sphere: Sphere3Df {
+                    center: Vector3::new(0.0, 0.0, 0.0),
+                    radius: 1000.0,
+                },
+                visible: true,
+                transformation: Mat4x4::identity(),
+            },
+            model: surfel_model,
         })
     }
-
-    pub fn len(&self) -> usize {
-        self.number_of_points
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.number_of_points == 0
-    }
 }
 
-pub struct VkPointCloudNode {
-    pub properties: NodeProperties,
-    point_cloud: Arc<VkPointCloud>,
-}
+impl MakeNode for SurfelModel {
+    type Node = SurfelNode;
 
-impl VkPointCloudNode {
-    pub fn new(point_cloud: Arc<VkPointCloud>) -> NodeRef<Self> {
-        let points = point_cloud.points.read().unwrap();
-
-        Rc::new(RefCell::new(Self {
-            properties: NodeProperties {
-                bounding_sphere: Sphere3Df::from_point_iter(
-                    points
-                        .iter()
-                        .map(|p| Vector3::new(p.position[0], p.position[1], p.position[2])),
-                ),
-                ..Default::default()
-            },
-            point_cloud: point_cloud.clone(),
-        }))
-    }
-
-    pub fn new_node(&self) -> NodeRef<Self> {
-        Rc::new(RefCell::new(Self {
-            properties: self.properties,
-            point_cloud: self.point_cloud.clone(),
-        }))
+    fn make_node(&self, manager: &mut Manager) -> NodeRef<dyn Node> {
+        panic!("SurfelModel::make_node() not implemented")
+        //SurfelNode::new(self)
     }
 }
 
 mod vs {
     vulkano_shaders::shader! {
         ty: "vertex",
-        path: "resources/shaders/vkpointcloud/pointcloud.vert",
+        path: "resources/shaders/surfel/surfel_model.vert",
         types_meta: {
             use bytemuck::{Pod, Zeroable};
 
@@ -144,7 +78,7 @@ mod vs {
 mod gs {
     vulkano_shaders::shader! {
         ty: "geometry",
-        path: "resources/shaders/vkpointcloud/pointcloud.geom",
+        path: "resources/shaders/surfel/surfel_model.geom",
         types_meta: {
             use bytemuck::{Pod, Zeroable};
 
@@ -156,11 +90,11 @@ mod gs {
 mod fs {
     vulkano_shaders::shader! {
         ty: "fragment",
-        path: "resources/shaders/vkpointcloud/pointcloud.frag"
+        path: "resources/shaders/surfel/surfel_model.frag"
     }
 }
 
-impl Node for VkPointCloudNode {
+impl Node for SurfelNode {
     fn properties(&self) -> &NodeProperties {
         &self.properties
     }
@@ -170,10 +104,11 @@ impl Node for VkPointCloudNode {
     }
 
     fn new_instance(&self) -> NodeRef<dyn Node> {
-        node_ref(VkPointCloudNode {
-            properties: self.properties,
-            point_cloud: self.point_cloud.clone(),
-        })
+        // node_ref(SurfelNode {
+        //     properties: self.properties,
+        //     point_cloud: self.point_cloud.clone(),
+        // })
+        panic!("SurfelNode::new_instance() not implemented")
     }
 
     fn collect_command_buffers(
@@ -198,7 +133,9 @@ impl Node for VkPointCloudNode {
                         BuffersDefinition::new()
                             .vertex::<PositionF32>()
                             .vertex::<NormalF32>()
-                            .vertex::<ColorU8>(),
+                            .vertex::<ColorU8>()
+                            .vertex::<ScalarF32>()
+                            .vertex::<ScalarI32>(),
                     )
                     .input_assembly_state(
                         InputAssemblyState::new().topology(PrimitiveTopology::PointList),
@@ -261,9 +198,11 @@ impl Node for VkPointCloudNode {
             .bind_vertex_buffers(
                 0,
                 (
-                    self.point_cloud.points.clone(),
-                    self.point_cloud.normals.clone(),
-                    self.point_cloud.colors.clone(),
+                    self.model.position.clone(),
+                    self.model.normal.clone(),
+                    self.model.color.clone(),
+                    self.model.radius.clone(),
+                    self.model.mask.clone(),
                 ),
             )
             .bind_descriptor_sets(
@@ -272,30 +211,8 @@ impl Node for VkPointCloudNode {
                 0,
                 descriptor_set,
             )
-            .draw(self.point_cloud.len() as u32, 1, 0, 0)
+            .draw(self.model.size() as u32, 1, 0, 0)
             .unwrap();
-    }
-}
-
-impl MakeNode for PointCloud {
-    type Node = VkPointCloudNode;
-
-    fn make_node(&self, manager: &mut Manager) -> NodeRef<dyn Node> {
-        VkPointCloudNode::new(VkPointCloud::from_pointcloud(
-            &manager.memory_allocator,
-            self,
-        ))
-    }
-}
-
-impl MakeNode for RangeImage {
-    type Node = VkPointCloudNode;
-
-    fn make_node(&self, manager: &mut Manager) -> NodeRef<dyn Node> {
-        VkPointCloudNode::new(VkPointCloud::from_pointcloud(
-            &manager.memory_allocator,
-            &PointCloud::from(self),
-        ))
     }
 }
 
@@ -308,8 +225,6 @@ mod tests {
 
     use crate::viz::{Manager, OffscreenRenderer};
 
-    use super::*;
-
     #[fixture]
     fn offscreen_renderer() -> (Manager, OffscreenRenderer) {
         let mut manager = Manager::default();
@@ -318,18 +233,18 @@ mod tests {
         (manager, renderer)
     }
 
-    #[ignore]
-    #[rstest]
-    fn test_creation(
-        offscreen_renderer: (Manager, OffscreenRenderer),
-        sample_teapot_pointcloud: PointCloud,
-    ) {
-        let (manager, mut offscreen_renderer) = offscreen_renderer;
-        let mem_alloc = StandardMemoryAllocator::new_default(manager.device.clone());
-        let node = VkPointCloudNode::new(VkPointCloud::from_pointcloud(
-            &mem_alloc,
-            &sample_teapot_pointcloud,
-        ));
-        offscreen_renderer.render(node);
-    }
+    // #[ignore]
+    // #[rstest]
+    // fn test_creation(
+    //     offscreen_renderer: (Manager, OffscreenRenderer),
+    //     sample_teapot_pointcloud: PointCloud,
+    // ) {
+    //     let (manager, mut offscreen_renderer) = offscreen_renderer;
+    //     let mem_alloc = StandardMemoryAllocator::new_default(manager.device.clone());
+    //     let node = VkPointCloudNode::new(VkPointCloud::from_pointcloud(
+    //         &mem_alloc,
+    //         &sample_teapot_pointcloud,
+    //     ));
+    //     offscreen_renderer.render(node);
+    // }
 }

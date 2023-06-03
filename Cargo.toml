@@ -91,6 +91,14 @@ name = "test_image_icp"
 path = "tests/test_image_icp.rs"
 harness = false
 
+[[test]]
+name = "test_surfel_fusion"
+path = "tests/test_surfel_fusion.rs"
+harness = false
+
+##
+# Benchmarks
+
 [[bench]]
 name = "bench_mesh"
 harness = false

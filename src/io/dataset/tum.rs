@@ -4,7 +4,7 @@ use nalgebra::{Quaternion, Vector3};
 use nshare::ToNdarray2;
 
 use crate::{
-    camera::Camera,
+    camera::CameraIntrinsics,
     image::{IntoArray3, RgbdFrame, RgbdImage},
     trajectory::Trajectory,
     transform::Transform,
@@ -145,15 +145,16 @@ impl RgbdDataset for TumRgbdDataset {
             .into_ndarray2();
         let mut rgbd_image = RgbdImage::new(rgb_image, depth_image);
         rgbd_image.depth_scale = Some(1.0 / 5000.0);
-        let camera = Camera {
+        let camera = CameraIntrinsics {
             fx: 525.0,
             fy: 525.0,
             cx: 319.5,
             cy: 239.5,
-            camera_to_world: Some(self.trajectory[index].clone()),
+            width: Some(640),
+            height: Some(480)
         };
 
-        Ok(RgbdFrame::new(camera, rgbd_image))
+        Ok(RgbdFrame::new(camera, rgbd_image, Some(self.trajectory[index].clone())))
     }
 
     fn len(&self) -> usize {

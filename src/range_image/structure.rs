@@ -1,4 +1,4 @@
-use crate::camera::Camera;
+use crate::camera::CameraIntrinsics;
 
 use crate::image::{py_scale_down, rgb_to_luma_u8, IntoImageRgb8, RgbdFrame, RgbdImage};
 use crate::intensity_map::IntensityMap;
@@ -23,7 +23,7 @@ pub struct RangeImage {
     /// Colors of the points, as array with shape: (height, width, 3)
     pub colors: Option<Array3<u8>>,
     /// Camera parameters that originated the image.
-    pub camera: Camera,
+    pub camera: CameraIntrinsics,
     /// Intensities of the points, as array with shape: (height*width)
     pub intensities: Option<Array1<u8>>,
     /// Intensity map of the points, as array with shape: (height, width)
@@ -38,7 +38,7 @@ impl RangeImage {
     ///
     /// * `camera` - Camera parameters.
     /// * rgbd_image - Rgbd image.
-    pub fn from_rgbd_image(camera: &Camera, rgbd_image: &RgbdImage) -> Self {
+    pub fn from_rgbd_image(camera: &CameraIntrinsics, rgbd_image: &RgbdImage) -> Self {
         let (width, height) = (rgbd_image.width(), rgbd_image.height());
         let depth_scale = rgbd_image.depth_scale.unwrap() as f32;
         let mut points = Array3::zeros((height, width, 3));
@@ -303,6 +303,10 @@ impl RangeImage {
         }
 
         pyramid
+    }
+
+    pub fn is_valid(&self, u: usize, v:usize) -> bool {
+        self.mask[(v, u)] != 0
     }
 }
 
