@@ -101,7 +101,7 @@ Nevertheless, here's the current release plan
 
 ## v0.2 - Improve ICP
 
-* [ ] Bug fixes in PCL ICP.
+* [x] Bug fixes in PCL ICP.
 * [ ] Optimize Image Icp performance
 
 ## v0.3 - Improve Visualization

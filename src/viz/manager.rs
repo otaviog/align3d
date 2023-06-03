@@ -2,10 +2,12 @@ use std::sync::Arc;
 
 use vulkano::{
     device::{
-        physical::{PhysicalDeviceType, PhysicalDevice}, Device, DeviceCreateInfo, DeviceExtensions, QueueCreateInfo, Queue, Features,
+        physical::{PhysicalDevice, PhysicalDeviceType},
+        Device, DeviceCreateInfo, DeviceExtensions, Features, Queue, QueueCreateInfo,
     },
     instance::{Instance, InstanceCreateInfo},
-    VulkanLibrary, memory::allocator::StandardMemoryAllocator,
+    memory::allocator::StandardMemoryAllocator,
+    VulkanLibrary,
 };
 
 pub struct Manager {
@@ -14,7 +16,7 @@ pub struct Manager {
     pub physical_device: Arc<PhysicalDevice>,
     pub device: Arc<Device>,
     pub queues: Box<dyn ExactSizeIterator<Item = Arc<Queue>>>,
-    pub memory_allocator: StandardMemoryAllocator
+    pub memory_allocator: StandardMemoryAllocator,
 }
 
 impl Default for Manager {
@@ -52,7 +54,7 @@ impl Default for Manager {
                     // which disqualifies this physical device.
                     .position(|(_, q)| {
                         q.queue_flags.graphics
-                            // && p.surface_support(i as u32, &surface).unwrap_or(false)
+                        // && p.surface_support(i as u32, &surface).unwrap_or(false)
                     })
                     .map(|q| (p, q as u32))
             })
@@ -82,14 +84,14 @@ impl Default for Manager {
         )
         .expect("failed to create device");
         let memory_allocator = StandardMemoryAllocator::new_default(device.clone());
-        
+
         Self {
             library,
             instance,
             physical_device,
             device,
             queues: Box::new(queues),
-            memory_allocator
+            memory_allocator,
         }
     }
 }

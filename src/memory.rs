@@ -31,7 +31,10 @@ pub enum Array2Recycle<T> {
     Recycle(Array2<T>),
 }
 
-impl<T> Array2Recycle<T> where T: num::Zero + Clone {
+impl<T> Array2Recycle<T>
+where
+    T: num::Zero + Clone,
+{
     pub fn get(self, required_dim: (usize, usize)) -> Array2<T> {
         match self {
             Self::Empty => Array2::<T>::zeros(required_dim),
@@ -62,7 +65,7 @@ mod tests {
             if let Array1Recycle::Recycle(rr) = &r {
                 assert_eq!(rr.dim(), 1000);
             } else {
-                assert!(false, "reuse still empty")
+                panic!("reuse still empty")
             }
         }
 

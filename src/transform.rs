@@ -227,12 +227,12 @@ impl ops::Mul<&Transform> for &Transform {
     }
 }
 
-impl Into<Matrix4<f32>> for Transform {
-    /// Converts a transform to a 4x4 matrix.
-    fn into(self) -> Matrix4<f32> {
-        self.0.into()
-    }
-}
+// impl Into<Matrix4<f32>> for Transform {
+//     /// Converts a transform to a 4x4 matrix.
+//     fn into(self) -> Matrix4<f32> {
+//         self.0.into()
+//     }
+// }
 
 impl From<&Transform> for Matrix4<f32> {
     /// Converts a transform to a 4x4 matrix.
@@ -334,7 +334,7 @@ mod tests {
         ));
 
         assert!(assert_array(
-            &(&transform.transform_vectors(array![[1.0, 2.0, 3.0], [1.0, 2.0, 3.0]])),
+            &transform.transform_vectors(array![[1.0, 2.0, 3.0], [1.0, 2.0, 3.0]]),
             &array![[-1.0, 2.0, 0.0], [-1.0, 2.0, 0.0]]
         ));
     }

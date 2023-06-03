@@ -1,8 +1,8 @@
-use align3d::Array2Recycle;
 use align3d::bilateral::BilateralFilter;
-use align3d::io::dataset::{SlamTbDataset, RgbdDataset};
+use align3d::io::dataset::{RgbdDataset, SlamTbDataset};
 use align3d::pointcloud::PointCloud;
 use align3d::range_image::RangeImage;
+use align3d::Array2Recycle;
 use ndarray::{Array2, Axis};
 use rstest::*;
 

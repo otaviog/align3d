@@ -2,9 +2,11 @@ use align3d::{
     bilateral::BilateralFilter,
     bin_utils::dataset::create_dataset_from_string,
     icp::{multiscale::MultiscaleAlign, MsIcpParams},
+    io::dataset::SubsetDataset,
     metrics::TransformMetrics,
     range_image::{RangeImage, RangeImageBuilder},
-    trajectory_builder::TrajectoryBuilder, viz::rgbd_dataset_viewer::RgbdDatasetViewer, io::dataset::SubsetDataset,
+    trajectory_builder::TrajectoryBuilder,
+    viz::rgbd_dataset_viewer::RgbdDatasetViewer,
 };
 use clap::Parser;
 use kdam::tqdm;
@@ -41,7 +43,7 @@ fn main() {
 
     let mut traj_builder = TrajectoryBuilder::default();
     let mut last_frame: Vec<RangeImage> = range_processing.build(dataset.get(0).unwrap());
-    
+
     for i in tqdm!(
         1..dataset.len(),
         total = dataset.len() - 1,
@@ -55,14 +57,9 @@ fn main() {
     }
 
     let pred_trajectory = traj_builder.build();
-    let gt_trajectory = &dataset
-        .trajectory()
-        .unwrap()
-        .first_frame_at_origin();
+    let gt_trajectory = &dataset.trajectory().unwrap().first_frame_at_origin();
 
-    
-    let metrics =
-        TransformMetrics::mean_trajectory_error(&pred_trajectory, gt_trajectory).unwrap();
+    let metrics = TransformMetrics::mean_trajectory_error(&pred_trajectory, gt_trajectory).unwrap();
     println!("Mean trajectory error: {metrics}");
 
     if args.show {

@@ -14,7 +14,7 @@ impl std::fmt::Display for A3dError {
             A3dError::Io(err) => write!(f, "IO error: {err}"),
             A3dError::Parser(err) => write!(f, "Parser error: {err}"),
             A3dError::InvalidParameter(err) => write!(f, "Parameter error: {err}"),
-            A3dError::Assertion(err) => write!(f, "Assertion err,or: {err}")
+            A3dError::Assertion(err) => write!(f, "Assertion err,or: {err}"),
         }
     }
 }
@@ -34,7 +34,7 @@ impl std::error::Error for A3dError {
             A3dError::Io(err) => Some(err),
             A3dError::Parser(_) => None,
             A3dError::InvalidParameter(_) => None,
-            A3dError::Assertion(_) => None
+            A3dError::Assertion(_) => None,
         }
     }
 }

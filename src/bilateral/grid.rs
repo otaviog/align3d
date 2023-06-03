@@ -1,14 +1,12 @@
 use ndarray::{Array2, Array4, Axis};
 use num::{clamp, ToPrimitive};
-use std::{
-    cmp::{max, min},
-};
+use std::cmp::{max, min};
 
 /// Bilateral grid. A data structure for representing images
-/// within its intensity space. 
-/// 
-/// More information: Chen, J., Paris, S., 
-/// & Durand, F. (2007). Real-time edge-aware image processing with 
+/// within its intensity space.
+///
+/// More information: Chen, J., Paris, S.,
+/// & Durand, F. (2007). Real-time edge-aware image processing with
 /// the bilateral grid. ACM Transactions on Graphics (TOG), 26(3), 103-es.
 pub struct BilateralGrid<I> {
     /// The grid data. Shape is [H W Z 2], where the last dimension contains,
@@ -108,7 +106,7 @@ where
         for row in 0..image_height {
             for col in 0..image_width {
                 let color = image[(row, col)];
-                
+
                 let trilinear = self.trilinear(
                     row as f64 / self.sigma_space + self.space_pad as f64,
                     col as f64 / self.sigma_space + self.space_pad as f64,
@@ -141,7 +139,7 @@ where
         let x_alpha = col - x_index as f64;
 
         #[rustfmt::skip]
-        let value = 
+        let value =
         {
               (1.0 - y_alpha) * (1.0 - x_alpha) * (1.0 - z_alpha) *  self.data[(y_index,  x_index , z_index,  0)]
             + (1.0 - y_alpha) * x_alpha         * (1.0 - z_alpha) *  self.data[(y_index,  xx_index, z_index,  0)]
@@ -162,14 +160,14 @@ where
 
 #[cfg(test)]
 mod tests {
-    use ndarray::Array2;
-    use rstest::{rstest, fixture};
     use crate::unit_test::bloei_luma16;
+    use ndarray::Array2;
+    use rstest::{fixture, rstest};
 
     use super::BilateralGrid;
 
     #[fixture]
-    fn bilateral_grid(bloei_luma16: Array2<u16>) -> BilateralGrid<u16>{
+    fn bilateral_grid(bloei_luma16: Array2<u16>) -> BilateralGrid<u16> {
         BilateralGrid::from_image(&bloei_luma16, 4.5, 30.0)
     }
 
@@ -183,7 +181,7 @@ mod tests {
         let mut dest_image = bloei_luma16.clone();
         bilateral_grid.normalize();
         bilateral_grid.slice(&bloei_luma16, &mut dest_image);
-        
+
         assert_eq!(dest_image.dim(), (600, 450));
         assert_eq!(dest_image[(421, 123)], 2266);
     }

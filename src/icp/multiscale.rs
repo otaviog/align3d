@@ -25,7 +25,7 @@ impl<'pyramid_lt> MultiscaleAlign<'pyramid_lt> {
     ///   of ICP parameters are equal.
     pub fn new(
         params: MsIcpParams,
-        target_pyramid: &'pyramid_lt Vec<RangeImage>
+        target_pyramid: &'pyramid_lt Vec<RangeImage>,
     ) -> Result<Self, A3dError> {
         if params.len() != target_pyramid.len() {
             return Err(A3dError::invalid_parameter(

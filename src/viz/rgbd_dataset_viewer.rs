@@ -1,9 +1,7 @@
-use crate::{
-    io::dataset::RgbdDataset, range_image::RangeImage, trajectory::Trajectory,
-};
+use crate::{io::dataset::RgbdDataset, range_image::RangeImage, trajectory::Trajectory};
 
 use super::{
-    node::{IntoVulkanWorldSpace, MakeNode, NodeRef, node_ref, Node},
+    node::{node_ref, IntoVulkanWorldSpace, MakeNode, Node, NodeRef},
     scene::Scene,
     Manager, Window,
 };
@@ -16,9 +14,9 @@ pub struct RgbdDatasetViewer {
 impl RgbdDatasetViewer {
     pub fn new(dataset: Box<dyn RgbdDataset>) -> Self {
         let trajectory = dataset.trajectory().unwrap();
-        Self { 
+        Self {
             dataset,
-            trajectory
+            trajectory,
         }
     }
 

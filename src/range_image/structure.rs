@@ -386,7 +386,10 @@ mod tests {
     use super::*;
     use crate::{
         image::IntoLumaImage,
-        io::{dataset::{SlamTbDataset, RgbdDataset}, write_ply},
+        io::{
+            dataset::{RgbdDataset, SlamTbDataset},
+            write_ply,
+        },
     };
     use nshare::ToNdarray2;
     use rstest::*;
@@ -460,7 +463,7 @@ mod tests {
 
         for (i, im) in pyramid.iter().enumerate() {
             write_ply(
-                format!("tests/outputs/out-range-image-{}.ply", i),
+                format!("tests/outputs/out-range-image-{i}.ply"),
                 &Geometry::from(im),
             )
             .expect("Error while writing the results");
@@ -469,7 +472,7 @@ mod tests {
         for (i, im) in pyramid.iter_mut().enumerate() {
             let imap = im.intensity_map.as_ref().unwrap().clone().into_ndarray2();
             imap.to_luma_image()
-                .save(format!("tests/outputs/out-range-image-{}.png", i))
+                .save(format!("tests/outputs/out-range-image-{i}.png"))
                 .expect("Error while writing the results");
         }
         assert_eq!(pyramid.len(), 3);

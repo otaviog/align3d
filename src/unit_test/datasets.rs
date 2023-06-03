@@ -1,8 +1,10 @@
 use rstest::fixture;
 
 use crate::{
+    bilateral::BilateralFilter,
     image::RgbdFrame,
-    io::dataset::{DatasetError, RgbdDataset, SlamTbDataset}, bilateral::BilateralFilter, Array2Recycle,
+    io::dataset::{DatasetError, RgbdDataset, SlamTbDataset},
+    Array2Recycle,
 };
 
 #[fixture]

@@ -1,6 +1,9 @@
 use std::{cell::RefCell, collections::HashMap, rc::Rc, sync::Arc};
 
-use crate::{bounds::Sphere3Df, transform::{Transformable, Transform}};
+use crate::{
+    bounds::Sphere3Df,
+    transform::{Transform, Transformable},
+};
 use nalgebra::Matrix4;
 use nalgebra_glm::{self, Mat3};
 use vulkano::{
@@ -28,12 +31,9 @@ pub trait IntoVulkanWorldSpace {
 
 impl IntoVulkanWorldSpace for Transform {
     fn into_vulkan_coordinate_system(self) -> Mat4x4 {
-        let matrix: Matrix4<f32> = self.into();
+        let matrix = Matrix4::from(&self);
         let inv_axis_matrix = Matrix4::new(
-            1.0, 0.0, 0.0, 0.0, 
-            0.0, -1.0, 0.0, 0.0, 
-            0.0, 0.0, 1.0, 0.0, 
-            0.0, 0.0, 0.0, 1.0,
+            1.0, 0.0, 0.0, 0.0, 0.0, -1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0,
         );
         inv_axis_matrix * matrix
     }

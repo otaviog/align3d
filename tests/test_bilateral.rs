@@ -40,7 +40,7 @@ fn test_bilateral_filter(bloei_luma8: Array2<u8>) {
         .save("tests/outputs/bilateral_filter-input.png")
         .expect("Save ok");
 
-    into_image_luma(filtered_image.clone())
+    into_image_luma(filtered_image)
         .save("tests/outputs/bilateral_filter-result.png")
         .expect("Save ok");
 }

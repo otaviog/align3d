@@ -94,6 +94,7 @@ impl Window {
         }
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn get_command_buffers(
         &self,
         framebuffer: Arc<Framebuffer>,
@@ -236,7 +237,6 @@ impl Window {
             VirtualCameraSphericalBuilder::fit(&scene_sphere, std::f32::consts::FRAC_PI_2)
                 .near_plane(0.05)
                 .build(),
-            
             0.05,
         );
 

@@ -1,4 +1,4 @@
-use crate::{bilateral::BilateralFilter, Array2Recycle, image::RgbdFrame};
+use crate::{bilateral::BilateralFilter, image::RgbdFrame, Array2Recycle};
 
 use super::RangeImage;
 
@@ -22,7 +22,7 @@ impl Default for RangeImageBuilder {
             bilateral_filter: None,
             // bilateral_data: Array2Recycle::Empty,
             pyramid_levels: 3,
-            blur_sigma: 1.0
+            blur_sigma: 1.0,
         }
     }
 }
@@ -48,7 +48,6 @@ impl RangeImageBuilder {
         self.with_intensity = value;
         self
     }
-
 
     /// Sets the number of pyramid levels to use, this corresponds to the output length of [`build`].
     /// See [`RangeImage::pyramid`].

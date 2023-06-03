@@ -1,5 +1,5 @@
 use align3d::icp::{Icp, IcpParams};
-use align3d::io::dataset::{SlamTbDataset, RgbdDataset};
+use align3d::io::dataset::{RgbdDataset, SlamTbDataset};
 use align3d::pointcloud::PointCloud;
 use align3d::range_image::RangeImage;
 

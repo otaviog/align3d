@@ -257,7 +257,6 @@ impl IntensityMap {
     }
 }
 
-
 impl ToNdarray2 for IntensityMap {
     type Out = Array2<f32>;
     fn into_ndarray2(self) -> Self::Out {
@@ -308,6 +307,4 @@ mod tests {
             assert_eq!(*img_value as f32 / 255.0, value);
         }
     }
-
-    
 }

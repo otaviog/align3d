@@ -1,10 +1,7 @@
 use ndarray::Array2;
 use rstest::fixture;
 
-use crate::{
-    io::read_off,
-    pointcloud::PointCloud,
-};
+use crate::{io::read_off, pointcloud::PointCloud, transform::Transform};
 
 use super::{sample_range_img_ds1, TestRangeImageDataset};
 
@@ -28,8 +25,7 @@ impl TestPclDataset {
             .dataset
             .get(index)
             .expect("Error when loading range image to point cloud.");
-        let pointcloud = PointCloud::from(&range_image);
-        pointcloud
+        PointCloud::from(&range_image)
     }
 
     pub fn len(&self) -> usize {
@@ -38,6 +34,10 @@ impl TestPclDataset {
 
     pub fn is_empty(&self) -> bool {
         self.dataset.is_empty()
+    }
+
+    pub fn get_ground_truth(&self, source_index: usize, target_index: usize) -> Transform {
+        self.dataset.get_ground_truth(source_index, target_index)
     }
 }
 

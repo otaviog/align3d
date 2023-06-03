@@ -1,0 +1,14 @@
+# Contributing
+
+Any Issues, Forks, or Pull Request with new features, improvements, or fixes are welcomed.
+
+# Setup the project
+
+* Clone the repository
+* `$ cd align3d` and `$cargo build`
+
+# Code guidelines
+
+* Unit or integration tests should be able to run without any parameters, i.e., they use hardcoded resources from the repository.
+* Tests that handle Vulkan Graphics should be marked with `[ignore]` so displayless CI can ignore them.
+* Use `$ cargo clippy`.
