@@ -3,7 +3,6 @@ use ndarray::s;
 use num::Float;
 
 use crate::{
-    camera::PointSpace,
     optim::{GaussNewton, GaussNewtonBatch},
     range_image::RangeImage,
     transform::{LieGroup, Transform},

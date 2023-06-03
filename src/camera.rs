@@ -77,8 +77,8 @@ impl CameraIntrinsics {
             fy: self.fy * scale,
             cx: self.cx * scale,
             cy: self.cy * scale,
-            width: self.width.clone(),
-            height: self.height.clone(),
+            width: self.width,
+            height: self.height,
         }
     }
 
@@ -129,11 +129,11 @@ impl PinholeCamera {
     /// * (x and y) coordinates.
     pub fn project(&self, point: &Vector3<f32>) -> (f32, f32) {
         self.intrinsics
-            .project(&self.world_to_camera.transform_vector(&point))
+            .project(&self.world_to_camera.transform_vector(point))
     }
 
     pub fn project_if_visible(&self, point: &Vector3<f32>) -> Option<(f32, f32)> {
-        let (x, y) = self.project(&point);
+        let (x, y) = self.project(point);
 
         if x >= 0.0 && x < self.width as f32 * 2.0 && y >= 0.0 && y < self.height as f32 * 2.0 {
             Some((x, y))

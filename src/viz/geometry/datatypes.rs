@@ -57,10 +57,11 @@ impl ColorU8 {
     }
 
     pub fn into_parts(&self) -> (u8, u8, u8) {
-        return (
+        (
             ((self.rgb >> 16) & 0xff) as u8,
             ((self.rgb >> 8) & 0xff) as u8,
-            (self.rgb & 0xff) as u8)
+            (self.rgb & 0xff) as u8,
+        )
     }
 }
 

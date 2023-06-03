@@ -87,15 +87,14 @@ impl RgbdFrame {
     }
 
     pub fn get_pinhole_camera(&self) -> Option<PinholeCamera> {
-        match self.camera_to_world {
-            Some(ref camera_to_world) => Some(PinholeCamera::new(
+        self.camera_to_world.as_ref().map(|camera_to_world| {
+            PinholeCamera::new(
                 self.camera.clone(),
                 camera_to_world.clone(),
                 self.image.width(),
                 self.image.height(),
-            )),
-            None => None,
-        }
+            )
+        })
     }
 }
 

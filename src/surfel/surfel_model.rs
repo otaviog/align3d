@@ -104,7 +104,6 @@ impl<'a> SurfelModelReader<'a> {
                     Some((i, Vector3::new(p.position[0], p.position[1], p.position[2])))
                 }
             })
-            .into_iter()
     }
 
     pub fn age_confidence_iter(&'a self) -> impl Iterator<Item = (usize, f32, f32)> + 'a {
@@ -119,7 +118,6 @@ impl<'a> SurfelModelReader<'a> {
                     Some((i, *a as f32, *c))
                 }
             })
-            .into_iter()
     }
 }
 

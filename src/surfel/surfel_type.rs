@@ -1,7 +1,7 @@
 use nalgebra::{Vector2, Vector3};
 use ndarray::s;
 
-use crate::{camera::PinholeCamera, range_image::RangeImage, utils::access::IntoVector3};
+use crate::{camera::PinholeCamera, range_image::RangeImage, utils::access::ToVector3};
 
 pub struct Surfel {
     pub position: Vector3<f32>,
@@ -92,9 +92,9 @@ impl RimageSurfelBuilder {
             if *mask == 0 {
                 continue;
             }
-            let range_point = rimage.points.slice(s![row, col, ..]).into_vector3();
-            let range_normal = normals.slice(s![row, col, ..]).into_vector3();
-            let range_color = colors.slice(s![row, col, ..]).into_vector3();
+            let range_point = rimage.points.slice(s![row, col, ..]).to_vector3();
+            let range_normal = normals.slice(s![row, col, ..]).to_vector3();
+            let range_color = colors.slice(s![row, col, ..]).to_vector3();
 
             surfels.push(self.build(
                 range_point,

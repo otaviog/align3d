@@ -1,7 +1,7 @@
 use core::panic;
 
-use nalgebra::{Vector, Vector3};
-use ndarray::{Array2, Axis};
+use nalgebra::Vector3;
+use ndarray::Array2;
 
 use crate::camera::PinholeCamera;
 
@@ -14,7 +14,7 @@ impl IndexMap {
     pub fn new(width: usize, height: usize, scale: usize) -> Self {
         IndexMap {
             map: Array2::zeros((height * scale, width * scale)),
-            scale: scale,
+            scale,
         }
     }
 
@@ -67,13 +67,13 @@ mod tests {
         //     640,
         //     480,
         // );
-// 
+        //
         // let mut indexmap = IndexMap::new(640, 480, 4);
-// 
+        //
         // let builder = RimageSurfelBuilder::new(&camera);
-        // 
+        //
         // let model = SurfelModel::new(3);
-        // 
+        //
         // let model_points =
         //     Array2::from_shape_vec((3, 3), vec![0.0, 0.0, 0.0, 1.0, 1.0, 1.0, -1.0, -1.0, -1.0])
         //         .unwrap();

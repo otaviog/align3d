@@ -6,7 +6,7 @@ use super::{
     surfel_model::SurfelModel,
     surfel_type::{RimageSurfelBuilder, Surfel},
 };
-use crate::utils::access::IntoVector3;
+use crate::utils::access::ToVector3;
 use crate::{camera::PinholeCamera, range_image::RangeImage};
 
 pub struct SurfelFusion {
@@ -44,9 +44,9 @@ impl SurfelFusion {
 
                 if let Some(id) = self.indexmap.get(u, v) {
                     if let Some(model_surfel) = model_reader.get(id) {
-                        let ri_point = range_image.points.slice(s![u, v, ..]).into_vector3();
-                        let ri_normal = range_normals.slice(s![u, v, ..]).into_vector3();
-                        let ri_color = range_colors.slice(s![u, v, ..]).into_vector3();
+                        let ri_point = range_image.points.slice(s![u, v, ..]).to_vector3();
+                        let ri_normal = range_normals.slice(s![u, v, ..]).to_vector3();
+                        let ri_color = range_colors.slice(s![u, v, ..]).to_vector3();
 
                         let ri_surfel = surfel_builder.build(
                             ri_point,
