@@ -81,6 +81,14 @@ pub struct ScalarI32 {
 
 impl_vertex!(ScalarI32, value);
 
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default, Zeroable, Pod)]
+pub struct ScalarU32 {
+    pub value: u32,
+}
+
+impl_vertex!(ScalarU32, value);
+
 #[cfg(test)]
 mod tests {
     use super::ColorU8;

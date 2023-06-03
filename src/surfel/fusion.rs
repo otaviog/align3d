@@ -29,7 +29,7 @@ impl SurfelFusion {
         self.indexmap
             .render_indices(model_reader.position_iter(), camera);
 
-        let surfel_builder = RimageSurfelBuilder::new(camera);
+        let surfel_builder = RimageSurfelBuilder::new(&camera.intrinsics);
         let range_normals = range_image.normals.as_ref().unwrap();
         let range_colors = range_image.colors.as_ref().unwrap();
 

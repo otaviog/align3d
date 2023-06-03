@@ -32,7 +32,11 @@ impl GeoViewer {
         }
     }
 
-    pub fn add_node<GeomType>(&mut self, node: &GeomType) -> NodeRef<dyn Node>
+    pub fn add_node(&mut self, node: NodeRef<dyn Node>) {
+        self.scene.borrow_mut().add(node);
+    }
+
+    pub fn add<GeomType>(&mut self, node: &GeomType) -> NodeRef<dyn Node>
     where
         GeomType: MakeNode,
     {

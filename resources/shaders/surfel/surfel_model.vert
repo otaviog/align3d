@@ -2,9 +2,8 @@
 
 layout(location = 0) in vec3 position;
 layout(location = 1) in vec3 normal;
-layout(location = 2) in uint rgb;
-layout(location = 3) in float radius;
-layout(location = 4) in uint mask;
+layout(location = 2) in uint rgbm;
+layout(location = 3) in float value;
 
 layout(set = 0, binding = 0) uniform Data {
   mat4 worldview;
@@ -20,6 +19,7 @@ layout(location = 3) out float gs_radius;
 layout(location = 4) out int gs_time;
 
 void main() {
+  uint mask = rgbm & 0xff;
 
   if (mask == 0) {
     gs_time = -1;
@@ -29,11 +29,11 @@ void main() {
 
   gs_position = position;
   gs_normal = normal;
-  gs_radius = radius;
+  gs_radius = value;
   gs_time = 1;
 
-  float r = float((rgb >> 16) & 0xff);
-  float g = float((rgb >> 8) & 0xff);
-  float b = float(rgb & 0xff);
+  float r = float((rgbm >> 24) & 0xff);
+  float g = float((rgbm >> 16) & 0xff);
+  float b = float((rgbm >> 8) & 0xff);
   gs_color = vec3(b, g, r) / 255.0;
 }

@@ -1,7 +1,7 @@
 use nalgebra::{Vector2, Vector3};
 use ndarray::s;
 
-use crate::{camera::PinholeCamera, range_image::RangeImage, utils::access::ToVector3};
+use crate::{camera::{PinholeCamera, CameraIntrinsics}, range_image::RangeImage, utils::access::ToVector3};
 
 pub struct Surfel {
     pub position: Vector3<f32>,
@@ -46,10 +46,9 @@ pub struct RimageSurfelBuilder {
 }
 
 impl RimageSurfelBuilder {
-    pub fn new(camera: &PinholeCamera) -> Self {
-        let intrinsics = &camera.intrinsics;
-        let camera_center = Vector2::new(intrinsics.cx as f32, intrinsics.cy as f32);
-        let inv_mean_focal_length = 1.0 / ((intrinsics.fx + intrinsics.fy) as f32 * 0.5);
+    pub fn new(camera: &CameraIntrinsics) -> Self {
+        let camera_center = Vector2::new(camera.cx as f32, camera.cy as f32);
+        let inv_mean_focal_length = 1.0 / ((camera.fx + camera.fy) as f32 * 0.5);
         let max_center_distance = (camera_center - Vector2::new(0.0, 0.0)).norm();
         RimageSurfelBuilder {
             camera_center,

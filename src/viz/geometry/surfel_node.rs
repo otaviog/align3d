@@ -19,32 +19,29 @@ use vulkano::{
 
 use crate::{
     bounds::Sphere3Df,
-    surfel::SurfelModel,
+    surfel::{AttrColorMask, SurfelModel},
     viz::{
         controllers::FrameStepInfo,
-        node::{node_ref, CommandBuffersContext, MakeNode, Node, NodeProperties, NodeRef, Mat4x4},
+        node::{node_ref, CommandBuffersContext, MakeNode, Mat4x4, Node, NodeProperties, NodeRef},
         Manager,
     },
 };
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
-use super::{
-    datatypes::{ScalarF32, ScalarI32},
-    ColorU8, NormalF32, PositionF32,
-};
+use super::{NormalF32, PositionF32, datatypes::ScalarF32};
 
 pub struct SurfelNode {
     pub properties: NodeProperties,
-    model: SurfelModel,
+    model: Arc<Mutex<SurfelModel>>,
 }
 
 impl SurfelNode {
-    pub fn new(surfel_model: SurfelModel) -> NodeRef<Self> {
+    pub fn new(surfel_model: Arc<Mutex<SurfelModel>>) -> NodeRef<Self> {
         node_ref(Self {
             properties: NodeProperties {
                 bounding_sphere: Sphere3Df {
                     center: Vector3::new(0.0, 0.0, 0.0),
-                    radius: 1000.0,
+                    radius: 3.0,
                 },
                 visible: true,
                 transformation: Mat4x4::identity(),
@@ -54,12 +51,11 @@ impl SurfelNode {
     }
 }
 
-impl MakeNode for SurfelModel {
+impl MakeNode for Arc<Mutex<SurfelModel>> {
     type Node = SurfelNode;
 
     fn make_node(&self, manager: &mut Manager) -> NodeRef<dyn Node> {
-        panic!("SurfelModel::make_node() not implemented")
-        //SurfelNode::new(self)
+        SurfelNode::new(self.clone())
     }
 }
 
@@ -133,9 +129,8 @@ impl Node for SurfelNode {
                         BuffersDefinition::new()
                             .vertex::<PositionF32>()
                             .vertex::<NormalF32>()
-                            .vertex::<ColorU8>()
+                            .vertex::<AttrColorMask>()
                             .vertex::<ScalarF32>()
-                            .vertex::<ScalarI32>(),
                     )
                     .input_assembly_state(
                         InputAssemblyState::new().topology(PrimitiveTopology::PointList),
@@ -192,17 +187,17 @@ impl Node for SurfelNode {
         )
         .unwrap();
 
+        let model = self.model.lock().unwrap();
         context
             .builder
             .bind_pipeline_graphics(pipeline.clone())
             .bind_vertex_buffers(
                 0,
                 (
-                    self.model.position.clone(),
-                    self.model.normal.clone(),
-                    self.model.color.clone(),
-                    self.model.radius.clone(),
-                    self.model.mask.clone(),
+                    model.position.clone(),
+                    model.normal.clone(),
+                    model.color_n_mask.clone(),
+                    model.radius.clone(),
                 ),
             )
             .bind_descriptor_sets(
@@ -211,8 +206,9 @@ impl Node for SurfelNode {
                 0,
                 descriptor_set,
             )
-            .draw(self.model.size() as u32, 1, 0, 0)
+            .draw(model.size() as u32, 1, 0, 0)
             .unwrap();
+        drop(model);
     }
 }
 

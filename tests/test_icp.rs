@@ -31,9 +31,9 @@ pub fn main() -> Result<(), Box<dyn std::error::Error>> {
     let result = icp.align(&source_pcl);
 
     let mut viewer = GeoViewer::new();
-    viewer.add_node(&target_pcl);
-    viewer.add_node(&source_pcl);
-    viewer.add_node(&(&result * &source_pcl));
+    viewer.add(&target_pcl);
+    viewer.add(&source_pcl);
+    viewer.add(&(&result * &source_pcl));
     viewer.run();
 
     Ok(())
