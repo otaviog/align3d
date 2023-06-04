@@ -1,7 +1,7 @@
 use nalgebra::{Vector2, Vector3};
 use ndarray::s;
 
-use crate::{camera::{PinholeCamera, CameraIntrinsics}, range_image::RangeImage, utils::access::ToVector3};
+use crate::{camera::CameraIntrinsics, range_image::RangeImage, utils::access::ToVector3};
 
 pub struct Surfel {
     pub position: Vector3<f32>,

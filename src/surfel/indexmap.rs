@@ -1,5 +1,3 @@
-use core::panic;
-
 use nalgebra::Vector3;
 use ndarray::Array2;
 
@@ -23,18 +21,20 @@ impl IndexMap {
         model_points: impl Iterator<Item = (usize, Vector3<f32>)>,
         camera: &PinholeCamera,
     ) {
-        panic!("Not implemented: scale");
         self.map.fill(-1);
         for (id, point) in model_points {
             if let Some((u, v)) = camera.project_if_visible(&point) {
-                let (u, v) = ((u + 0.5) as usize, (v + 0.5) as usize);
-                self.map[(u, v)] = id as i64;
+                let (u, v) = (
+                    u as usize * self.scale,
+                    v as usize * self.scale,
+                );
+                self.map[(v, u)] = id as i64;
             }
         }
     }
 
     pub fn get(&self, u: usize, v: usize) -> Option<usize> {
-        let id = self.map[(u, v)];
+        let id = self.map[(v * self.scale, u * self.scale)];
         if id >= 0 {
             Some(id as usize)
         } else {
@@ -45,41 +45,24 @@ impl IndexMap {
 
 #[cfg(test)]
 mod tests {
-    use nalgebra::UnitVector3;
-
-    //use crate::{transform::TransformBuilder, surfel::surfel_model::{SurfelModel, Surfel, RimageSurfelBuilder}};
-
     use super::*;
+    use crate::{unit_test::{sample_pcl_ds1, TestPclDataset}, utils::access::ToVector3};
+    use ndarray::Axis;
+    use rstest::rstest;
 
-    #[test]
-    fn test_indexmap() {
-        // let mut camera = FullCamera::from_simple_intrinsic(
-        //     525.0,
-        //     525.0,
-        //     319.5,
-        //     239.5,
-        //     TransformBuilder::default()
-        //         .axis_angle(
-        //             UnitVector3::new_normalize(Vector3::new(4.0, 1.0, 0.0)),
-        //             35.0_f32.to_radians(),
-        //         )
-        //         .build(),
-        //     640,
-        //     480,
-        // );
-        //
-        // let mut indexmap = IndexMap::new(640, 480, 4);
-        //
-        // let builder = RimageSurfelBuilder::new(&camera);
-        //
-        // let model = SurfelModel::new(3);
-        //
-        // let model_points =
-        //     Array2::from_shape_vec((3, 3), vec![0.0, 0.0, 0.0, 1.0, 1.0, 1.0, -1.0, -1.0, -1.0])
-        //         .unwrap();
-        // indexmap.render_indices(&model_points, &camera);
-        // assert_eq!(indexmap.map[(320, 240)], 0);
-        // assert_eq!(indexmap.map[(321, 241)], 1);
-        // assert_eq!(indexmap.map[(319, 239)], 2);
+    #[rstest]
+    fn test_indexmap(sample_pcl_ds1: TestPclDataset) {
+        let pcl = sample_pcl_ds1.get(0);
+        let mut indexmap = IndexMap::new(640, 480, 4);
+        let (intrinsics, extrinsics) = sample_pcl_ds1.camera(0);
+        let camera = PinholeCamera::new(intrinsics, extrinsics.unwrap());
+
+        indexmap.render_indices(
+            pcl.points
+                .axis_iter(Axis(0))
+                .enumerate()
+                .map(|(id, point)| (id, point.to_vector3())),
+            &camera,
+        );
     }
 }

@@ -145,16 +145,9 @@ impl RgbdDataset for TumRgbdDataset {
             .into_ndarray2();
         let mut rgbd_image = RgbdImage::new(rgb_image, depth_image);
         rgbd_image.depth_scale = Some(1.0 / 5000.0);
-        let camera = CameraIntrinsics {
-            fx: 525.0,
-            fy: 525.0,
-            cx: 319.5,
-            cy: 239.5,
-            width: Some(640),
-            height: Some(480)
-        };
 
-        Ok(RgbdFrame::new(camera, rgbd_image, Some(self.trajectory[index].clone())))
+        let (camera, transform) = self.camera(index);
+        Ok(RgbdFrame::new(camera, rgbd_image, transform))
     }
 
     fn len(&self) -> usize {
@@ -167,6 +160,18 @@ impl RgbdDataset for TumRgbdDataset {
 
     fn trajectory(&self) -> Option<Trajectory> {
         Some(self.trajectory.clone())
+    }
+
+    fn camera(&self, index: usize) -> (CameraIntrinsics, Option<Transform>) {
+        let camera = CameraIntrinsics {
+            fx: 525.0,
+            fy: 525.0,
+            cx: 319.5,
+            cy: 239.5,
+            width: 640,
+            height: 480,
+        };
+        (camera, Some(self.trajectory[index].clone()))
     }
 }
 

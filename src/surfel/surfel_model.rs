@@ -203,7 +203,7 @@ impl SurfelModel {
         }
     }
 
-    pub fn read<'a>(&'a mut self) -> Result<SurfelModelReader<'a>, ReadLockError> {
+    pub fn read(&'_ mut self) -> Result<SurfelModelReader<'_>, ReadLockError> {
         Ok(SurfelModelReader {
             position: self.position.read()?,
             normal: self.normal.read()?,
@@ -215,7 +215,7 @@ impl SurfelModel {
         })
     }
 
-    pub fn write<'a>(&'a mut self) -> Result<SurfelModelWriter<'a>, WriteLockError> {
+    pub fn write(&'_ mut self) -> Result<SurfelModelWriter<'_>, WriteLockError> {
         Ok(SurfelModelWriter {
             position: self.position.write()?,
             normal: self.normal.write()?,

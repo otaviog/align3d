@@ -403,7 +403,7 @@ mod tests {
     fn should_backproject_rgbd_image(sample1: SlamTbDataset) {
         use crate::io::write_ply;
 
-        let (cam, rgbd_image) = sample1.get(0).unwrap().into_parts();
+        let (cam, rgbd_image, _) = sample1.get(0).unwrap().into_parts();
         let im_pcl = RangeImage::from_rgbd_image(&cam, &rgbd_image);
 
         assert_eq!(480, im_pcl.height());
@@ -418,7 +418,7 @@ mod tests {
 
     #[rstest]
     fn should_compute_normals(sample1: SlamTbDataset) {
-        let (cam, rgbd_image) = sample1.get(0).unwrap().into_parts();
+        let (cam, rgbd_image, _) = sample1.get(0).unwrap().into_parts();
 
         let mut im_pcl = RangeImage::from_rgbd_image(&cam, &rgbd_image);
         im_pcl.compute_normals();
@@ -444,7 +444,7 @@ mod tests {
 
     #[rstest]
     fn should_convert_into_pointcloud(sample1: SlamTbDataset) {
-        let (cam, rgbd_image) = sample1.get(0).unwrap().into_parts();
+        let (cam, rgbd_image, _) = sample1.get(0).unwrap().into_parts();
         let im_pcl = RangeImage::from_rgbd_image(&cam, &rgbd_image);
 
         let pcl = PointCloud::from(&im_pcl);

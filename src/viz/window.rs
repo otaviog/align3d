@@ -42,6 +42,7 @@ pub struct Window {
     scene: NodeRef<dyn Node>,
     command_buffer_allocator: StandardCommandBufferAllocator,
     pub on_key: Option<KeyCallback>,
+    frame_counter: usize,
 }
 
 fn window_size_dependent_setup(
@@ -91,6 +92,7 @@ impl Window {
                 Default::default(),
             ),
             on_key: None,
+            frame_counter: 0,
         }
     }
 
@@ -384,6 +386,7 @@ impl Window {
                                 ),
                             )
                             .then_signal_fence_and_flush();
+                        self.frame_counter += 1;
 
                         match future {
                             Ok(future) => {

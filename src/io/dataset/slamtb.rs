@@ -2,7 +2,7 @@ use std::path::{Path, PathBuf};
 
 use super::core::{DatasetError, RgbdDataset};
 use crate::{
-    camera::{CameraIntrinsics},
+    camera::CameraIntrinsics,
     image::{IntoArray3, RgbdFrame, RgbdImage},
     trajectory::Trajectory,
     transform::Transform,
@@ -86,9 +86,14 @@ impl SlamTbDataset {
                         Transform::eye()
                     };
 
-                    cameras.push(
-                        CameraIntrinsics::from_simple_intrinsic(fx, fy, cx, cy)
-                    );
+                    cameras.push(CameraIntrinsics::from_simple_intrinsic(
+                        fx,
+                        fy,
+                        cx,
+                        cy,
+                        info.kcam.image_size.0 as usize,
+                        info.kcam.image_size.1 as usize,
+                    ));
                     extrinsic_cameras.push(extrinsics);
                     rgb_images.push(frame.rgb_image.clone());
                     depth_images.push(frame.depth_image.clone());
@@ -128,16 +133,23 @@ impl RgbdDataset for SlamTbDataset {
         Ok(RgbdFrame::new(
             self.cameras[index].clone(),
             RgbdImage::with_depth_scale(rgb_image, depth_image, self.depth_scales[index]),
-            Some(self.extrinsic_cameras[index].clone())))
-        
+            Some(self.extrinsic_cameras[index].clone()),
+        ))
     }
 
     fn trajectory(&self) -> Option<Trajectory> {
         let mut trajectory = Trajectory::default();
         for (i, cam) in self.extrinsic_cameras.iter().enumerate() {
-                trajectory.push(cam.clone(), i as f32);
+            trajectory.push(cam.clone(), i as f32);
         }
         Some(trajectory)
+    }
+
+    fn camera(&self, index: usize) -> (CameraIntrinsics, Option<Transform>) {
+        (
+            self.cameras[index].clone(),
+            Some(self.extrinsic_cameras[index].clone()),
+        )
     }
 }
 
@@ -149,7 +161,7 @@ mod tests {
     fn test_load() {
         let rgbd_dataset = SlamTbDataset::load("tests/data/rgbd/sample1").unwrap();
 
-        let (camera, image) = rgbd_dataset.get(0).unwrap().into_parts();
+        let (camera, image, _) = rgbd_dataset.get(0).unwrap().into_parts();
 
         assert_eq!(camera.fx, 544.4732666015625);
         assert_eq!(camera.fy, 544.4732666015625);

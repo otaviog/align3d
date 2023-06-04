@@ -54,7 +54,7 @@ impl SurfelNode {
 impl MakeNode for Arc<Mutex<SurfelModel>> {
     type Node = SurfelNode;
 
-    fn make_node(&self, manager: &mut Manager) -> NodeRef<dyn Node> {
+    fn make_node(&self, _manager: &mut Manager) -> NodeRef<dyn Node> {
         SurfelNode::new(self.clone())
     }
 }
@@ -188,36 +188,34 @@ impl Node for SurfelNode {
         .unwrap();
 
         let model = self.model.lock().unwrap();
-        context
-            .builder
-            .bind_pipeline_graphics(pipeline.clone())
-            .bind_vertex_buffers(
-                0,
-                (
-                    model.position.clone(),
-                    model.normal.clone(),
-                    model.color_n_mask.clone(),
-                    model.radius.clone(),
-                ),
-            )
-            .bind_descriptor_sets(
-                PipelineBindPoint::Graphics,
-                pipeline.layout().clone(),
-                0,
-                descriptor_set,
-            )
-            .draw(model.size() as u32, 1, 0, 0)
-            .unwrap();
+         context
+             .builder
+             .bind_pipeline_graphics(pipeline.clone())
+             .bind_vertex_buffers(
+                 0,
+                 (
+                     model.position.clone(),
+                     model.normal.clone(),
+                     model.color_n_mask.clone(),
+                     model.radius.clone(),
+                 ),
+             )
+             .bind_descriptor_sets(
+                 PipelineBindPoint::Graphics,
+                 pipeline.layout().clone(),
+                 0,
+                 descriptor_set,
+             )
+             .draw(model.size() as u32, 1, 0, 0)
+             .unwrap();
+
         drop(model);
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::pointcloud::PointCloud;
-    use crate::unit_test::sample_teapot_pointcloud;
     use rstest::*;
-    use vulkano::memory::allocator::StandardMemoryAllocator;
 
     use crate::viz::{Manager, OffscreenRenderer};
 

@@ -5,7 +5,7 @@ use crate::{
     io::dataset::{DatasetError, RgbdDataset, SlamTbDataset},
     range_image::RangeImage,
     transform::Transform,
-    Array2Recycle,
+    Array2Recycle, camera::CameraIntrinsics,
 };
 
 pub struct TestRangeImageDataset {
@@ -14,7 +14,7 @@ pub struct TestRangeImageDataset {
 
 impl TestRangeImageDataset {
     pub fn get(&self, index: usize) -> Result<RangeImage, DatasetError> {
-        let (cam, mut rgbd_image) = self.dataset.get(index)?.into_parts();
+        let (cam, mut rgbd_image, _) = self.dataset.get(index)?.into_parts();
         rgbd_image.depth = {
             let filter = BilateralFilter::default();
             filter.filter(&rgbd_image.depth, Array2Recycle::Empty)
@@ -40,6 +40,10 @@ impl TestRangeImageDataset {
             .unwrap()
             .get_relative_transform(source_index, target_index)
             .unwrap()
+    }
+
+    pub fn camera(&self, index: usize) -> (CameraIntrinsics, Option<Transform>) {
+        self.dataset.camera(index)
     }
 }
 

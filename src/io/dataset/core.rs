@@ -1,6 +1,8 @@
 use image::ImageError;
 
-use crate::{image::RgbdFrame, trajectory::Trajectory};
+use crate::{
+    camera::CameraIntrinsics, image::RgbdFrame, trajectory::Trajectory, transform::Transform,
+};
 use std::io::Error;
 
 #[derive(Debug)]
@@ -47,6 +49,7 @@ pub trait RgbdDataset {
     fn is_empty(&self) -> bool;
     fn get(&self, index: usize) -> Result<RgbdFrame, DatasetError>;
     fn trajectory(&self) -> Option<Trajectory>;
+    fn camera(&self, index: usize) -> (CameraIntrinsics, Option<Transform>);
 }
 
 pub struct SubsetDataset {
@@ -80,5 +83,9 @@ impl RgbdDataset for SubsetDataset {
             trajectory.push(orig_trajectory.camera_to_world[*index].clone(), i as f32);
         }
         Some(trajectory)
+    }
+
+    fn camera(&self, index: usize) -> (CameraIntrinsics, Option<Transform>) {
+        self.dataset.camera(self.indices[index])
     }
 }

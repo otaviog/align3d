@@ -82,19 +82,14 @@ impl RgbdFrame {
         }
     }
 
-    pub fn into_parts(self) -> (CameraIntrinsics, RgbdImage) {
-        (self.camera, self.image)
+    pub fn into_parts(self) -> (CameraIntrinsics, RgbdImage, Option<Transform>) {
+        (self.camera, self.image, self.camera_to_world)
     }
 
     pub fn get_pinhole_camera(&self) -> Option<PinholeCamera> {
-        self.camera_to_world.as_ref().map(|camera_to_world| {
-            PinholeCamera::new(
-                self.camera.clone(),
-                camera_to_world.clone(),
-                self.image.width(),
-                self.image.height(),
-            )
-        })
+        self.camera_to_world
+            .as_ref()
+            .map(|camera_to_world| PinholeCamera::new(self.camera.clone(), camera_to_world.clone()))
     }
 }
 

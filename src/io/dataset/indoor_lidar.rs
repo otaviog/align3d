@@ -95,24 +95,25 @@ impl RgbdDataset for IndoorLidarDataset {
             .into_luma16()
             .into_ndarray2();
         let rgbd_image = RgbdImage::with_depth_scale(rgb_image, depth_image, 0.001);
+
+        let (camera, transform) = self.camera(idx);
+
+        Ok(RgbdFrame::new(camera, rgbd_image, transform))
+    }
+
+    fn trajectory(&self) -> Option<Trajectory> {
+        Some(self.trajectory.clone())
+    }
+
+    fn camera(&self, index: usize) -> (CameraIntrinsics, Option<Transform>) {
         let camera = CameraIntrinsics {
             fx: 525.0,
             fy: 525.0,
             cx: 319.5,
             cy: 239.5,
-
-            width: Some(640),
-            height: Some(480),
+            width: 640,
+            height: 480,
         };
-
-        Ok(RgbdFrame::new(
-            camera,
-            rgbd_image,
-            Some(self.trajectory[idx].clone()),
-        ))
-    }
-
-    fn trajectory(&self) -> Option<Trajectory> {
-        Some(self.trajectory.clone())
+        (camera, Some(self.trajectory[index].clone()))
     }
 }
