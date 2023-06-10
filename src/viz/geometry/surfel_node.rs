@@ -118,7 +118,7 @@ impl Node for SurfelNode {
 
         let pipeline = context
             .pipelines
-            .entry("VkPointCloud".to_string())
+            .entry("SurfelModel".to_string())
             .or_insert_with(|| {
                 let vs = vs::load(context.device.clone()).unwrap();
                 let gs = gs::load(context.device.clone()).unwrap();
@@ -187,8 +187,10 @@ impl Node for SurfelNode {
         )
         .unwrap();
 
-        let model = self.model.lock().unwrap();
-         context
+        let mut model = self.model.lock().unwrap();
+        model.write_flush();
+
+        context
              .builder
              .bind_pipeline_graphics(pipeline.clone())
              .bind_vertex_buffers(

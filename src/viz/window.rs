@@ -362,6 +362,23 @@ impl Window {
                         if suboptimal {
                             recreate_swapchain = true;
                         };
+
+                        let mut builder = AutoCommandBufferBuilder::primary(
+                            &self.command_buffer_allocator,
+                            self.queue.queue_family_index(),
+                            CommandBufferUsage::OneTimeSubmit,
+                        )
+                        .unwrap();
+                        let command_buffer = builder.build().unwrap();
+
+                        let future = previous_frame_end
+                        .take()
+                        .unwrap()
+                        .join(acquire_future)
+                        .then_execute(self.queue.clone(), command_buffer)
+                        .unwrap()
+                        .then_signal_fence_and_flush();
+
                         let command_buffer = self.get_command_buffers(
                             framebuffers[image_index as usize].clone(),
                             &mut viewport,
@@ -372,10 +389,10 @@ impl Window {
                             &window_state,
                         );
 
-                        let future = previous_frame_end
+                        let future = Some(future.unwrap().boxed())
                             .take()
                             .unwrap()
-                            .join(acquire_future)
+                            //.join(acquire_future)
                             .then_execute(self.queue.clone(), command_buffer)
                             .unwrap()
                             .then_swapchain_present(
@@ -387,7 +404,7 @@ impl Window {
                             )
                             .then_signal_fence_and_flush();
                         self.frame_counter += 1;
-
+                            
                         match future {
                             Ok(future) => {
                                 previous_frame_end = Some(future.boxed());

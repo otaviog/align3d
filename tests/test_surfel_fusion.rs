@@ -42,9 +42,8 @@ fn main() {
         }
     });
 
-    
-    fusion_thread.join().unwrap();
     geo_viewer.add_node(node);
     geo_viewer.run();
+    fusion_thread.join().unwrap();
     
 }

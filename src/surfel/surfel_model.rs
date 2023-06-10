@@ -1,7 +1,8 @@
 use bytemuck::{Pod, Zeroable};
 use nalgebra::Vector3;
 use std::collections::BTreeSet;
-use std::sync::Arc;
+use std::rc::Rc;
+use std::sync::{Arc, Mutex};
 use vulkano::buffer::cpu_access::{ReadLock, ReadLockError, WriteLock, WriteLockError};
 use vulkano::impl_vertex;
 use vulkano::{
@@ -13,7 +14,7 @@ use crate::viz::geometry::{NormalF32, PositionF32};
 
 use super::Surfel;
 
-pub struct SurfelModelWriter<'a> {
+struct SurfelModelWriter<'a> {
     position: WriteLock<'a, [PositionF32]>,
     normal: WriteLock<'a, [NormalF32]>,
     color_n_mask: WriteLock<'a, [AttrColorMask]>,
@@ -24,7 +25,7 @@ pub struct SurfelModelWriter<'a> {
 }
 
 impl<'a> SurfelModelWriter<'a> {
-    pub fn update(&mut self, index: usize, surfel: Surfel) {
+    pub fn update(&mut self, index: usize, surfel: &Surfel) {
         self.position[index] =
             PositionF32::new(surfel.position[0], surfel.position[1], surfel.position[2]);
         self.normal[index] = NormalF32::new(surfel.normal[0], surfel.normal[1], surfel.normal[2]);
@@ -35,7 +36,7 @@ impl<'a> SurfelModelWriter<'a> {
         self.age[index] = surfel.age;
     }
 
-    pub fn add(&mut self, surfel: Surfel) -> usize {
+    pub fn add(&mut self, surfel: &Surfel) -> usize {
         let id = self.allocate();
         self.update(id, surfel);
         id
@@ -137,6 +138,22 @@ impl AttrColorMask {
     }
 }
 
+pub struct SurfelModelWriteCommands {
+    pub update: Vec<(usize, Surfel)>,
+    pub add: Vec<Surfel>,
+    pub free: Vec<usize>,
+}
+
+impl SurfelModelWriteCommands {
+    pub fn new() -> Self {
+        Self {
+            update: Vec::new(),
+            add: Vec::new(),
+            free: Vec::new(),
+        }
+    }
+}
+
 pub struct SurfelModel {
     pub position: Arc<CpuAccessibleBuffer<[PositionF32]>>,
     pub normal: Arc<CpuAccessibleBuffer<[NormalF32]>>,
@@ -146,6 +163,7 @@ pub struct SurfelModel {
     pub age: Arc<CpuAccessibleBuffer<[i32]>>,
     free_list: BTreeSet<usize>,
     size: usize,
+    pub write_commands: Arc<Mutex<SurfelModelWriteCommands>>,
 }
 
 impl SurfelModel {
@@ -200,10 +218,11 @@ impl SurfelModel {
             .unwrap(),
             free_list: BTreeSet::from_iter(0..size),
             size,
+            write_commands: Arc::new(Mutex::new(SurfelModelWriteCommands::new())),
         }
     }
 
-    pub fn read(&'_ mut self) -> Result<SurfelModelReader<'_>, ReadLockError> {
+    pub fn read(&'_ self) -> Result<SurfelModelReader<'_>, ReadLockError> {
         Ok(SurfelModelReader {
             position: self.position.read()?,
             normal: self.normal.read()?,
@@ -215,7 +234,7 @@ impl SurfelModel {
         })
     }
 
-    pub fn write(&'_ mut self) -> Result<SurfelModelWriter<'_>, WriteLockError> {
+    fn write(&'_ mut self) -> Result<SurfelModelWriter<'_>, WriteLockError> {
         Ok(SurfelModelWriter {
             position: self.position.write()?,
             normal: self.normal.write()?,
@@ -229,5 +248,28 @@ impl SurfelModel {
 
     pub fn size(&self) -> usize {
         self.size
+    }
+
+    pub fn write_flush(&mut self) {
+        let foo = self.write_commands.clone();
+            let mut write_commands = foo.lock().unwrap();
+
+            let mut writer = self.write().unwrap();
+            
+            for (id, surfel) in &write_commands.update {
+                writer.update(*id, surfel.clone());
+            }
+
+            for surfel in &write_commands.add {
+                writer.add(surfel);
+            }
+
+            for id in &write_commands.free {
+                writer.free(*id);
+            }
+
+            write_commands.update.clear();
+            write_commands.add.clear();
+            write_commands.free.clear();
     }
 }
