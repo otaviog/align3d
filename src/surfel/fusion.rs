@@ -1,4 +1,4 @@
-use std::{rc::Rc, sync::Mutex, sync::Arc};
+use std::{sync::Arc, sync::Mutex};
 
 use nalgebra::Vector2;
 use ndarray::s;
@@ -6,21 +6,37 @@ use ndarray::s;
 use super::{
     indexmap::IndexMap,
     surfel_model::{SurfelModel, SurfelModelWriteCommands},
-    surfel_type::{RimageSurfelBuilder},
+    surfel_type::RimageSurfelBuilder,
 };
 use crate::utils::access::ToVector3;
 use crate::{camera::PinholeCamera, range_image::RangeImage};
 
+pub struct SurfelFusionParameters {
+    pub confidence_remove_threshold: f32,
+    pub age_remove_threshold: i32,
+}
+
+impl Default for SurfelFusionParameters {
+    fn default() -> Self {
+        SurfelFusionParameters {
+            confidence_remove_threshold: 15.0,
+            age_remove_threshold: 10,
+        }
+    }
+}
+
 pub struct SurfelFusion {
     indexmap: IndexMap,
     timestamp: i32,
+    params: SurfelFusionParameters
 }
 
 impl SurfelFusion {
-    pub fn new(map_width: usize, map_height: usize, map_scale: usize) -> Self {
+    pub fn new(map_width: usize, map_height: usize, map_scale: usize, params: SurfelFusionParameters) -> Self {
         SurfelFusion {
             indexmap: IndexMap::new(map_width, map_height, map_scale),
             timestamp: 0,
+            params
         }
     }
 
@@ -61,7 +77,9 @@ impl SurfelFusion {
                     if let Some(id) = self.indexmap.get(u, v) {
                         if let Some(model_surfel) = model_reader.get(id) {
                             if (model_surfel.position - ri_point).norm() < 0.1 {
-                                write_commands.update.push((id, model_surfel.merge(&ri_surfel, 0.5, 0.5)));
+                                write_commands
+                                    .update
+                                    .push((id, model_surfel.merge(&ri_surfel, 0.5, 0.5)));
                             } else {
                                 write_commands.add.push(ri_surfel);
                             }
@@ -70,16 +88,14 @@ impl SurfelFusion {
                         write_commands.add.push(ri_surfel);
                     }
                 }
+            }
 
-                for (id, _age, conf) in model_reader.age_confidence_iter() {
-                    if conf < 100.0 {
-                        write_commands.free.push(id);
-                    }
+            for (id, age, conf) in model_reader.age_confidence_iter() {
+                if (self.timestamp - age) > self.params.age_remove_threshold && conf < self.params.confidence_remove_threshold {
+                    write_commands.free.push(id);
                 }
-
             }
         }
-
 
         model.write_commands = Arc::new(Mutex::new(write_commands));
     }

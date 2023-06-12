@@ -3,7 +3,7 @@ use std::sync::Arc;
 use vulkano::{
     device::{
         physical::{PhysicalDevice, PhysicalDeviceType},
-        Device, DeviceCreateInfo, DeviceExtensions, Features, Queue, QueueCreateInfo,
+        Device, DeviceCreateInfo, DeviceExtensions, Features, Queue, QueueCreateInfo, QueueFlags,
     },
     instance::{Instance, InstanceCreateInfo},
     memory::allocator::StandardMemoryAllocator,
@@ -53,7 +53,7 @@ impl Default for Manager {
                     // If none is found, `None` is returned to `filter_map`,
                     // which disqualifies this physical device.
                     .position(|(_, q)| {
-                        q.queue_flags.graphics
+                        q.queue_flags.intersects(QueueFlags::GRAPHICS)
                         // && p.surface_support(i as u32, &surface).unwrap_or(false)
                     })
                     .map(|q| (p, q as u32))

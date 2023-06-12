@@ -2,16 +2,21 @@ use std::{cell::RefCell, rc::Rc, sync::Arc};
 
 use ndarray::{Array, Axis};
 use vulkano::{
-    buffer::{BufferUsage, CpuAccessibleBuffer},
+    buffer::{
+        allocator::{SubbufferAllocator, SubbufferAllocatorCreateInfo},
+        Buffer, BufferCreateInfo, BufferUsage, Subbuffer,
+    },
     descriptor_set::{
         allocator::StandardDescriptorSetAllocator, PersistentDescriptorSet, WriteDescriptorSet,
     },
-    memory::allocator::{MemoryAllocator, StandardMemoryAllocator},
+    memory::allocator::{
+        AllocationCreateInfo, MemoryAllocator, MemoryUsage, StandardMemoryAllocator,
+    },
     pipeline::{
         graphics::{
             depth_stencil::DepthStencilState,
             input_assembly::{InputAssemblyState, PrimitiveTopology},
-            vertex_input::BuffersDefinition,
+            vertex_input::Vertex,
             viewport::{Viewport, ViewportState},
         },
         GraphicsPipeline, Pipeline, PipelineBindPoint,
@@ -24,6 +29,7 @@ use crate::{
     io::Geometry,
     viz::{
         controllers::FrameStepInfo,
+        misc::get_normal_matrix,
         node::{node_ref, CommandBuffersContext, MakeNode, Node, NodeProperties, NodeRef},
         Manager,
     },
@@ -34,13 +40,13 @@ use super::datatypes::{ColorU8, NormalF32, PositionF32};
 /// Triangular mesh in GPU.
 pub struct VkMesh {
     /// Vertex points.
-    pub points: Arc<CpuAccessibleBuffer<[PositionF32]>>,
+    pub points: Subbuffer<[PositionF32]>,
     // Indices.
-    pub indices: Arc<CpuAccessibleBuffer<[u32]>>,
+    pub indices: Subbuffer<[u32]>,
     /// Vertex normals.
-    pub normals: Option<Arc<CpuAccessibleBuffer<[PositionF32]>>>,
+    pub normals: Option<Subbuffer<[PositionF32]>>,
     /// RGB colors.
-    pub colors: Option<Arc<CpuAccessibleBuffer<[ColorU8]>>>,
+    pub colors: Option<Subbuffer<[ColorU8]>>,
     bounding_sphere: Sphere3Df,
     number_of_vertex: usize,
     number_of_faces: usize,
@@ -58,31 +64,34 @@ impl VkMesh {
         memory_allocator: &(impl MemoryAllocator + ?Sized),
         geometry: &Geometry,
     ) -> Arc<Self> {
-        let vertex_buffer_usage = BufferUsage {
-            vertex_buffer: true,
-            ..Default::default()
-        };
-
         let number_of_points = geometry.len_vertices();
         let number_of_faces = geometry.len_faces();
+        let create_info = BufferCreateInfo {
+            usage: BufferUsage::VERTEX_BUFFER,
+            ..Default::default()
+        };
+        let alloc_info = AllocationCreateInfo {
+            usage: MemoryUsage::Upload,
+            ..Default::default()
+        };
         Arc::new(Self {
-            points: CpuAccessibleBuffer::from_iter(
+            points: Buffer::from_iter(
                 memory_allocator,
-                vertex_buffer_usage,
-                false,
+                create_info.clone(),
+                alloc_info.clone(),
                 geometry
                     .points
                     .axis_iter(Axis(0))
                     .map(|v| PositionF32::new(v[0], v[1], v[2])),
             )
             .unwrap(),
-            indices: CpuAccessibleBuffer::from_iter(
+            indices: Buffer::from_iter(
                 memory_allocator,
-                BufferUsage {
-                    index_buffer: true,
+                BufferCreateInfo {
+                    usage: BufferUsage::INDEX_BUFFER,
                     ..Default::default()
                 },
-                false,
+                alloc_info.clone(),
                 Array::from_iter(geometry.faces.as_ref().unwrap().iter().cloned())
                     .iter()
                     .rev()
@@ -90,10 +99,10 @@ impl VkMesh {
             )
             .unwrap(),
             normals: Some(
-                CpuAccessibleBuffer::from_iter(
+                Buffer::from_iter(
                     memory_allocator,
-                    vertex_buffer_usage,
-                    false,
+                    create_info.clone(),
+                    alloc_info.clone(),
                     geometry
                         .normals
                         .as_ref()
@@ -104,10 +113,10 @@ impl VkMesh {
                 .unwrap(),
             ),
             colors: Some(
-                CpuAccessibleBuffer::from_iter(
+                Buffer::from_iter(
                     memory_allocator,
-                    vertex_buffer_usage,
-                    false,
+                    create_info,
+                    alloc_info,
                     geometry
                         .colors
                         .as_ref()
@@ -167,11 +176,6 @@ mod vs {
     vulkano_shaders::shader! {
         ty: "vertex",
         path: "resources/shaders/vkmesh/mesh.vert",
-        types_meta: {
-            use bytemuck::{Pod, Zeroable};
-
-            #[derive(Clone, Copy, Zeroable, Pod)]
-        },
     }
 }
 
@@ -211,11 +215,7 @@ impl Node for VkMeshNode {
                 let fs = fs::load(context.device.clone()).unwrap();
                 GraphicsPipeline::start()
                     .render_pass(Subpass::from(context.render_pass.clone(), 0).unwrap())
-                    .vertex_input_state(
-                        BuffersDefinition::new()
-                            .vertex::<PositionF32>()
-                            .vertex::<NormalF32>(), //.vertex::<ColorU8>(),
-                    )
+                    .vertex_input_state([PositionF32::per_vertex(), NormalF32::per_vertex()])
                     .input_assembly_state(
                         InputAssemblyState::new().topology(PrimitiveTopology::TriangleList),
                     )
@@ -235,24 +235,25 @@ impl Node for VkMeshNode {
         let memory_allocator =
             Arc::new(StandardMemoryAllocator::new_default(context.device.clone()));
 
+        let uniform_buffer = SubbufferAllocator::new(
+            memory_allocator.clone(),
+            SubbufferAllocatorCreateInfo {
+                buffer_usage: BufferUsage::UNIFORM_BUFFER,
+                ..Default::default()
+            },
+        );
+
         let uniform_buffer_subbuffer = {
-            let uniform_data = vs::ty::Data {
+            let uniform_data = vs::Data {
                 worldview: context.view_matrix.into(),
-                worldview_normals: context.view_normals_matrix.into(),
+                worldview_normals: get_normal_matrix(&context.view_matrix),
                 projection_worldview: (context.projection_matrix * context.view_matrix).into(),
-                _dummy0: [0; 12],
             };
 
-            CpuAccessibleBuffer::from_data(
-                &memory_allocator,
-                BufferUsage {
-                    uniform_buffer: true,
-                    ..Default::default()
-                },
-                false,
-                uniform_data,
-            )
-            .unwrap()
+            let subbuffer = uniform_buffer.allocate_sized().unwrap();
+            *subbuffer.write().unwrap() = uniform_data;
+
+            subbuffer
         };
         let descriptor_set_allocator = StandardDescriptorSetAllocator::new(context.device.clone());
 

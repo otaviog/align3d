@@ -39,6 +39,7 @@ fn main() {
 
             let mut wmodel = model.lock().unwrap();
             fusion.integrate(&mut wmodel, &ri_frame[0], &pinhole_camera);
+            println!("Frame {} fused", i);
         }
     });
 

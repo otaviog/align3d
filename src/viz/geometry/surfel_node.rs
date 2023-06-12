@@ -1,6 +1,9 @@
 use nalgebra::Vector3;
 use vulkano::{
-    buffer::{BufferUsage, CpuAccessibleBuffer},
+    buffer::{
+        allocator::{SubbufferAllocator, SubbufferAllocatorCreateInfo},
+        BufferUsage,
+    },
     descriptor_set::{
         allocator::StandardDescriptorSetAllocator, PersistentDescriptorSet, WriteDescriptorSet,
     },
@@ -9,7 +12,7 @@ use vulkano::{
         graphics::{
             depth_stencil::DepthStencilState,
             input_assembly::{InputAssemblyState, PrimitiveTopology},
-            vertex_input::BuffersDefinition,
+            vertex_input::Vertex,
             viewport::{Viewport, ViewportState},
         },
         GraphicsPipeline, Pipeline, PipelineBindPoint,
@@ -22,13 +25,14 @@ use crate::{
     surfel::{AttrColorMask, SurfelModel},
     viz::{
         controllers::FrameStepInfo,
+        misc::get_normal_matrix,
         node::{node_ref, CommandBuffersContext, MakeNode, Mat4x4, Node, NodeProperties, NodeRef},
         Manager,
     },
 };
 use std::sync::{Arc, Mutex};
 
-use super::{NormalF32, PositionF32, datatypes::ScalarF32};
+use super::{datatypes::ScalarF32, NormalF32, PositionF32};
 
 pub struct SurfelNode {
     pub properties: NodeProperties,
@@ -63,11 +67,6 @@ mod vs {
     vulkano_shaders::shader! {
         ty: "vertex",
         path: "resources/shaders/surfel/surfel_model.vert",
-        types_meta: {
-            use bytemuck::{Pod, Zeroable};
-
-            #[derive(Clone, Copy, Zeroable, Pod)]
-        },
     }
 }
 
@@ -75,11 +74,6 @@ mod gs {
     vulkano_shaders::shader! {
         ty: "geometry",
         path: "resources/shaders/surfel/surfel_model.geom",
-        types_meta: {
-            use bytemuck::{Pod, Zeroable};
-
-            #[derive(Clone, Copy, Zeroable, Pod)]
-        }
     }
 }
 
@@ -125,13 +119,12 @@ impl Node for SurfelNode {
                 let fs = fs::load(context.device.clone()).unwrap();
                 GraphicsPipeline::start()
                     .render_pass(Subpass::from(context.render_pass.clone(), 0).unwrap())
-                    .vertex_input_state(
-                        BuffersDefinition::new()
-                            .vertex::<PositionF32>()
-                            .vertex::<NormalF32>()
-                            .vertex::<AttrColorMask>()
-                            .vertex::<ScalarF32>()
-                    )
+                    .vertex_input_state([
+                        PositionF32::per_vertex(),
+                        NormalF32::per_vertex(),
+                        AttrColorMask::per_vertex(),
+                        ScalarF32::per_vertex(),
+                    ])
                     .input_assembly_state(
                         InputAssemblyState::new().topology(PrimitiveTopology::PointList),
                     )
@@ -146,36 +139,38 @@ impl Node for SurfelNode {
                     .geometry_shader(gs.entry_point("main").unwrap(), ())
                     .fragment_shader(fs.entry_point("main").unwrap(), ())
                     .depth_stencil_state(DepthStencilState::simple_depth_test())
+                    .render_pass(Subpass::from(context.render_pass.clone(), 0).unwrap())
                     .build(context.device.clone())
                     .unwrap()
             });
+        let mut model = self.model.lock().unwrap();
+        model.write_flush();
+
         let memory_allocator =
             Arc::new(StandardMemoryAllocator::new_default(context.device.clone()));
+
+        let uniform_buffer = SubbufferAllocator::new(
+            memory_allocator.clone(),
+            SubbufferAllocatorCreateInfo {
+                buffer_usage: BufferUsage::UNIFORM_BUFFER,
+                ..Default::default()
+            },
+        );
 
         let uniform_buffer_subbuffer = {
             let view_matrix = context.view_matrix * self.properties.transformation;
             let projection_worldview = context.projection_matrix * view_matrix;
 
-            let normal_matrix = view_matrix.try_inverse().unwrap().transpose();
-            let normal_matrix = normal_matrix.fixed_slice::<3, 3>(0, 0);
-
-            let uniform_data = vs::ty::Data {
-                normal_worldview: normal_matrix.into(),
+            let uniform_data = vs::Data {
+                normal_worldview: get_normal_matrix(&view_matrix),
                 worldview: view_matrix.into(),
                 projection_worldview: projection_worldview.into(),
-                _dummy0: [0; 12],
             };
 
-            CpuAccessibleBuffer::from_data(
-                &memory_allocator,
-                BufferUsage {
-                    uniform_buffer: true,
-                    ..Default::default()
-                },
-                false,
-                uniform_data,
-            )
-            .unwrap()
+            let subbuffer = uniform_buffer.allocate_sized().unwrap();
+            *subbuffer.write().unwrap() = uniform_data;
+
+            subbuffer
         };
         let descriptor_set_allocator = StandardDescriptorSetAllocator::new(context.device.clone());
 
@@ -187,29 +182,27 @@ impl Node for SurfelNode {
         )
         .unwrap();
 
-        let mut model = self.model.lock().unwrap();
-        model.write_flush();
-
         context
-             .builder
-             .bind_pipeline_graphics(pipeline.clone())
-             .bind_vertex_buffers(
-                 0,
-                 (
-                     model.position.clone(),
-                     model.normal.clone(),
-                     model.color_n_mask.clone(),
-                     model.radius.clone(),
-                 ),
-             )
-             .bind_descriptor_sets(
-                 PipelineBindPoint::Graphics,
-                 pipeline.layout().clone(),
-                 0,
-                 descriptor_set,
-             )
-             .draw(model.size() as u32, 1, 0, 0)
-             .unwrap();
+            .builder
+            .bind_pipeline_graphics(pipeline.clone())
+            .bind_vertex_buffers(
+                0,
+                (
+                    model.position.clone(),
+                    model.normal.clone(),
+                    model.color_n_mask.clone(),
+                    model.radius.clone(),
+                ),
+            )
+            .bind_descriptor_sets(
+                PipelineBindPoint::Graphics,
+                pipeline.layout().clone(),
+                0,
+                descriptor_set,
+            )
+            .draw(model.size() as u32, 1, 0, 0)
+            .unwrap();
+            
 
         drop(model);
     }

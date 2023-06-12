@@ -1,12 +1,12 @@
-use bytemuck::{Pod, Zeroable};
 use nalgebra::Vector3;
 use std::collections::BTreeSet;
-use std::rc::Rc;
 use std::sync::{Arc, Mutex};
-use vulkano::buffer::cpu_access::{ReadLock, ReadLockError, WriteLock, WriteLockError};
-use vulkano::impl_vertex;
+use vulkano::buffer::subbuffer::{BufferReadGuard, BufferWriteGuard};
+use vulkano::buffer::{Buffer, BufferContents, BufferCreateInfo, BufferError};
+use vulkano::memory::allocator::{AllocationCreateInfo, MemoryUsage};
+use vulkano::pipeline::graphics::vertex_input::Vertex;
 use vulkano::{
-    buffer::{BufferUsage, CpuAccessibleBuffer},
+    buffer::{BufferUsage, Subbuffer},
     memory::allocator::MemoryAllocator,
 };
 
@@ -15,12 +15,12 @@ use crate::viz::geometry::{NormalF32, PositionF32};
 use super::Surfel;
 
 struct SurfelModelWriter<'a> {
-    position: WriteLock<'a, [PositionF32]>,
-    normal: WriteLock<'a, [NormalF32]>,
-    color_n_mask: WriteLock<'a, [AttrColorMask]>,
-    radius: WriteLock<'a, [f32]>,
-    confidence: WriteLock<'a, [f32]>,
-    age: WriteLock<'a, [i32]>,
+    position: BufferWriteGuard<'a, [PositionF32]>,
+    normal: BufferWriteGuard<'a, [NormalF32]>,
+    color_n_mask: BufferWriteGuard<'a, [AttrColorMask]>,
+    radius: BufferWriteGuard<'a, [f32]>,
+    confidence: BufferWriteGuard<'a, [f32]>,
+    age: BufferWriteGuard<'a, [i32]>,
     free_list: &'a mut BTreeSet<usize>,
 }
 
@@ -60,12 +60,12 @@ impl<'a> SurfelModelWriter<'a> {
 }
 
 pub struct SurfelModelReader<'a> {
-    position: ReadLock<'a, [PositionF32]>,
-    normal: ReadLock<'a, [NormalF32]>,
-    color_n_mask: ReadLock<'a, [AttrColorMask]>,
-    radius: ReadLock<'a, [f32]>,
-    confidence: ReadLock<'a, [f32]>,
-    age: ReadLock<'a, [i32]>,
+    position: BufferReadGuard<'a, [PositionF32]>,
+    normal: BufferReadGuard<'a, [NormalF32]>,
+    color_n_mask: BufferReadGuard<'a, [AttrColorMask]>,
+    radius: BufferReadGuard<'a, [f32]>,
+    confidence: BufferReadGuard<'a, [f32]>,
+    age: BufferReadGuard<'a, [i32]>,
     free_list: &'a BTreeSet<usize>,
 }
 
@@ -99,7 +99,7 @@ impl<'a> SurfelModelReader<'a> {
         })
     }
 
-    pub fn age_confidence_iter(&'a self) -> impl Iterator<Item = (usize, f32, f32)> + 'a {
+    pub fn age_confidence_iter(&'a self) -> impl Iterator<Item = (usize, i32, f32)> + 'a {
         self.age
             .iter()
             .zip(self.confidence.iter())
@@ -108,18 +108,18 @@ impl<'a> SurfelModelReader<'a> {
                 if self.free_list.contains(&i) {
                     None
                 } else {
-                    Some((i, *a as f32, *c))
+                    Some((i, *a, *c))
                 }
             })
     }
 }
 
+#[derive(BufferContents, Vertex)]
 #[repr(C)]
-#[derive(Clone, Copy, Debug, Default, Zeroable, Pod)]
 pub struct AttrColorMask {
+    #[format(R32_UINT)]
     pub rgbm: u32,
 }
-impl_vertex!(AttrColorMask, rgbm);
 
 impl AttrColorMask {
     pub fn new(r: u8, g: u8, b: u8, mask: u8) -> Self {
@@ -154,13 +154,15 @@ impl SurfelModelWriteCommands {
     }
 }
 
+pub struct SurfelModelData {}
+
 pub struct SurfelModel {
-    pub position: Arc<CpuAccessibleBuffer<[PositionF32]>>,
-    pub normal: Arc<CpuAccessibleBuffer<[NormalF32]>>,
-    pub color_n_mask: Arc<CpuAccessibleBuffer<[AttrColorMask]>>,
-    pub radius: Arc<CpuAccessibleBuffer<[f32]>>,
-    pub confidence: Arc<CpuAccessibleBuffer<[f32]>>,
-    pub age: Arc<CpuAccessibleBuffer<[i32]>>,
+    pub position: Subbuffer<[PositionF32]>,
+    pub normal: Subbuffer<[NormalF32]>,
+    pub color_n_mask: Subbuffer<[AttrColorMask]>,
+    pub radius: Subbuffer<[f32]>,
+    pub confidence: Subbuffer<[f32]>,
+    pub age: Subbuffer<[i32]>,
     free_list: BTreeSet<usize>,
     size: usize,
     pub write_commands: Arc<Mutex<SurfelModelWriteCommands>>,
@@ -168,51 +170,55 @@ pub struct SurfelModel {
 
 impl SurfelModel {
     pub fn new(memory_allocator: &(impl MemoryAllocator + ?Sized), size: usize) -> Self {
-        let buffer_usage = BufferUsage {
-            vertex_buffer: true,
-            ..BufferUsage::default()
+        let create_info = BufferCreateInfo {
+            usage: BufferUsage::VERTEX_BUFFER,
+            ..Default::default()
+        };
+        let alloc_info = AllocationCreateInfo {
+            usage: MemoryUsage::Upload,
+            ..Default::default()
         };
 
         SurfelModel {
-            position: CpuAccessibleBuffer::from_iter(
+            position: Buffer::from_iter(
                 memory_allocator,
-                buffer_usage,
-                false,
+                create_info.clone(),
+                alloc_info.clone(),
                 (0..size).map(|_| PositionF32::new(0.0, 0.0, 0.0)),
             )
             .unwrap(),
-            normal: CpuAccessibleBuffer::from_iter(
+            normal: Buffer::from_iter(
                 memory_allocator,
-                buffer_usage,
-                false,
+                create_info.clone(),
+                alloc_info.clone(),
                 (0..size).map(|_| NormalF32::new(0.0, 0.0, 0.0)),
             )
             .unwrap(),
-            color_n_mask: CpuAccessibleBuffer::from_iter(
+            color_n_mask: Buffer::from_iter(
                 memory_allocator,
-                buffer_usage,
-                false,
+                create_info.clone(),
+                alloc_info.clone(),
                 (0..size).map(|_| AttrColorMask::new(0, 0, 0, 0)),
             )
             .unwrap(),
-            radius: CpuAccessibleBuffer::from_iter(
+            radius: Buffer::from_iter(
                 memory_allocator,
-                buffer_usage,
-                false,
+                create_info.clone(),
+                alloc_info.clone(),
                 (0..size).map(|_| 0.0),
             )
             .unwrap(),
-            confidence: CpuAccessibleBuffer::from_iter(
+            confidence: Buffer::from_iter(
                 memory_allocator,
-                buffer_usage,
-                false,
+                create_info.clone(),
+                alloc_info.clone(),
                 (0..size).map(|_| 0.0),
             )
             .unwrap(),
-            age: CpuAccessibleBuffer::from_iter(
+            age: Buffer::from_iter(
                 memory_allocator,
-                buffer_usage,
-                false,
+                create_info,
+                alloc_info,
                 (0..size).map(|_| 0),
             )
             .unwrap(),
@@ -222,7 +228,7 @@ impl SurfelModel {
         }
     }
 
-    pub fn read(&'_ self) -> Result<SurfelModelReader<'_>, ReadLockError> {
+    pub fn read(&'_ self) -> Result<SurfelModelReader<'_>, BufferError> {
         Ok(SurfelModelReader {
             position: self.position.read()?,
             normal: self.normal.read()?,
@@ -234,7 +240,7 @@ impl SurfelModel {
         })
     }
 
-    fn write(&'_ mut self) -> Result<SurfelModelWriter<'_>, WriteLockError> {
+    fn write(&'_ mut self) -> Result<SurfelModelWriter<'_>, BufferError> {
         Ok(SurfelModelWriter {
             position: self.position.write()?,
             normal: self.normal.write()?,
@@ -252,24 +258,24 @@ impl SurfelModel {
 
     pub fn write_flush(&mut self) {
         let foo = self.write_commands.clone();
-            let mut write_commands = foo.lock().unwrap();
+        let mut write_commands = foo.lock().unwrap();
 
-            let mut writer = self.write().unwrap();
-            
-            for (id, surfel) in &write_commands.update {
-                writer.update(*id, surfel.clone());
-            }
+        let mut writer = self.write().unwrap();
 
-            for surfel in &write_commands.add {
-                writer.add(surfel);
-            }
+        for (id, surfel) in &write_commands.update {
+            writer.update(*id, surfel.clone());
+        }
 
-            for id in &write_commands.free {
-                writer.free(*id);
-            }
+        for surfel in &write_commands.add {
+            writer.add(surfel);
+        }
 
-            write_commands.update.clear();
-            write_commands.add.clear();
-            write_commands.free.clear();
+        for id in &write_commands.free {
+            writer.free(*id);
+        }
+
+        write_commands.update.clear();
+        write_commands.add.clear();
+        write_commands.free.clear();
     }
 }

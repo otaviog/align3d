@@ -3,21 +3,23 @@ use std::{cell::RefCell, rc::Rc, sync::Arc};
 use nalgebra::Vector3;
 use ndarray::Axis;
 use vulkano::{
-    buffer::{BufferUsage, CpuAccessibleBuffer},
+    buffer::{
+        allocator::{SubbufferAllocator, SubbufferAllocatorCreateInfo},
+        Buffer, BufferCreateInfo, BufferUsage, Subbuffer,
+    },
     descriptor_set::{
         allocator::StandardDescriptorSetAllocator, PersistentDescriptorSet, WriteDescriptorSet,
     },
-    memory::allocator::{MemoryAllocator, StandardMemoryAllocator},
+    memory::allocator::{AllocationCreateInfo, MemoryUsage, StandardMemoryAllocator, MemoryAllocator},
     pipeline::{
         graphics::{
             depth_stencil::DepthStencilState,
             input_assembly::{InputAssemblyState, PrimitiveTopology},
-            vertex_input::BuffersDefinition,
+            vertex_input::Vertex,
             viewport::{Viewport, ViewportState},
         },
         GraphicsPipeline, Pipeline, PipelineBindPoint,
-    },
-    render_pass::Subpass,
+    }, render_pass::Subpass
 };
 
 use crate::{
@@ -27,16 +29,16 @@ use crate::{
     viz::{
         controllers::FrameStepInfo,
         node::{node_ref, CommandBuffersContext, MakeNode, Node, NodeProperties, NodeRef},
-        Manager,
+        Manager, misc::get_normal_matrix,
     },
 };
 
 use super::datatypes::{ColorU8, NormalF32, PositionF32};
 
 pub struct VkPointCloud {
-    pub points: Arc<CpuAccessibleBuffer<[PositionF32]>>,
-    pub normals: Arc<CpuAccessibleBuffer<[NormalF32]>>,
-    pub colors: Arc<CpuAccessibleBuffer<[ColorU8]>>,
+    pub points: Subbuffer<[PositionF32]>,
+    pub normals: Subbuffer<[NormalF32]>,
+    pub colors: Subbuffer<[ColorU8]>,
     number_of_points: usize,
 }
 
@@ -45,27 +47,26 @@ impl VkPointCloud {
         memory_allocator: &(impl MemoryAllocator + ?Sized),
         pointcloud: &PointCloud,
     ) -> Arc<Self> {
-        let buffer_usage = BufferUsage {
-            vertex_buffer: true,
+        let create_info = BufferCreateInfo {
+            usage: BufferUsage::VERTEX_BUFFER,
+            ..Default::default()
+        };
+        let alloc_info = AllocationCreateInfo {
+            usage: MemoryUsage::Upload,
             ..Default::default()
         };
 
         let number_of_points = pointcloud.len();
+
         Arc::new(Self {
-            points: CpuAccessibleBuffer::from_iter(
-                memory_allocator,
-                buffer_usage,
-                false,
+            points: Buffer::from_iter(memory_allocator, create_info.clone(), alloc_info.clone(),
                 pointcloud
                     .points
                     .axis_iter(Axis(0))
                     .map(|v| PositionF32::new(v[0], v[1], v[2])),
             )
             .unwrap(),
-            normals: CpuAccessibleBuffer::from_iter(
-                memory_allocator,
-                buffer_usage,
-                false,
+            normals: Buffer::from_iter(memory_allocator, create_info.clone(), alloc_info.clone(),
                 pointcloud
                     .normals
                     .as_ref()
@@ -74,10 +75,7 @@ impl VkPointCloud {
                     .map(|v| NormalF32::new(v[0], v[1], v[2])),
             )
             .unwrap(),
-            colors: CpuAccessibleBuffer::from_iter(
-                memory_allocator,
-                buffer_usage,
-                false,
+            colors: Buffer::from_iter(memory_allocator, create_info.clone(), alloc_info.clone(),
                 pointcloud
                     .colors
                     .as_ref()
@@ -133,11 +131,6 @@ mod vs {
     vulkano_shaders::shader! {
         ty: "vertex",
         path: "resources/shaders/vkpointcloud/pointcloud.vert",
-        types_meta: {
-            use bytemuck::{Pod, Zeroable};
-
-            #[derive(Clone, Copy, Zeroable, Pod)]
-        },
     }
 }
 
@@ -145,11 +138,6 @@ mod gs {
     vulkano_shaders::shader! {
         ty: "geometry",
         path: "resources/shaders/vkpointcloud/pointcloud.geom",
-        types_meta: {
-            use bytemuck::{Pod, Zeroable};
-
-            #[derive(Clone, Copy, Zeroable, Pod)]
-        }
     }
 }
 
@@ -192,18 +180,13 @@ impl Node for VkPointCloudNode {
                 let vs = vs::load(context.device.clone()).unwrap();
                 let gs = gs::load(context.device.clone()).unwrap();
                 let fs = fs::load(context.device.clone()).unwrap();
+
                 GraphicsPipeline::start()
-                    .render_pass(Subpass::from(context.render_pass.clone(), 0).unwrap())
-                    .vertex_input_state(
-                        BuffersDefinition::new()
-                            .vertex::<PositionF32>()
-                            .vertex::<NormalF32>()
-                            .vertex::<ColorU8>(),
-                    )
+                    .vertex_input_state([PositionF32::per_vertex(), NormalF32::per_vertex(), ColorU8::per_vertex()])
+                    .vertex_shader(vs.entry_point("main").unwrap(), ())
                     .input_assembly_state(
                         InputAssemblyState::new().topology(PrimitiveTopology::PointList),
                     )
-                    .vertex_shader(vs.entry_point("main").unwrap(), ())
                     .viewport_state(ViewportState::viewport_fixed_scissor_irrelevant([
                         Viewport {
                             origin: [0.0, 0.0],
@@ -214,36 +197,36 @@ impl Node for VkPointCloudNode {
                     .geometry_shader(gs.entry_point("main").unwrap(), ())
                     .fragment_shader(fs.entry_point("main").unwrap(), ())
                     .depth_stencil_state(DepthStencilState::simple_depth_test())
+                    .render_pass(Subpass::from(context.render_pass.clone(), 0).unwrap())
                     .build(context.device.clone())
                     .unwrap()
             });
+
         let memory_allocator =
             Arc::new(StandardMemoryAllocator::new_default(context.device.clone()));
+
+        let uniform_buffer = SubbufferAllocator::new(
+                memory_allocator.clone(),
+                SubbufferAllocatorCreateInfo {
+                    buffer_usage: BufferUsage::UNIFORM_BUFFER,
+                    ..Default::default()
+                },
+            );
 
         let uniform_buffer_subbuffer = {
             let view_matrix = context.view_matrix * self.properties.transformation;
             let projection_worldview = context.projection_matrix * view_matrix;
 
-            let normal_matrix = view_matrix.try_inverse().unwrap().transpose();
-            let normal_matrix = normal_matrix.fixed_slice::<3, 3>(0, 0);
-
-            let uniform_data = vs::ty::Data {
-                normal_worldview: normal_matrix.into(),
+            let uniform_data = vs::Data {
+                normal_worldview: get_normal_matrix(&view_matrix),
                 worldview: view_matrix.into(),
                 projection_worldview: projection_worldview.into(),
-                _dummy0: [0; 12],
             };
 
-            CpuAccessibleBuffer::from_data(
-                &memory_allocator,
-                BufferUsage {
-                    uniform_buffer: true,
-                    ..Default::default()
-                },
-                false,
-                uniform_data,
-            )
-            .unwrap()
+            let subbuffer = uniform_buffer.allocate_sized().unwrap();
+            *subbuffer.write().unwrap() = uniform_data;
+
+            subbuffer
         };
         let descriptor_set_allocator = StandardDescriptorSetAllocator::new(context.device.clone());
 

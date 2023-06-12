@@ -17,6 +17,7 @@ use vulkano::{
     },
     sync::{self, FlushError, GpuFuture},
 };
+
 use vulkano_win::VkSurfaceBuild;
 use winit::{
     event::{ElementState, Event, VirtualKeyCode, WindowEvent},
@@ -176,13 +177,10 @@ impl Window {
                     min_image_count: surface_capabilities.min_image_count,
                     image_format,
                     image_extent: dimensions.into(),
-                    image_usage: ImageUsage {
-                        color_attachment: true,
-                        ..Default::default()
-                    },
+                    image_usage: ImageUsage::COLOR_ATTACHMENT,
                     composite_alpha: surface_capabilities
                         .supported_composite_alpha
-                        .iter()
+                        .into_iter()
                         .next()
                         .unwrap(),
                     ..Default::default()
@@ -318,8 +316,15 @@ impl Window {
                         window_state.viewport_size =
                             [dimensions.width as f32, dimensions.height as f32];
 
+                        //let pfe = previous_frame_end.take().unwrap();
+                        //pfe.then_signal_fence_and_flush()
+                        //    .unwrap()
+                        //    .wait(None)
+                        //    .unwrap();
+
                         // Clean up resources from the previous frame.
-                        previous_frame_end.as_mut().unwrap().cleanup_finished();
+                        //previous_frame_end.as_mut().unwrap().cleanup_finished();
+                        //previous_frame_end.as_mut().unwrap().flush().unwrap();
 
                         // Swap chain recreation
                         if recreate_swapchain {
@@ -363,22 +368,6 @@ impl Window {
                             recreate_swapchain = true;
                         };
 
-                        let mut builder = AutoCommandBufferBuilder::primary(
-                            &self.command_buffer_allocator,
-                            self.queue.queue_family_index(),
-                            CommandBufferUsage::OneTimeSubmit,
-                        )
-                        .unwrap();
-                        let command_buffer = builder.build().unwrap();
-
-                        let future = previous_frame_end
-                        .take()
-                        .unwrap()
-                        .join(acquire_future)
-                        .then_execute(self.queue.clone(), command_buffer)
-                        .unwrap()
-                        .then_signal_fence_and_flush();
-
                         let command_buffer = self.get_command_buffers(
                             framebuffers[image_index as usize].clone(),
                             &mut viewport,
@@ -389,10 +378,23 @@ impl Window {
                             &window_state,
                         );
 
-                        let future = Some(future.unwrap().boxed())
-                            .take()
-                            .unwrap()
-                            //.join(acquire_future)
+                        //      let future = previous_frame_end
+                        //      .take()
+                        //      .unwrap()
+                        //      .join(acquire_future)
+                        //      .then_execute(self.queue.clone(), command_buffer)
+                        //      .unwrap()
+                        //      .then_swapchain_present(
+                        //      self.queue.clone(),
+                        //      SwapchainPresentInfo::swapchain_image_index(
+                        //      swapchain.clone(),
+                        //      image_index,
+                        //   //   ),
+                        //)
+                        //      .then_signal_fence_and_flush();
+
+                        let future =  sync::now(self.device.clone())
+                            .join(acquire_future)
                             .then_execute(self.queue.clone(), command_buffer)
                             .unwrap()
                             .then_swapchain_present(
@@ -402,21 +404,21 @@ impl Window {
                                     image_index,
                                 ),
                             )
-                            .then_signal_fence_and_flush();
+                            .then_signal_fence_and_flush().unwrap().wait(None).unwrap();
                         self.frame_counter += 1;
-                            
-                        match future {
-                            Ok(future) => {
-                                previous_frame_end = Some(future.boxed());
-                            }
-                            Err(FlushError::OutOfDate) => {
-                                recreate_swapchain = true;
-                                previous_frame_end = Some(sync::now(self.device.clone()).boxed());
-                            }
-                            Err(e) => {
-                                panic!("Failed to flush future: {e:?}");
-                            }
-                        }
+
+                        // let amatch future {
+                        //     Ok(future) => {
+                        //         previous_frame_end = Some(future.boxed());
+                        //     }
+                        //     Err(FlushError::OutOfDate) => {
+                        //         recreate_swapchain = true;
+                        //         previous_frame_end = Some(sync::now(self.device.clone()).boxed());
+                        //     }
+                        //     Err(e) => {
+                        //         panic!("Failed to flush future: {e:?}");
+                        //     }
+                        // }
                     }
                     _ => (),
                 }
