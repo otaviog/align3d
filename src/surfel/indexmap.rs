@@ -1,7 +1,7 @@
 use nalgebra::Vector3;
 use ndarray::Array2;
 
-use crate::camera::PinholeCamera;
+use crate::{camera::PinholeCamera, utils::window_iter::window};
 
 pub struct IndexMap {
     pub map: Array2<i64>,
@@ -24,10 +24,7 @@ impl IndexMap {
         self.map.fill(-1);
         for (id, point) in model_points {
             if let Some((u, v)) = camera.project_if_visible(&point) {
-                let (u, v) = (
-                    u as usize * self.scale,
-                    v as usize * self.scale,
-                );
+                let (u, v) = (u as usize * self.scale, v as usize * self.scale);
                 self.map[(v, u)] = id as i64;
             }
         }
@@ -41,12 +38,19 @@ impl IndexMap {
             None
         }
     }
+
+    pub fn window<'a>(&'a self, u: usize, v: usize, n: usize) -> impl Iterator<Item = i64> + 'a {
+        window(self.map.view(), u, v, n)
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{unit_test::{sample_pcl_ds1, TestPclDataset}, utils::access::ToVector3};
+    use crate::{
+        unit_test::{sample_pcl_ds1, TestPclDataset},
+        utils::access::ToVector3,
+    };
     use ndarray::Axis;
     use rstest::rstest;
 

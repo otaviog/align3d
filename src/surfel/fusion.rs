@@ -1,13 +1,7 @@
-use std::{sync::Arc, sync::Mutex};
-
 use nalgebra::Vector2;
 use ndarray::s;
 
-use super::{
-    indexmap::IndexMap,
-    surfel_model::{SurfelModel, SurfelModelWriteCommands},
-    surfel_type::RimageSurfelBuilder,
-};
+use super::{indexmap::IndexMap, surfel_model::SurfelModel, surfel_type::RimageSurfelBuilder};
 use crate::utils::access::ToVector3;
 use crate::{camera::PinholeCamera, range_image::RangeImage};
 
@@ -28,15 +22,20 @@ impl Default for SurfelFusionParameters {
 pub struct SurfelFusion {
     indexmap: IndexMap,
     timestamp: i32,
-    params: SurfelFusionParameters
+    params: SurfelFusionParameters,
 }
 
 impl SurfelFusion {
-    pub fn new(map_width: usize, map_height: usize, map_scale: usize, params: SurfelFusionParameters) -> Self {
+    pub fn new(
+        map_width: usize,
+        map_height: usize,
+        map_scale: usize,
+        params: SurfelFusionParameters,
+    ) -> Self {
         SurfelFusion {
             indexmap: IndexMap::new(map_width, map_height, map_scale),
             timestamp: 0,
-            params
+            params,
         }
     }
 
@@ -46,7 +45,10 @@ impl SurfelFusion {
         range_image: &RangeImage,
         camera: &PinholeCamera,
     ) {
-        let mut write_commands = SurfelModelWriteCommands::new();
+        let mut update_list = Vec::new();
+        let mut add_list = Vec::new();
+        let mut free_list = Vec::new();
+
         {
             let model_reader = model.read().unwrap();
             self.indexmap
@@ -74,30 +76,45 @@ impl SurfelFusion {
                         self.timestamp,
                     );
 
+                    for i in self.indexmap.window(u, v, 4) {
+                        
+                    }
+
                     if let Some(id) = self.indexmap.get(u, v) {
                         if let Some(model_surfel) = model_reader.get(id) {
                             if (model_surfel.position - ri_point).norm() < 0.1 {
-                                write_commands
-                                    .update
-                                    .push((id, model_surfel.merge(&ri_surfel, 0.5, 0.5)));
+                                update_list.push((id, model_surfel.merge(&ri_surfel, 0.5, 0.5)));
                             } else {
-                                write_commands.add.push(ri_surfel);
+                                add_list.push(ri_surfel);
                             }
                         }
                     } else {
-                        write_commands.add.push(ri_surfel);
+                        add_list.push(ri_surfel);
                     }
                 }
             }
 
             for (id, age, conf) in model_reader.age_confidence_iter() {
-                if (self.timestamp - age) > self.params.age_remove_threshold && conf < self.params.confidence_remove_threshold {
-                    write_commands.free.push(id);
+                if (self.timestamp - age) > self.params.age_remove_threshold
+                    && conf < self.params.confidence_remove_threshold
+                {
+                    free_list.push(id);
                 }
             }
         }
 
-        model.write_commands = Arc::new(Mutex::new(write_commands));
+        let mut writer = model.write().unwrap();
+        for (id, surfel) in &update_list {
+            writer.update(*id, surfel.clone());
+        }
+
+        for surfel in &add_list {
+            writer.add(surfel);
+        }
+
+        for id in &free_list {
+            writer.free(*id);
+        }
     }
 }
 
@@ -120,7 +137,7 @@ mod tests {
 
         let mut model = SurfelModel::new(&manager.memory_allocator, 400_000);
 
-        let mut surfel_fusion = SurfelFusion::new(640, 480, 4);
+        let mut surfel_fusion = SurfelFusion::new(640, 480, 4, SurfelFusionParameters::default());
 
         let mut duration_accum = 0.0;
         const NUM_ITER: usize = 5;
