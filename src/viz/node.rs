@@ -8,7 +8,7 @@ use nalgebra::Matrix4;
 use nalgebra_glm::{self, Mat3};
 use vulkano::{
     command_buffer::{AutoCommandBufferBuilder, PrimaryAutoCommandBuffer},
-    device::Device,
+    device::{Device, Queue},
     pipeline::GraphicsPipeline,
     render_pass::RenderPass,
 };
@@ -78,6 +78,7 @@ impl NodeProperties {
 }
 pub struct CommandBuffersContext<'a> {
     pub device: Arc<Device>,
+    pub queue: Arc<Queue>,
     pub builder: &'a mut AutoCommandBufferBuilder<PrimaryAutoCommandBuffer>,
     pub pipelines: &'a mut HashMap<String, Arc<GraphicsPipeline>>,
     pub render_pass: Arc<RenderPass>,
@@ -89,6 +90,7 @@ pub struct CommandBuffersContext<'a> {
 impl<'a> CommandBuffersContext<'a> {
     pub fn new(
         device: Arc<Device>,
+        queue: Arc<Queue>,
         builder: &'a mut AutoCommandBufferBuilder<PrimaryAutoCommandBuffer>,
         pipelines: &'a mut HashMap<String, Arc<GraphicsPipeline>>,
         render_pass: Arc<RenderPass>,
@@ -101,6 +103,7 @@ impl<'a> CommandBuffersContext<'a> {
 
         Self {
             device,
+            queue,
             builder,
             pipelines,
             render_pass,

@@ -173,6 +173,7 @@ impl OffscreenRenderer {
         scene.borrow().collect_command_buffers(
             &mut CommandBuffersContext {
                 device: self.device.clone(),
+                queue: self.queue.clone(),
                 builder: &mut builder,
                 pipelines: &mut self.pipelines,
                 render_pass: self.render_pass.clone(),

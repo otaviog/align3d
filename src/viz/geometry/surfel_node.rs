@@ -144,7 +144,7 @@ impl Node for SurfelNode {
                     .unwrap()
             });
         let mut model = self.model.lock().unwrap();
-        model.write_flush();
+        model.swap_graphics(context.device.clone(), context.queue.clone());
 
         let memory_allocator =
             Arc::new(StandardMemoryAllocator::new_default(context.device.clone()));
@@ -188,10 +188,10 @@ impl Node for SurfelNode {
             .bind_vertex_buffers(
                 0,
                 (
-                    model.position.clone(),
-                    model.normal.clone(),
-                    model.color_n_mask.clone(),
-                    model.radius.clone(),
+                    model.graphics.position.clone(),
+                    model.graphics.normal.clone(),
+                    model.graphics.color_n_mask.clone(),
+                    model.graphics.radius.clone(),
                 ),
             )
             .bind_descriptor_sets(

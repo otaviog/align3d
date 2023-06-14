@@ -1,10 +1,16 @@
 use nalgebra::Vector3;
 use std::collections::BTreeSet;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use vulkano::buffer::subbuffer::{BufferReadGuard, BufferWriteGuard};
 use vulkano::buffer::{Buffer, BufferContents, BufferCreateInfo, BufferError};
+use vulkano::command_buffer::allocator::{
+    StandardCommandBufferAllocator, StandardCommandBufferAllocatorCreateInfo,
+};
+use vulkano::command_buffer::{AutoCommandBufferBuilder, CommandBufferUsage, CopyBufferInfo};
+use vulkano::device::{Device, Queue};
 use vulkano::memory::allocator::{AllocationCreateInfo, MemoryUsage};
 use vulkano::pipeline::graphics::vertex_input::Vertex;
+use vulkano::sync::{self, GpuFuture};
 use vulkano::{
     buffer::{BufferUsage, Subbuffer},
     memory::allocator::MemoryAllocator,
@@ -14,7 +20,7 @@ use crate::viz::geometry::{NormalF32, PositionF32};
 
 use super::Surfel;
 
-struct SurfelModelWriter<'a> {
+pub struct SurfelModelWriter<'a> {
     position: BufferWriteGuard<'a, [PositionF32]>,
     normal: BufferWriteGuard<'a, [NormalF32]>,
     color_n_mask: BufferWriteGuard<'a, [AttrColorMask]>,
@@ -138,48 +144,32 @@ impl AttrColorMask {
     }
 }
 
-pub struct SurfelModelWriteCommands {
-    pub update: Vec<(usize, Surfel)>,
-    pub add: Vec<Surfel>,
-    pub free: Vec<usize>,
-}
-
-impl SurfelModelWriteCommands {
-    pub fn new() -> Self {
-        Self {
-            update: Vec::new(),
-            add: Vec::new(),
-            free: Vec::new(),
-        }
-    }
-}
-
-pub struct SurfelModelData {}
-
-pub struct SurfelModel {
+pub struct SurfelModelBuffers {
     pub position: Subbuffer<[PositionF32]>,
     pub normal: Subbuffer<[NormalF32]>,
     pub color_n_mask: Subbuffer<[AttrColorMask]>,
     pub radius: Subbuffer<[f32]>,
     pub confidence: Subbuffer<[f32]>,
     pub age: Subbuffer<[i32]>,
-    free_list: BTreeSet<usize>,
-    size: usize,
-    pub write_commands: Arc<Mutex<SurfelModelWriteCommands>>,
 }
 
-impl SurfelModel {
-    pub fn new(memory_allocator: &(impl MemoryAllocator + ?Sized), size: usize) -> Self {
+impl SurfelModelBuffers {
+    pub fn new(
+        memory_allocator: &(impl MemoryAllocator + ?Sized),
+        size: usize,
+        buffer_usage: BufferUsage,
+        memory_usage: MemoryUsage,
+    ) -> Self {
         let create_info = BufferCreateInfo {
-            usage: BufferUsage::VERTEX_BUFFER,
+            usage: buffer_usage,
             ..Default::default()
         };
         let alloc_info = AllocationCreateInfo {
-            usage: MemoryUsage::Upload,
+            usage: memory_usage,
             ..Default::default()
         };
 
-        SurfelModel {
+        Self {
             position: Buffer::from_iter(
                 memory_allocator,
                 create_info.clone(),
@@ -222,32 +212,47 @@ impl SurfelModel {
                 (0..size).map(|_| 0),
             )
             .unwrap(),
+        }
+    }
+}
+
+pub struct SurfelModel {
+    pub graphics: SurfelModelBuffers,
+    pub process: SurfelModelBuffers,
+    free_list: BTreeSet<usize>,
+    size: usize,
+}
+
+impl SurfelModel {
+    pub fn new(memory_allocator: &(impl MemoryAllocator + ?Sized), size: usize) -> Self {
+        SurfelModel {
+            graphics: SurfelModelBuffers::new(memory_allocator, size, BufferUsage::TRANSFER_DST | BufferUsage::VERTEX_BUFFER, MemoryUsage::Upload),
+            process: SurfelModelBuffers::new(memory_allocator, size, BufferUsage::TRANSFER_SRC, MemoryUsage::Upload),
             free_list: BTreeSet::from_iter(0..size),
             size,
-            write_commands: Arc::new(Mutex::new(SurfelModelWriteCommands::new())),
         }
     }
 
     pub fn read(&'_ self) -> Result<SurfelModelReader<'_>, BufferError> {
         Ok(SurfelModelReader {
-            position: self.position.read()?,
-            normal: self.normal.read()?,
-            color_n_mask: self.color_n_mask.read()?,
-            radius: self.radius.read()?,
-            confidence: self.confidence.read()?,
-            age: self.age.read()?,
+            position: self.process.position.read()?,
+            normal: self.process.normal.read()?,
+            color_n_mask: self.process.color_n_mask.read()?,
+            radius: self.process.radius.read()?,
+            confidence: self.process.confidence.read()?,
+            age: self.process.age.read()?,
             free_list: &self.free_list,
         })
     }
 
-    fn write(&'_ mut self) -> Result<SurfelModelWriter<'_>, BufferError> {
+    pub fn write(&'_ mut self) -> Result<SurfelModelWriter<'_>, BufferError> {
         Ok(SurfelModelWriter {
-            position: self.position.write()?,
-            normal: self.normal.write()?,
-            color_n_mask: self.color_n_mask.write()?,
-            radius: self.radius.write()?,
-            confidence: self.confidence.write()?,
-            age: self.age.write()?,
+            position: self.process.position.write()?,
+            normal: self.process.normal.write()?,
+            color_n_mask: self.process.color_n_mask.write()?,
+            radius: self.process.radius.write()?,
+            confidence: self.process.confidence.write()?,
+            age: self.process.age.write()?,
             free_list: &mut self.free_list,
         })
     }
@@ -256,26 +261,57 @@ impl SurfelModel {
         self.size
     }
 
-    pub fn write_flush(&mut self) {
-        let foo = self.write_commands.clone();
-        let mut write_commands = foo.lock().unwrap();
+    pub fn swap_graphics(&mut self, device: Arc<Device>, queue: Arc<Queue>) {
+        let command_buffer_allocator = StandardCommandBufferAllocator::new(
+            device.clone(),
+            StandardCommandBufferAllocatorCreateInfo::default(),
+        );
 
-        let mut writer = self.write().unwrap();
+        let mut builder = AutoCommandBufferBuilder::primary(
+            &command_buffer_allocator,
+            queue.queue_family_index(),
+            CommandBufferUsage::OneTimeSubmit,
+        )
+        .unwrap();
 
-        for (id, surfel) in &write_commands.update {
-            writer.update(*id, surfel.clone());
-        }
+        builder
+            .copy_buffer(CopyBufferInfo::buffers(
+                self.process.position.clone(),
+                self.graphics.position.clone(),
+            ))
+            .unwrap()
+            .copy_buffer(CopyBufferInfo::buffers(
+                self.process.normal.clone(),
+                self.graphics.normal.clone(),
+            ))
+            .unwrap()
+            .copy_buffer(CopyBufferInfo::buffers(
+                self.process.color_n_mask.clone(),
+                self.graphics.color_n_mask.clone(),
+            ))
+            .unwrap()
+            .copy_buffer(CopyBufferInfo::buffers(
+                self.process.radius.clone(),
+                self.graphics.radius.clone(),
+            ))
+            .unwrap()
+            .copy_buffer(CopyBufferInfo::buffers(
+                self.process.confidence.clone(),
+                self.graphics.confidence.clone(),
+            ))
+            .unwrap()
+            .copy_buffer(CopyBufferInfo::buffers(
+                self.process.age.clone(),
+                self.graphics.age.clone(),
+            ))
+            .unwrap();
 
-        for surfel in &write_commands.add {
-            writer.add(surfel);
-        }
-
-        for id in &write_commands.free {
-            writer.free(*id);
-        }
-
-        write_commands.update.clear();
-        write_commands.add.clear();
-        write_commands.free.clear();
+        let command_buffer = builder.build().unwrap();
+        let future = sync::now(device.clone())
+            .then_execute(queue.clone(), command_buffer)
+            .unwrap()
+            .then_signal_fence_and_flush()
+            .unwrap();
+        future.wait(None).unwrap();
     }
 }

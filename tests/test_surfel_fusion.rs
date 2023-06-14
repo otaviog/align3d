@@ -7,7 +7,7 @@ use align3d::{
     bilateral::BilateralFilter,
     io::dataset::{RgbdDataset, SlamTbDataset},
     range_image::RangeImageBuilder,
-    surfel::{SurfelFusion, SurfelModel},
+    surfel::{SurfelFusion, SurfelFusionParameters, SurfelModel},
     viz::{node::MakeNode, GeoViewer, Manager},
 };
 
@@ -30,7 +30,12 @@ fn main() {
             .with_normals(true)
             .pyramid_levels(1);
 
-        let mut fusion = SurfelFusion::new(camera_intrinsics.width, camera_intrinsics.height, 4);
+        let mut fusion = SurfelFusion::new(
+            camera_intrinsics.width,
+            camera_intrinsics.height,
+            4,
+            SurfelFusionParameters::default(),
+        );
 
         for i in 0..3 {
             let rgbd_frame = dataset.get(i).unwrap();
@@ -46,5 +51,4 @@ fn main() {
     geo_viewer.add_node(node);
     geo_viewer.run();
     fusion_thread.join().unwrap();
-    
 }

@@ -15,7 +15,7 @@ use vulkano::{
         acquire_next_image, AcquireError, Surface, Swapchain, SwapchainCreateInfo,
         SwapchainCreationError, SwapchainPresentInfo,
     },
-    sync::{self, FlushError, GpuFuture},
+    sync::{self, GpuFuture},
 };
 
 use vulkano_win::VkSurfaceBuild;
@@ -108,7 +108,6 @@ impl Window {
         projection_matrix: &nalgebra_glm::Mat4,
         window_state: &FrameStepInfo,
     ) -> PrimaryAutoCommandBuffer {
-        // Builds the command buffer
         let mut builder = AutoCommandBufferBuilder::primary(
             &self.command_buffer_allocator,
             self.queue.queue_family_index(),
@@ -116,7 +115,6 @@ impl Window {
         )
         .unwrap();
 
-        // Render pass
         builder
             .begin_render_pass(
                 RenderPassBeginInfo {
@@ -131,6 +129,7 @@ impl Window {
         (*self.scene).borrow().collect_command_buffers(
             &mut CommandBuffersContext::new(
                 self.device.clone(),
+                self.queue.clone(),
                 &mut builder,
                 pipelines,
                 render_pass,
@@ -140,8 +139,6 @@ impl Window {
             window_state,
         );
         builder.end_render_pass().unwrap();
-
-        // Finish building the command buffer by calling `build`.
         builder.build().unwrap()
     }
 
@@ -316,16 +313,6 @@ impl Window {
                         window_state.viewport_size =
                             [dimensions.width as f32, dimensions.height as f32];
 
-                        //let pfe = previous_frame_end.take().unwrap();
-                        //pfe.then_signal_fence_and_flush()
-                        //    .unwrap()
-                        //    .wait(None)
-                        //    .unwrap();
-
-                        // Clean up resources from the previous frame.
-                        //previous_frame_end.as_mut().unwrap().cleanup_finished();
-                        //previous_frame_end.as_mut().unwrap().flush().unwrap();
-
                         // Swap chain recreation
                         if recreate_swapchain {
                             let (new_swapchain, new_images) =
@@ -343,8 +330,6 @@ impl Window {
                                 };
 
                             swapchain = new_swapchain;
-                            // Because framebuffers contains an Arc on the old swapchain, we need to
-                            // recreate framebuffers as well.
                             framebuffers = window_size_dependent_setup(
                                 &memory_allocator,
                                 &new_images,
@@ -378,22 +363,7 @@ impl Window {
                             &window_state,
                         );
 
-                        //      let future = previous_frame_end
-                        //      .take()
-                        //      .unwrap()
-                        //      .join(acquire_future)
-                        //      .then_execute(self.queue.clone(), command_buffer)
-                        //      .unwrap()
-                        //      .then_swapchain_present(
-                        //      self.queue.clone(),
-                        //      SwapchainPresentInfo::swapchain_image_index(
-                        //      swapchain.clone(),
-                        //      image_index,
-                        //   //   ),
-                        //)
-                        //      .then_signal_fence_and_flush();
-
-                        let future =  sync::now(self.device.clone())
+                        let future = sync::now(self.device.clone())
                             .join(acquire_future)
                             .then_execute(self.queue.clone(), command_buffer)
                             .unwrap()
@@ -404,7 +374,10 @@ impl Window {
                                     image_index,
                                 ),
                             )
-                            .then_signal_fence_and_flush().unwrap().wait(None).unwrap();
+                            .then_signal_fence_and_flush()
+                            .unwrap()
+                            .wait(None)
+                            .unwrap();
                         self.frame_counter += 1;
 
                         // let amatch future {
