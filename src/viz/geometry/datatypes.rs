@@ -13,6 +13,7 @@ impl Array2f32 {
     }
 }
 
+
 #[derive(BufferContents, Vertex)]
 #[repr(C)]
 pub struct PositionF32 {

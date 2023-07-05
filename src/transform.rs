@@ -295,6 +295,10 @@ pub trait Transformable<Type> {
     fn transform(&self, value: &Type) -> Type;
 }
 
+pub trait TransformableMove<Type> {
+    fn transform(&self, value: Type) -> Type;
+}
+
 #[cfg(test)]
 mod tests {
     use crate::transform::LieGroup;

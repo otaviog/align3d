@@ -1,8 +1,9 @@
 use nalgebra::{Vector2, Vector3};
 use ndarray::s;
 
-use crate::{camera::CameraIntrinsics, range_image::RangeImage, utils::access::ToVector3};
+use crate::{camera::CameraIntrinsics, range_image::RangeImage, utils::access::ToVector3, transform::{Transformable, Transform, TransformableMove}};
 
+#[derive(Debug, Clone, Copy)]
 pub struct Surfel {
     pub position: Vector3<f32>,
     pub normal: Vector3<f32>,
@@ -13,7 +14,11 @@ pub struct Surfel {
 }
 
 impl Surfel {
-    pub fn merge(&self, other: &Surfel, weight1: f32, weight2: f32) -> Self {
+    pub fn merge(&self, other: &Surfel) -> Self {
+        let total_confidence = self.confidence + other.confidence;
+        let weight1 = self.confidence / (total_confidence);
+        let weight2 = other.confidence / (total_confidence);
+
         let color = Vector3::<f32>::new(
             self.color[0] as f32 * weight1,
             self.color[1] as f32 * weight1,
@@ -65,20 +70,20 @@ impl RimageSurfelBuilder {
         range_coord: Vector2<f32>,
         age: i32,
     ) -> Surfel {
-        let _1_sqrt_2: f32 = 1.0f32 / 2.0f32.sqrt();
-        let radius = _1_sqrt_2 * range_point[2] * self.inv_mean_focal_length;
-        let radius = (radius / range_normal[2].abs()).min(2.0 * radius);
-
-        let constant_weight: f32 = 2.0 * 0.6f32.powf(2.0);
-        let weight = (range_coord - self.camera_center).norm() / self.max_center_distance;
-        let weight = (-(weight * weight) / constant_weight).exp() * weight;
+        // let _1_sqrt_2: f32 = 1.0f32 / 2.0f32.sqrt();
+        // let radius = _1_sqrt_2 * range_point[2] * self.inv_mean_focal_length;
+        // let radius = (radius / range_normal[2].abs()).min(2.0 * radius);
+// 
+        // let constant_weight: f32 = 2.0 * 0.6f32.powf(2.0);
+        // let weight = (range_coord - self.camera_center).norm() / self.max_center_distance;
+        // let weight = (-(weight * weight) / constant_weight).exp() * weight;
 
         Surfel {
             position: range_point,
             normal: range_normal,
             color,
-            radius,
-            confidence: weight,
+            radius: 0.25,
+            confidence: 1.0, // weight
             age,
         }
     }
@@ -105,5 +110,18 @@ impl RimageSurfelBuilder {
         }
 
         surfels
+    }
+}
+
+impl TransformableMove<Surfel> for Transform {
+    fn transform(&self, surfel: Surfel) -> Surfel {
+        Surfel {
+            position: self.transform_vector(&surfel.position),
+            normal: self.transform_normal(&surfel.normal),
+            color: surfel.color,
+            radius: surfel.radius,
+            confidence: surfel.confidence,
+            age: surfel.age,
+        }
     }
 }

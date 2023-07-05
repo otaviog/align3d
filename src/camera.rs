@@ -137,6 +137,8 @@ pub struct PinholeCamera {
     pub intrinsics: CameraIntrinsics,
     pub camera_to_world: Transform,
     world_to_camera: Transform,
+    width_f32: f32,
+    height_f32: f32,
 }
 
 impl PinholeCamera {
@@ -151,10 +153,14 @@ impl PinholeCamera {
     ///
     /// * A new pinhole camera.
     pub fn new(intrinsics: CameraIntrinsics, camera_to_world: Transform) -> Self {
+        let width_f32 = intrinsics.width as f32;
+        let height_f32 = intrinsics.height as f32;
         Self {
             intrinsics,
             world_to_camera: camera_to_world.inverse(),
             camera_to_world,
+            width_f32,
+            height_f32
         }
     }
 
@@ -185,9 +191,9 @@ impl PinholeCamera {
         let (x, y) = self.project(point);
 
         if x >= 0.0
-            && x < self.intrinsics.width as f32
+            && x < self.width_f32 as f32
             && y >= 0.0
-            && y < self.intrinsics.height as f32
+            && y < self.height_f32 as f32
         {
             Some((x, y))
         } else {

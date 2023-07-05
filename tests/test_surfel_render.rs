@@ -26,7 +26,7 @@ fn main() {
     let mut model_writer = model_lock.write().unwrap();
      
     for surfel in surfel_builder.build_from_rimage(&ri_frame[0]) {
-        model_writer.add(surfel);
+        model_writer.add(&surfel);
     }
     drop(model_writer);
     drop(model_lock);

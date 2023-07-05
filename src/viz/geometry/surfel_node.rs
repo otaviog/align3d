@@ -22,7 +22,7 @@ use vulkano::{
 
 use crate::{
     bounds::Sphere3Df,
-    surfel::{AttrColorMask, SurfelModel},
+    surfel::{AttrColorMaskAge, SurfelModel, AttrPositionConfidence, AttrNormalRadius},
     viz::{
         controllers::FrameStepInfo,
         misc::get_normal_matrix,
@@ -31,8 +31,6 @@ use crate::{
     },
 };
 use std::sync::{Arc, Mutex};
-
-use super::{datatypes::ScalarF32, NormalF32, PositionF32};
 
 pub struct SurfelNode {
     pub properties: NodeProperties,
@@ -120,10 +118,9 @@ impl Node for SurfelNode {
                 GraphicsPipeline::start()
                     .render_pass(Subpass::from(context.render_pass.clone(), 0).unwrap())
                     .vertex_input_state([
-                        PositionF32::per_vertex(),
-                        NormalF32::per_vertex(),
-                        AttrColorMask::per_vertex(),
-                        ScalarF32::per_vertex(),
+                        AttrPositionConfidence::per_vertex(),
+                        AttrNormalRadius::per_vertex(),
+                        AttrColorMaskAge::per_vertex(),
                     ])
                     .input_assembly_state(
                         InputAssemblyState::new().topology(PrimitiveTopology::PointList),
@@ -191,7 +188,6 @@ impl Node for SurfelNode {
                     model.graphics.position.clone(),
                     model.graphics.normal.clone(),
                     model.graphics.color_n_mask.clone(),
-                    model.graphics.radius.clone(),
                 ),
             )
             .bind_descriptor_sets(

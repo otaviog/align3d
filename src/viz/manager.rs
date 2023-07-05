@@ -22,7 +22,8 @@ pub struct Manager {
 impl Default for Manager {
     fn default() -> Self {
         let library = VulkanLibrary::new().expect("Vulkan is not supported by this system");
-        let required_extensions = vulkano_win::required_extensions(&library);
+        let mut required_extensions = vulkano_win::required_extensions(&library);
+        required_extensions.khr_external_memory_capabilities =true;
 
         let instance = Instance::new(
             library.clone(),
@@ -36,6 +37,7 @@ impl Default for Manager {
 
         let physical_device_extensions = DeviceExtensions {
             khr_swapchain: true,
+            ext_external_memory_host: true,
             ..DeviceExtensions::empty()
         };
         let (physical_device, queue_family_index) = instance

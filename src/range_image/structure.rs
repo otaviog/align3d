@@ -13,6 +13,7 @@ use crate::pointcloud::PointCloud;
 use super::resize::{resize_range_normals, resize_range_points};
 
 /// A point cloud that comes from an image-based measurement. It representation holds its grid structure.
+#[derive(Debug, Clone)]
 pub struct RangeImage {
     /// 3D points in the camera frame, as array with shape: (height, width, 3)
     pub points: Array3<f32>,

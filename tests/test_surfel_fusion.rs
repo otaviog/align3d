@@ -7,7 +7,7 @@ use align3d::{
     bilateral::BilateralFilter,
     io::dataset::{RgbdDataset, SlamTbDataset},
     range_image::RangeImageBuilder,
-    surfel::{SurfelFusion, SurfelFusionParameters, SurfelModel},
+    surfel::{SurfelFusion, SurfelFusionParameters, SurfelModel, RangeImage2},
     viz::{node::MakeNode, GeoViewer, Manager},
 };
 
@@ -43,7 +43,7 @@ fn main() {
             let ri_frame = ribuilder.build(rgbd_frame);
 
             let mut wmodel = model.lock().unwrap();
-            fusion.integrate(&mut wmodel, &ri_frame[0], &pinhole_camera);
+            fusion.integrate(&mut wmodel, &RangeImage2::from(&ri_frame[0]), &pinhole_camera);
             println!("Frame {} fused", i);
         }
     });
