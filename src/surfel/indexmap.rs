@@ -4,12 +4,17 @@ use ndarray::Array2;
 use crate::{camera::PinholeCamera, utils::window_iter::window};
 use rayon::prelude::*;
 
+/// IndexMap is a 2D array of indices of surfels in the surfel model.
+/// This is used for fast neighbor search during fusion of a new frame.
 pub struct IndexMap {
+    /// The map is a 2D array of indices of surfels in the surfel model.
     pub map: Array2<i64>,
+    /// The map is scaled by a factor of `scale` so we avoid collisions between surfels.
     pub scale: usize,
 }
 
 impl IndexMap {
+    /// Create a new IndexMap with the given width, height and scale.
     pub fn new(width: usize, height: usize, scale: usize) -> Self {
         IndexMap {
             map: Array2::zeros((height * scale, width * scale)),
@@ -24,7 +29,7 @@ impl IndexMap {
     ) {
         self.map.fill(-1);
         for (id, point) in model_points {
-            if let Some((u, v)) = camera.project_if_visible(&point) {
+            if let Some((u, v)) = camera.project_to_image(&point) {
                 let (u, v) = (u as usize * self.scale, v as usize * self.scale);
                 self.map[(v, u)] = id as i64;
             }
@@ -38,7 +43,7 @@ impl IndexMap {
 
         self.map.fill(-1);
         for (v, u, id) in model_points.filter_map(|(id, point)| {
-            if let Some((u, v)) = camera.project_if_visible(&point) {
+            if let Some((u, v)) = camera.project_to_image(&point) {
                 let (u, v) = (u as usize * self.scale, v as usize * self.scale);
                 Some((v, u, id as i64))
             } else {
@@ -47,28 +52,6 @@ impl IndexMap {
         }).collect::<Vec<_>>() {
             self.map[(v, u)] = id;
         }
-        
-        
-        // .collect::<Vec<_>>().iter().for_each(|(v, u, id)| {
-        //     self.map[(v, u)] = id;
-        // });
-    }
-
-    // pub fn iter_indexed<'a>(&self) -> impl Iterator<Item = (usize, usize, i64)> + 'a {
-    //     self.map.view().indexed_iter().map(|((v, u), id)| (v, u, *id))
-    // }
-
-    pub fn get(&self, u: usize, v: usize) -> Option<usize> {
-        let id = self.map[(v * self.scale, u * self.scale)];
-        if id >= 0 {
-            Some(id as usize)
-        } else {
-            None
-        }
-    }
-
-    pub fn window<'a>(&'a self, u: usize, v: usize, n: usize) -> impl Iterator<Item = i64> + 'a {
-        window(self.map.view(), u, v, n).filter(|id| *id >= 0)
     }
 
     pub fn summary(&self) -> String {

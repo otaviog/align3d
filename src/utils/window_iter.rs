@@ -21,7 +21,7 @@ where
             let x = (u as isize) + du;
             let y = (v as isize) + dv;
             if width > x && x >= 0 && height > y && y >= 0 {
-                Some(arr[(x as usize, y as usize)])
+                Some(arr[(y as usize, x as usize)])
             } else {
                 None
             }

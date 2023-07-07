@@ -15,7 +15,7 @@ fn main() {
     let mut manager = Manager::default();
     let model = Arc::new(Mutex::new(SurfelModel::new(
         &manager.memory_allocator,
-        500_000,
+        4_000_000,
     )));
     let render_model = model.clone();
 
@@ -37,14 +37,14 @@ fn main() {
             SurfelFusionParameters::default(),
         );
 
-        for i in 0..3 {
+        for i in [0, 4, 8, 12] {
             let rgbd_frame = dataset.get(i).unwrap();
             let pinhole_camera = rgbd_frame.get_pinhole_camera().unwrap();
             let ri_frame = ribuilder.build(rgbd_frame);
 
             let mut wmodel = model.lock().unwrap();
-            fusion.integrate(&mut wmodel, &RangeImage2::from(&ri_frame[0]), &pinhole_camera);
-            println!("Frame {} fused", i);
+            let summary = fusion.integrate(&mut wmodel, &RangeImage2::from(&ri_frame[0]), &pinhole_camera);
+            println!("Frame {i} fused {:?}", summary);
         }
     });
 

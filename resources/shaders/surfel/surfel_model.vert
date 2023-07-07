@@ -2,7 +2,7 @@
 
 layout(location = 0) in vec4 position_confidence;
 layout(location = 1) in vec4 normal_radius;
-layout(location = 2) in uvec2 rgbm;
+layout(location = 2) in uvec2 rgbmask_age;
 
 layout(set = 0, binding = 0) uniform Data {
   mat4 worldview;
@@ -18,7 +18,8 @@ layout(location = 3) out float gs_radius;
 layout(location = 4) out int gs_time;
 
 void main() {
-  uint mask = rgbm.x & 0xff;
+  uint rgbmask = rgbmask_age.x;
+  uint mask = rgbmask & 0xff;
 
   if (mask == 0) {
     gs_time = -1;
@@ -31,8 +32,8 @@ void main() {
   gs_radius = normal_radius.w;
   gs_time = 1;
 
-  float r = float((rgbm.x >> 24) & 0xff);
-  float g = float((rgbm.x >> 16) & 0xff);
-  float b = float((rgbm.x >> 8) & 0xff);
+  float r = float((rgbmask >> 8) & 0xff);
+  float g = float((rgbmask >> 16) & 0xff);
+  float b = float((rgbmask >> 24) & 0xff);
   gs_color = vec3(b, g, r) / 255.0;
 }

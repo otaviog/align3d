@@ -22,7 +22,7 @@ use vulkano::{
 
 use crate::{
     bounds::Sphere3Df,
-    surfel::{AttrColorMaskAge, SurfelModel, AttrPositionConfidence, AttrNormalRadius},
+    surfel::{VkSurfelColorMaskAge, SurfelModel, VkSurfelPositionConf, VkSurfelNormalRadius},
     viz::{
         controllers::FrameStepInfo,
         misc::get_normal_matrix,
@@ -118,9 +118,9 @@ impl Node for SurfelNode {
                 GraphicsPipeline::start()
                     .render_pass(Subpass::from(context.render_pass.clone(), 0).unwrap())
                     .vertex_input_state([
-                        AttrPositionConfidence::per_vertex(),
-                        AttrNormalRadius::per_vertex(),
-                        AttrColorMaskAge::per_vertex(),
+                        VkSurfelPositionConf::per_vertex(),
+                        VkSurfelNormalRadius::per_vertex(),
+                        VkSurfelColorMaskAge::per_vertex(),
                     ])
                     .input_assembly_state(
                         InputAssemblyState::new().topology(PrimitiveTopology::PointList),
@@ -185,9 +185,9 @@ impl Node for SurfelNode {
             .bind_vertex_buffers(
                 0,
                 (
-                    model.graphics.position.clone(),
-                    model.graphics.normal.clone(),
-                    model.graphics.color_n_mask.clone(),
+                    model.graphics.position_conf.clone(),
+                    model.graphics.normal_radius.clone(),
+                    model.graphics.color_mask_age.clone(),
                 ),
             )
             .bind_descriptor_sets(
@@ -196,7 +196,7 @@ impl Node for SurfelNode {
                 0,
                 descriptor_set,
             )
-            .draw(model.size() as u32, 1, 0, 0)
+            .draw(model.capacity() as u32, 1, 0, 0)
             .unwrap();
             
 

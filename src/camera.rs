@@ -187,7 +187,7 @@ impl PinholeCamera {
     /// # Returns
     ///
     /// * (x and y) coordinates if the point is visible, None otherwise.
-    pub fn project_if_visible(&self, point: &Vector3<f32>) -> Option<(f32, f32)> {
+    pub fn project_to_image(&self, point: &Vector3<f32>) -> Option<(f32, f32)> {
         let (x, y) = self.project(point);
 
         if x >= 0.0
@@ -195,9 +195,52 @@ impl PinholeCamera {
             && y >= 0.0
             && y < self.height_f32 as f32
         {
+            //Some((x, self.height_f32 - y))
             Some((x, y))
         } else {
             None
         }
+    }
+}
+
+
+#[cfg(test)]
+mod tests {
+    use crate::transform::Transform;
+
+    #[test]
+    pub fn test_project() {
+        let camera = super::PinholeCamera::new(
+            super::CameraIntrinsics::from_simple_intrinsic(50.0, 50.0, 0.0, 0.0, 100, 100),
+            Transform::eye()
+        );
+
+        let point = nalgebra::Vector3::new(1.0, 1.0, 1.0);
+        let (x, y) = camera.project(&point);
+        assert_eq!(x, 50.0);
+        assert_eq!(y, 50.0);
+
+        let point = nalgebra::Vector3::new(1.0, 1.5, 1.0);
+        let (x, y) = camera.project(&point);
+        assert_eq!(x, 50.0);
+        assert_eq!(y, 75.0);
+    }
+
+    #[test]
+    pub fn test_project_to_image() {
+        let camera = super::PinholeCamera::new(
+            super::CameraIntrinsics::from_simple_intrinsic(50.0, 50.0, 0.0, 0.0, 100, 100),
+            Transform::eye()
+        );
+
+        let point = nalgebra::Vector3::new(1.0, 1.0, 1.0);
+        let (x, y) = camera.project_to_image(&point).unwrap();
+        assert_eq!(x, 50.0);
+        assert_eq!(y, 50.0);
+
+        let point = nalgebra::Vector3::new(1.0, 1.5, 1.0);
+        let (x, y) = camera.project_to_image(&point).unwrap();
+        assert_eq!(x, 50.0);
+        assert_eq!(y, 25.0);
     }
 }
