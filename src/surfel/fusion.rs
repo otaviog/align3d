@@ -50,12 +50,12 @@ impl SurfelFusion {
         }
     }
 
-    pub fn integrate(
+    pub fn integrate<'a, 'x, 'y>(
         &mut self,
-        model: &mut SurfelModel,
+        model: &'a mut SurfelModel,
         range_image: &RangeImage,
         camera: &PinholeCamera,
-    ) -> FusionSummary {
+    ) -> FusionSummary where 'a: 'x, 'a: 'y, 'x: 'y {
         enum SurfelUpdate {
             Update(usize, Surfel),
             Add(Surfel),
@@ -143,28 +143,79 @@ impl SurfelFusion {
 
         self.timestamp += 1;
 
-        let mut writer = model.write().unwrap();
+        //let mut vk_data = model.vk_data.lock().unwrap();
+
+        //let mut writer = vk_data.write(model.data);
 
         let mut update_count = 0;
         let mut add_count = 0;
-        for surfel_update in &updates {
-            match surfel_update {
-                SurfelUpdate::Update(id, surfel) => {
-                    update_count += 1;
-                    writer.update(*id, surfel);
+        {
+            let mut cpu_writer = model.write_cpu();
+
+            {
+                for surfel_update in &updates {
+                    match surfel_update {
+                        SurfelUpdate::Update(id, surfel) => {
+                            update_count += 1;
+                            cpu_writer.update(*id, surfel);
+                        }
+                        SurfelUpdate::Add(surfel) => {
+                            add_count += 1;
+                            //writer.add(&surfel);
+                        }
+                        SurfelUpdate::Discard => {}
+                    }
                 }
-                SurfelUpdate::Add(surfel) => {
-                    add_count += 1;
-                    writer.add(&surfel);
+
+                for id in &free_list {
+                    //writer.free(*id);
                 }
-                SurfelUpdate::Discard => {}
             }
         }
 
-        for id in &free_list {
-            writer.free(*id);
-        }
+        {
+            let mut gpu_writer = model.lock_gpu();
+            let mut writer = gpu_writer.write();
+            for surfel_update in &updates {
+                match surfel_update {
+                    SurfelUpdate::Update(id, surfel) => {
+                        update_count += 1;
+                        writer.update(*id, surfel);
+                    }
+                    SurfelUpdate::Add(surfel) => {
+                        add_count += 1;
+                        //writer.add(&surfel);
+                    }
+                    SurfelUpdate::Discard => {}
+                }
+            }
 
+            for id in &free_list {
+                //writer.free(*id);
+            }
+        }
+        'x: {
+            let mut writer_t = model.write::<'a, 'x>();
+            'y: {
+                let writer = writer_t.get::<'y>();
+                // for surfel_update in &updates {
+                //     match surfel_update {
+                //         SurfelUpdate::Update(id, surfel) => {
+                //             update_count += 1;
+                //             writer.update(*id, surfel);
+                //         }
+                //         SurfelUpdate::Add(surfel) => {
+                //             add_count += 1;
+                //             //writer.add(&surfel);
+                //         }
+                //         SurfelUpdate::Discard => {}
+                //     }
+                // }
+                drop(writer);
+            }
+
+            drop(writer_t);
+        }
         return FusionSummary {
             num_added: add_count,
             num_updated: update_count,

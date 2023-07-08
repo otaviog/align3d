@@ -22,7 +22,7 @@ use vulkano::{
 
 use crate::{
     bounds::Sphere3Df,
-    surfel::{VkSurfelColorMaskAge, SurfelModel, VkSurfelPositionConf, VkSurfelNormalRadius},
+    surfel::{VkSurfelColorMaskAge, SurfelModel, VkSurfelPositionConf, VkSurfelNormalRadius, VkSurfelStorage},
     viz::{
         controllers::FrameStepInfo,
         misc::get_normal_matrix,
@@ -34,11 +34,11 @@ use std::sync::{Arc, Mutex};
 
 pub struct SurfelNode {
     pub properties: NodeProperties,
-    model: Arc<Mutex<SurfelModel>>,
+    model: Arc<Mutex<VkSurfelStorage>>,
 }
 
 impl SurfelNode {
-    pub fn new(surfel_model: Arc<Mutex<SurfelModel>>) -> NodeRef<Self> {
+    pub fn new(surfel_model: Arc<Mutex<VkSurfelStorage>>) -> NodeRef<Self> {
         node_ref(Self {
             properties: NodeProperties {
                 bounding_sphere: Sphere3Df {
@@ -53,7 +53,7 @@ impl SurfelNode {
     }
 }
 
-impl MakeNode for Arc<Mutex<SurfelModel>> {
+impl MakeNode for Arc<Mutex<VkSurfelStorage>> {
     type Node = SurfelNode;
 
     fn make_node(&self, _manager: &mut Manager) -> NodeRef<dyn Node> {
@@ -142,6 +142,7 @@ impl Node for SurfelNode {
             });
 
         let mut model = self.model.lock().unwrap();
+        
         model.swap_graphics(context.device.clone(), context.queue.clone());
 
         let memory_allocator =
