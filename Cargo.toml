@@ -56,6 +56,9 @@ winit = "0.28"
 glob = "0.3.1"
 egui = "0.21.0"
 kdam = "0.3.0"
+rayon = "1.7.0"
+ordered-float = "3.7.0"
+
 
 [dev-dependencies]
 rstest = "0.15.0"
@@ -64,7 +67,7 @@ tempfile = "3.3.0"
 criterion = "0.4"
 
 [target.'cfg(unix)'.dev-dependencies]
-pprof = { version = "0.11", features = ["flamegraph", "criterion"]  }
+pprof = { version = "0.11", features = ["flamegraph", "criterion", "protobuf"]  }
 
 [[test]]
 name = "viz-point_cloud"
@@ -99,6 +102,12 @@ harness = false
 ##
 # Benchmarks
 
+[profile.bench]
+debug = true
+opt-level = 1               # Use slightly better optimizations.
+overflow-checks = false     # Disable integer overflow checks.
+debug-assertions = false # Disable debug assertions.
+
 [[bench]]
 name = "bench_mesh"
 harness = false
@@ -113,4 +122,8 @@ harness = false
 
 [[bench]]
 name = "bench_icp"
+harness = false
+
+[[bench]]
+name = "bench_surfel_fusion"
 harness = false

@@ -1,6 +1,6 @@
 use std::{cell::RefCell, rc::Rc, sync::Arc};
 
-use ndarray::{Array, Axis};
+use ndarray::Array;
 use vulkano::{
     buffer::{
         allocator::{SubbufferAllocator, SubbufferAllocatorCreateInfo},
@@ -81,7 +81,7 @@ impl VkMesh {
                 alloc_info.clone(),
                 geometry
                     .points
-                    .axis_iter(Axis(0))
+                    .iter()
                     .map(|v| PositionF32::new(v[0], v[1], v[2])),
             )
             .unwrap(),
@@ -107,7 +107,7 @@ impl VkMesh {
                         .normals
                         .as_ref()
                         .unwrap()
-                        .axis_iter(Axis(0))
+                        .iter()
                         .map(|v| PositionF32::new(v[0], v[1], v[2])),
                 )
                 .unwrap(),
@@ -121,12 +121,12 @@ impl VkMesh {
                         .colors
                         .as_ref()
                         .unwrap()
-                        .axis_iter(Axis(0))
+                        .iter()
                         .map(|v| ColorU8::new(v[0], v[1], v[2])),
                 )
                 .unwrap(),
             ),
-            bounding_sphere: Sphere3Df::from_points(&geometry.points),
+            bounding_sphere: Sphere3Df::from_points(&geometry.points.view()),
             number_of_vertex: number_of_points,
             number_of_faces,
         })

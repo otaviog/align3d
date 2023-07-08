@@ -1,12 +1,10 @@
 use nalgebra::{Vector2, Vector3};
-use ndarray::{s, Array2};
-// use rerun::{MsgSender, RecordingStreamBuilder};
+use ndarray::Array2;
 
 use super::{indexmap::IndexMap, surfel_model::SurfelModel, surfel_type::SurfelBuilder};
 use crate::surfel::Surfel;
 use crate::transform::TransformableMove;
 use crate::trig::angle_between_normals;
-use crate::utils::access::ToVector3;
 use crate::utils::window_iter::window;
 use crate::{camera::PinholeCamera, range_image::RangeImage};
 
@@ -24,70 +22,22 @@ impl Default for SurfelFusionParameters {
     }
 }
 
-pub struct RangeImage2 {
-    pub points: Array2<Vector3<f32>>,
-    pub normals: Array2<Vector3<f32>>,
-    pub colors: Array2<Vector3<u8>>,
-    pub valid_points: Array2<u8>,
-    pub valid_points_count: usize,
-}
-
-impl From<&RangeImage> for RangeImage2 {
-    fn from(range_image: &RangeImage) -> Self {
-        let mut points: Array2<Vector3<f32>> =
-            Array2::zeros((range_image.height(), range_image.width()));
-        let mut normals: Array2<Vector3<f32>> =
-            Array2::zeros((range_image.height(), range_image.width()));
-        let mut colors: Array2<Vector3<u8>> =
-            Array2::zeros((range_image.height(), range_image.width()));
-
-        range_image.mask.indexed_iter().for_each(|((v, u), m)| {
-            if *m > 0 {
-                let point = range_image.get_point(v, u);
-                let normal = range_image
-                    .normals
-                    .as_ref()
-                    .unwrap()
-                    .slice(s![v, u, ..])
-                    .to_vector3();
-                let color = range_image
-                    .colors
-                    .as_ref()
-                    .unwrap()
-                    .slice(s![v, u, ..])
-                    .to_vector3();
-                points[[v, u]] = point.unwrap();
-                normals[[v, u]] = normal;
-                colors[[v, u]] = color;
-            }
-        });
-
-        RangeImage2 {
-            points,
-            normals,
-            colors,
-            valid_points: range_image.mask.clone(),
-            valid_points_count: range_image.valid_points_count(),
-        }
-    }
-}
-
-impl<'a> RangeImage2 {
+impl<'a> RangeImage {
     pub fn indexed_iter(
         &'a self,
     ) -> impl Iterator<Item = (usize, usize, Vector3<f32>, Vector3<f32>, Vector3<u8>)> + 'a {
-        self.valid_points
-            .indexed_iter()
-            .filter_map(move |((v, u), m)| {
-                if *m > 0 {
-                    let point = self.points[[v, u]];
-                    let normal = self.normals[[v, u]];
-                    let color = self.colors[[v, u]];
-                    Some((v, u, point, normal, color))
-                } else {
-                    None
-                }
-            })
+        let normals = self.normals.as_ref().unwrap();
+        let colors = self.colors.as_ref().unwrap();
+        self.mask.indexed_iter().filter_map(move |((v, u), m)| {
+            if *m > 0 {
+                let point = self.points[[v, u]];
+                let normal = normals[[v, u]];
+                let color = colors[[v, u]];
+                Some((v, u, point, normal, color))
+            } else {
+                None
+            }
+        })
     }
 }
 
@@ -121,11 +71,11 @@ impl SurfelFusion {
     pub fn integrate(
         &mut self,
         model: &mut SurfelModel,
-        range_image: &RangeImage2,
+        range_image: &RangeImage,
         camera: &PinholeCamera,
     ) -> FusionSummary {
-        let mut update_list = Vec::with_capacity(range_image.valid_points_count);
-        let mut add_list = Vec::with_capacity(range_image.valid_points_count);
+        let mut update_list = Vec::with_capacity(range_image.valid_points_count());
+        let mut add_list = Vec::with_capacity(range_image.valid_points_count());
         let mut free_list = Vec::with_capacity(40000);
 
         //let recording = RecordingStreamBuilder::new("minimal").connect(rerun::default_server_addr())?;
@@ -171,7 +121,8 @@ impl SurfelFusion {
                             return None;
                         }
 
-                        if angle_between_normals(&ri_surfel.normal, &model_surfel.normal) < 30.0_f32.to_radians()
+                        if angle_between_normals(&ri_surfel.normal, &model_surfel.normal)
+                            < 30.0_f32.to_radians()
                         {
                             let ray_dist =
                                 model_surfel.position.cross(&ray_cam_ri).norm() * ray_cam_ri_norm;
@@ -253,7 +204,7 @@ mod tests {
             .build()
             .unwrap();
         for i in 0..NUM_ITER {
-            let range_image = RangeImage2::from(&sample_range_img_ds2.get(i).unwrap());
+            let range_image = sample_range_img_ds2.get(i).unwrap();
             let (intrinsics, transform) = sample_range_img_ds2.camera(i).clone();
 
             let camera = PinholeCamera::new(intrinsics, transform.unwrap());

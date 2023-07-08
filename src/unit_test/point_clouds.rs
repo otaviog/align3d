@@ -1,7 +1,7 @@
-use ndarray::Array2;
+use ndarray::Array1;
 use rstest::fixture;
 
-use crate::{io::read_off, pointcloud::PointCloud, transform::Transform, camera::CameraIntrinsics};
+use crate::{camera::CameraIntrinsics, io::read_off, pointcloud::PointCloud, transform::Transform};
 
 use super::{sample_range_img_ds1, TestRangeImageDataset};
 
@@ -9,8 +9,8 @@ use super::{sample_range_img_ds1, TestRangeImageDataset};
 pub fn sample_teapot_pointcloud() -> PointCloud {
     let mut geometry = read_off("tests/data/teapot.off").unwrap();
     let num_vertices = geometry.len_vertices();
-    geometry.normals = Some(Array2::<f32>::zeros((num_vertices, 3)));
-    geometry.colors = Some(Array2::<u8>::zeros((num_vertices, 3)));
+    geometry.normals = Some(Array1::zeros(num_vertices));
+    geometry.colors = Some(Array1::zeros(num_vertices));
 
     PointCloud::from_geometry(geometry)
 }

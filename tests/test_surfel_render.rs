@@ -4,7 +4,7 @@ use align3d::{
     bilateral::BilateralFilter,
     io::dataset::{RgbdDataset, SlamTbDataset},
     range_image::RangeImageBuilder,
-    surfel::{RimageSurfelBuilder, SurfelModel},
+    surfel::{SurfelBuilder, SurfelModel},
     viz::{GeoViewer, Manager, node::MakeNode},
 };
 
@@ -21,11 +21,11 @@ fn main() {
     let mut manager = Manager::default();
     let model = Arc::new(Mutex::new(SurfelModel::new(&manager.memory_allocator, 500_000)));
     
-    let surfel_builder = RimageSurfelBuilder::new(&intrinsics);
+    let surfel_builder = SurfelBuilder::new(&intrinsics);
     let mut model_lock = model.lock().unwrap();
     let mut model_writer = model_lock.write().unwrap();
      
-    for surfel in surfel_builder.build_from_rimage(&ri_frame[0]) {
+    for surfel in surfel_builder.from_range_image(&ri_frame[0]) {
         model_writer.add(&surfel);
     }
     drop(model_writer);

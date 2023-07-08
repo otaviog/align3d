@@ -1,5 +1,6 @@
-use image::{flat::SampleLayout, imageops::blur, RgbImage};
-use ndarray::{Array3, ShapeBuilder};
+use image::{flat::SampleLayout, imageops::blur, ImageBuffer, Rgb, RgbImage};
+use nalgebra::Vector3;
+use ndarray::{Array2, Array3, ShapeBuilder};
 
 /// Trait to convert into ndarray::Array3, this is different than nshare version
 /// because it uses the shape [height, width, channels] instead of [channels, height, width].
@@ -38,12 +39,27 @@ impl IntoImageRgb8 for Array3<u8> {
     }
 }
 
-pub fn py_scale_down(src_img: &RgbImage, sigma: f32) -> Array3<u8> {
+pub trait ToImageRgb8 {
+    fn to_image_rgb8(self) -> RgbImage;
+}
+
+impl ToImageRgb8 for Array2<Vector3<u8>> {
+    fn to_image_rgb8(self) -> RgbImage {
+        let (height, width) = self.dim();
+        RgbImage::from_fn(width as u32, height as u32, |x, y| {
+            let c = self[(y as usize, x as usize)];
+            image::Rgb([c[0], c[1], c[2]])
+        })
+    }
+}
+
+
+pub fn py_scale_down(src_img: &ImageBuffer<Rgb<u8>, Vec<u8>>, sigma: f32) -> Array3<u8> {
     let (src_height, src_width) = (src_img.height() as usize, src_img.width() as usize);
     let src_img = blur(src_img, sigma).into_array3();
 
     let (dst_height, dst_width) = (src_height / 2, src_width / 2);
-    Array3::<u8>::from_shape_fn((dst_height, dst_width, 3), |(i_dst, j_dst, c)| {
+    Array3::from_shape_fn((dst_height, dst_width, 3), |(i_dst, j_dst, c)| {
         num::clamp(src_img[[i_dst * 2, j_dst * 2, c]], 0, 255)
     })
 }

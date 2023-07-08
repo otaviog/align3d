@@ -1,20 +1,22 @@
 use nalgebra::Vector3;
-use ndarray::iter::AxisIter;
-use ndarray::{ArrayView2, Axis};
+use ndarray::{iter::Iter, ArrayView2};
 use std::iter::Zip;
 
 use super::RangeImage;
 
 pub struct PointCloudView<'a> {
-    points: ArrayView2<'a, f32>,
-    normals: ArrayView2<'a, f32>,
+    points: ArrayView2<'a, Vector3<f32>>,
+    normals: ArrayView2<'a, Vector3<f32>>,
     mask: ArrayView2<'a, u8>,
 }
 
-type NdArrayRowIter<'a, T> = AxisIter<'a, T, ndarray::Dim<[usize; 1]>>;
+type NdArrayIter2<'a, T> = Iter<'a, T, ndarray::Dim<[usize; 2]>>;
 
 pub struct PointCloudViewIterator<'a> {
-    iter: Zip<Zip<NdArrayRowIter<'a, f32>, NdArrayRowIter<'a, f32>>, NdArrayRowIter<'a, u8>>,
+    iter: Zip<
+        Zip<NdArrayIter2<'a, Vector3<f32>>, NdArrayIter2<'a, Vector3<f32>>>,
+        NdArrayIter2<'a, u8>,
+    >,
     linear_index: usize,
 }
 
@@ -23,9 +25,9 @@ impl<'a> PointCloudView<'a> {
         PointCloudViewIterator {
             iter: self
                 .points
-                .axis_iter(Axis(0))
-                .zip(self.normals.axis_iter(Axis(0)))
-                .zip(self.mask.axis_iter(Axis(0))),
+                .iter()
+                .zip(self.normals.iter())
+                .zip(self.mask.iter()),
             linear_index: 0,
         }
     }
@@ -36,15 +38,11 @@ impl<'a> Iterator for PointCloudViewIterator<'a> {
 
     fn next(&mut self) -> Option<Self::Item> {
         loop {
-            let ((v, n), m) = self.iter.next()?;
+            let ((point, normal), mask) = self.iter.next()?;
             let linear_index = self.linear_index;
             self.linear_index += 1;
-            if m[0] > 0 {
-                return Some((
-                    linear_index,
-                    Vector3::new(v[0], v[1], v[2]),
-                    Vector3::new(n[0], n[1], n[2]),
-                ));
+            if *mask > 0 {
+                return Some((linear_index, *point, *normal));
             };
         }
     }
@@ -52,20 +50,10 @@ impl<'a> Iterator for PointCloudViewIterator<'a> {
 
 impl RangeImage {
     pub fn point_cloud_view(&'_ self) -> PointCloudView<'_> {
-        let total_points = self.len();
-        let points = self.points.view().into_shape((total_points, 3)).unwrap();
-        let normals = self
-            .normals
-            .as_ref()
-            .unwrap()
-            .view()
-            .into_shape((total_points, 3))
-            .unwrap();
-        let mask = self.mask.view().into_shape((total_points, 1)).unwrap();
         PointCloudView {
-            points,
-            normals,
-            mask,
+            points: self.points.view(),
+            normals: self.normals.as_ref().unwrap().view(),
+            mask: self.mask.view(),
         }
     }
 }

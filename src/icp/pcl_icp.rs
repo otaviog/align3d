@@ -1,16 +1,13 @@
 use super::cost_function::PointPlaneDistance;
 use super::icp_params::IcpParams;
 use crate::{
-    kdtree::KdTree,
+    kdtree::R3dTree,
     optim::GaussNewton,
     pointcloud::PointCloud,
     transform::{LieGroup, Transform},
     trig,
 };
 use itertools::izip;
-use nalgebra::Vector3;
-use ndarray::Axis;
-use nshare::ToNalgebra;
 use num::Float;
 
 /// Standard Iterative Closest Point (ICP) algorithm for aligning two point clouds.
@@ -21,7 +18,7 @@ pub struct Icp<'target_lt> {
     // Initial transformation to start the algorithm. Default is the identity.
     pub initial_transform: Transform,
     target: &'target_lt PointCloud,
-    kdtree: KdTree,
+    kdtree: R3dTree,
 }
 
 impl<'target_lt> Icp<'target_lt> {
@@ -36,7 +33,7 @@ impl<'target_lt> Icp<'target_lt> {
             params,
             initial_transform: Transform::eye(),
             target,
-            kdtree: KdTree::new(&target.points.view()),
+            kdtree: R3dTree::new(&target.points.view()),
         }
     }
 
@@ -68,44 +65,25 @@ impl<'target_lt> Icp<'target_lt> {
         let mut best_residual = Float::infinity();
         let mut best_transform = optim_transform.clone();
         for _ in 0..self.params.max_iterations {
-            for (source_point, source_normal) in izip!(
-                source.points.axis_iter(Axis(0)),
-                source_normals.axis_iter(Axis(0))
-            ) {
-                let source_point = optim_transform.transform_vector(&Vector3::new(
-                    source_point[0],
-                    source_point[1],
-                    source_point[2],
-                ));
-                let source_normal = optim_transform.transform_normal(&Vector3::new(
-                    source_normal[0],
-                    source_normal[1],
-                    source_normal[2],
-                ));
+            for (source_point, source_normal) in izip!(source.points.iter(), source_normals.iter())
+            {
+                let source_point = optim_transform.transform_vector(&source_point);
+                let source_normal = optim_transform.transform_normal(&source_normal);
 
-                let (found_index, found_sqr_distance) = self.kdtree.nearest3d(&source_point);
+                let (found_index, found_sqr_distance) = self.kdtree.nearest(&source_point);
                 if found_sqr_distance > max_distance_sqr {
                     continue;
                 }
 
-                let target_normal = target_normals
-                    .row(found_index)
-                    .into_nalgebra()
-                    .fixed_slice::<3, 1>(0, 0)
-                    .into_owned();
+                let target_normal = target_normals[found_index];
+
                 if trig::angle_between_vectors(&source_normal, &target_normal)
                     > self.params.max_normal_angle
                 {
                     continue;
                 }
 
-                let target_point = self
-                    .target
-                    .points
-                    .row(found_index)
-                    .into_nalgebra()
-                    .fixed_slice::<3, 1>(0, 0)
-                    .into_owned();
+                let target_point = self.target.points[found_index];
 
                 let (residual, jacobian) =
                     geom_cost.jacobian(&source_point, &target_point, &target_normal);

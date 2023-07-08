@@ -3,7 +3,8 @@ use std::io::BufWriter;
 use std::path::Path;
 
 use super::{Geometry, LoadError};
-use ndarray::{Array2, Axis};
+use nalgebra::Vector3;
+use ndarray::{Array2, Axis, Array1};
 use ply_rs::ply::{
     Addable, DefaultElement, ElementDef, Encoding, Ply, Property, PropertyDef, PropertyType,
     ScalarType,
@@ -92,18 +93,18 @@ where
                     .read_payload_for_element(&mut f, element, &header)
                     .unwrap();
 
-                point_array = Some(Array2::<f32>::from_shape_fn(
-                    (vertex_vec.len(), 3),
-                    |(i, c)| vertex_vec[i].point[c],
+                point_array = Some(Array1::<Vector3<f32>>::from_shape_fn(
+                    vertex_vec.len(),
+                    |i| Vector3::from_row_slice(&vertex_vec[i].point),
                 ));
 
                 if ["nx", "ny", "nz"]
                     .iter()
                     .all(|k| element.properties.contains_key(*k))
                 {
-                    normal_array = Some(Array2::<f32>::from_shape_fn(
-                        (vertex_vec.len(), 3),
-                        |(i, c)| vertex_vec[i].normal[c],
+                    normal_array = Some(Array1::<Vector3<f32>>::from_shape_fn(
+                        vertex_vec.len(),
+                        |i| Vector3::from_row_slice(&vertex_vec[i].normal),
                     ));
                 }
 
@@ -111,9 +112,9 @@ where
                     .iter()
                     .all(|k| element.properties.contains_key(*k))
                 {
-                    color_array = Some(Array2::<u8>::from_shape_fn(
-                        (vertex_vec.len(), 3),
-                        |(i, c)| vertex_vec[i].color[c],
+                    color_array = Some(Array1::<Vector3<u8>>::from_shape_fn(
+                        vertex_vec.len(),
+                        |i| Vector3::from_row_slice(&vertex_vec[i].color),
                     ));
                 }
             }
@@ -156,7 +157,7 @@ where
 
         let mut vertex_array: Vec<DefaultElement> = geom
             .points
-            .axis_iter(Axis(0))
+            .iter()
             .map(|point| {
                 let mut elem = DefaultElement::new();
                 elem.insert("x".to_string(), Property::Float(point[0]));
@@ -175,7 +176,7 @@ where
             });
 
             normals
-                .axis_iter(Axis(0))
+                .iter()
                 .enumerate()
                 .for_each(|(i, normal)| {
                     vertex_array[i].insert("nx".to_string(), Property::Float(normal[0]));
@@ -193,7 +194,7 @@ where
             });
 
             colors
-                .axis_iter(Axis(0))
+                .iter()
                 .enumerate()
                 .for_each(|(i, color)| {
                     vertex_array[i].insert("red".to_string(), Property::UChar(color[0]));

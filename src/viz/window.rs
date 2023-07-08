@@ -225,7 +225,7 @@ impl Window {
 
         let mut recreate_swapchain = false;
 
-        let mut previous_frame_end = Some(sync::now(self.device.clone()).boxed());
+        let mut _previous_frame_end = Some(sync::now(self.device.clone()).boxed());
         let mut pipelines = HashMap::<String, Arc<GraphicsPipeline>>::new();
 
         let scene_sphere = (self.scene).borrow().properties().get_bounding_sphere();

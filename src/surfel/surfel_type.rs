@@ -1,11 +1,9 @@
 use nalgebra::{Vector2, Vector3};
-use ndarray::s;
 
 use crate::{
     camera::CameraIntrinsics,
     range_image::RangeImage,
     transform::{Transform, TransformableMove},
-    utils::access::ToVector3,
 };
 
 /// A surfel is a point in 3D space with a radius, normal, color.
@@ -154,9 +152,9 @@ impl SurfelBuilder {
             if *mask == 0 {
                 continue;
             }
-            let range_point = rimage.points.slice(s![row, col, ..]).to_vector3();
-            let range_normal = normals.slice(s![row, col, ..]).to_vector3();
-            let range_color = colors.slice(s![row, col, ..]).to_vector3();
+            let range_point = rimage.points[(row, col)];
+            let range_normal = normals[(row, col)];
+            let range_color = colors[(row, col)];
 
             surfels.push(self.from_range_pixel(
                 range_point,

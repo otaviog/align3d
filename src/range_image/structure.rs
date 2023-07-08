@@ -1,28 +1,32 @@
 use crate::camera::CameraIntrinsics;
 
-use crate::image::{py_scale_down, rgb_to_luma_u8, IntoImageRgb8, RgbdFrame, RgbdImage};
+use crate::image::{rgb_to_luma_u8, ToImageRgb8, RgbdFrame, RgbdImage};
 use crate::intensity_map::IntensityMap;
 
+use image::imageops::blur;
+use image::{ImageBuffer, Rgb};
 use nalgebra::Vector3;
 
-use ndarray::{ArcArray2, Array1, Array2, Array3, Axis};
+use ndarray::{Array1, Array2};
 
 use crate::io::Geometry;
 use crate::pointcloud::PointCloud;
 
 use super::resize::{resize_range_normals, resize_range_points};
 
+
+
 /// A point cloud that comes from an image-based measurement. It representation holds its grid structure.
 #[derive(Debug, Clone)]
 pub struct RangeImage {
     /// 3D points in the camera frame, as array with shape: (height, width, 3)
-    pub points: Array3<f32>,
+    pub points: Array2<Vector3<f32>>,
     /// Mask of valid points, as array with shape: (height, width)
     pub mask: Array2<u8>,
     /// Normals of the points, as array with shape: (height, width, 3)
-    pub normals: Option<Array3<f32>>,
+    pub normals: Option<Array2<Vector3<f32>>>,
     /// Colors of the points, as array with shape: (height, width, 3)
-    pub colors: Option<Array3<u8>>,
+    pub colors: Option<Array2<Vector3<u8>>>,
     /// Camera parameters that originated the image.
     pub camera: CameraIntrinsics,
     /// Intensities of the points, as array with shape: (height*width)
@@ -30,6 +34,21 @@ pub struct RangeImage {
     /// Intensity map of the points, as array with shape: (height, width)
     pub intensity_map: Option<IntensityMap>,
     valid_points: usize,
+}
+
+fn py_scale_down2(src_img: &ImageBuffer<Rgb<u8>, Vec<u8>>, sigma: f32) -> Array2<Vector3<u8>> {
+    let (src_height, src_width) = (src_img.height() as usize, src_img.width() as usize);
+    let src_img = blur(src_img, sigma);
+
+    let (dst_height, dst_width) = (src_height / 2, src_width / 2);
+    Array2::from_shape_fn((dst_height, dst_width), |(i_dst, j_dst)| {
+        let pixel = src_img.get_pixel((j_dst * 2) as u32, (i_dst * 2) as u32);
+        Vector3::new(
+            pixel[0] as u8,
+            pixel[1] as u8,
+            pixel[2] as u8,
+        )
+    })
 }
 
 impl RangeImage {
@@ -42,9 +61,9 @@ impl RangeImage {
     pub fn from_rgbd_image(camera: &CameraIntrinsics, rgbd_image: &RgbdImage) -> Self {
         let (width, height) = (rgbd_image.width(), rgbd_image.height());
         let depth_scale = rgbd_image.depth_scale.unwrap() as f32;
-        let mut points = Array3::zeros((height, width, 3));
+        let mut points = Array2::zeros((height, width));
         let mut mask = Array2::<u8>::zeros((height, width));
-        let mut colors = Array3::<u8>::zeros((height, width, 3));
+        let mut colors = Array2::<Vector3<u8>>::zeros((height, width));
         let mut valid_points = 0;
 
         for x in 0..width {
@@ -53,17 +72,18 @@ impl RangeImage {
                 if z > 0 {
                     let z = rgbd_image.depth[[y, x]] as f32 * depth_scale;
                     let point3d = camera.backproject(x as f32, y as f32, z);
-                    points[[y, x, 0]] = point3d[0];
-                    points[[y, x, 1]] = point3d[1];
-                    points[[y, x, 2]] = point3d[2];
+                    points[[y, x]] = point3d;
+
                     mask[[y, x]] = 1;
                     valid_points += 1;
                 }
 
                 //colors.slice_mut(s![y, x, ..]).assign(&rgbd_image.color.slice(s![y, x, ..]));
-                colors[[y, x, 0]] = rgbd_image.color[[y, x, 0]];
-                colors[[y, x, 1]] = rgbd_image.color[[y, x, 1]];
-                colors[[y, x, 2]] = rgbd_image.color[[y, x, 2]];
+                colors[[y, x]] = Vector3::<u8>::new(
+                    rgbd_image.color[[y, x, 0]],
+                    rgbd_image.color[[y, x, 1]],
+                    rgbd_image.color[[y, x, 2]],
+                );
             }
         }
 
@@ -124,11 +144,7 @@ impl RangeImage {
     /// * `Option<Vector3<f32>>` - 3D point at `row` and `col`.
     pub fn get_point(&self, row: usize, col: usize) -> Option<nalgebra::Vector3<f32>> {
         if col < self.width() && row < self.height() && self.mask[(row, col)] == 1 {
-            Some(Vector3::new(
-                self.points[(row, col, 0)],
-                self.points[(row, col, 1)],
-                self.points[(row, col, 2)],
-            ))
+            Some(self.points[(row, col)])
         } else {
             None
         }
@@ -142,7 +158,7 @@ impl RangeImage {
         let ratio_threshold = 2f32;
         let ratio_threshold_squared = ratio_threshold * ratio_threshold;
 
-        let mut normals = Array3::<f32>::zeros((height, width, 3));
+        let mut normals = Array2::<Vector3<f32>>::zeros((height, width));
 
         for row in 0..height {
             for col in 0..width {
@@ -150,11 +166,7 @@ impl RangeImage {
                     continue;
                 };
 
-                let center = nalgebra::Vector3::<f32>::new(
-                    self.points[(row, col, 0)],
-                    self.points[(row, col, 1)],
-                    self.points[(row, col, 2)],
-                );
+                let center = self.points[(row, col)];
                 let left = self
                     .get_point(row, (col as i32 - 1) as usize)
                     .unwrap_or_else(nalgebra::Vector3::<f32>::zeros);
@@ -201,9 +213,7 @@ impl RangeImage {
 
                 let normal_magnitude = normal.magnitude();
                 if normal_magnitude > 1e-6_f32 {
-                    normals[(row, col, 0)] = normal[0] / normal_magnitude;
-                    normals[(row, col, 1)] = normal[1] / normal_magnitude;
-                    normals[(row, col, 2)] = normal[2] / normal_magnitude;
+                    normals[(row, col)] = normal / normal_magnitude;
                 }
             }
         }
@@ -216,17 +226,12 @@ impl RangeImage {
     /// By default, range image have only the RGB colors, this method
     /// will convert them into luma values, which are used as color optimization term in ICP.
     pub fn compute_intensity(&mut self) -> &mut Self {
-        let color = self
-            .colors
-            .as_ref()
-            .unwrap()
-            .view()
-            .into_shape((self.len(), 3))
-            .unwrap();
         self.intensities = Some(
-            color
-                .axis_iter(Axis(0))
-                .map(|rgb| rgb_to_luma_u8(rgb[0], rgb[1], rgb[2]))
+            self.colors
+                .as_ref()
+                .unwrap()
+                .iter()
+                .map(|color| rgb_to_luma_u8(color[0], color[1], color[2]))
                 .collect(),
         );
 
@@ -276,12 +281,13 @@ impl RangeImage {
         // TODO: Figure out how to not clone the colors, keep all immutable
         // and still convert into_image_rgb8
         let colors = if let Some(colors) = self.colors.clone() {
-            let colors = colors.into_image_rgb8();
-            let down_colors = py_scale_down(&colors, sigma);
+            let colors = colors.to_image_rgb8();
+            let down_colors = py_scale_down2(&colors, sigma);
             Some(down_colors)
         } else {
             None
         };
+
         let valid_points = mask.iter().map(|x| (*x == 1) as usize).sum();
         RangeImage {
             points,
@@ -306,65 +312,34 @@ impl RangeImage {
         pyramid
     }
 
-    pub fn is_valid(&self, u: usize, v:usize) -> bool {
+    pub fn is_valid(&self, u: usize, v: usize) -> bool {
         self.mask[(v, u)] != 0
     }
 }
 
 impl From<&RangeImage> for PointCloud {
     fn from(image_pcl: &RangeImage) -> PointCloud {
-        let num_total_points = image_pcl.len();
-
-        let mask = image_pcl
-            .mask
-            .view()
-            .into_shape((num_total_points,))
-            .unwrap();
-        let num_valid_points = mask.iter().map(|x| *x as usize).sum();
-
-        // TODO: Improve mask and make a generic function/macro.
-        let v: Vec<f32> = image_pcl
+        let points = image_pcl
             .points
-            .view()
-            .into_shape((num_total_points, 3))
-            .unwrap()
-            .axis_iter(Axis(0))
-            .enumerate()
-            .filter(|(idx, _)| mask[*idx] != 0)
-            .flat_map(|(_, v)| [v[0], v[1], v[2]])
+            .iter()
+            .zip(image_pcl.mask.iter())
+            .filter_map(|(point, mask)| if *mask != 0 { Some(*point) } else { None })
             .collect();
-        let points = Array2::from_shape_vec((num_valid_points, 3), v).unwrap();
 
         let normals = image_pcl.normals.as_ref().map(|normals| {
-            Array2::from_shape_vec(
-                (num_valid_points, 3),
-                normals
-                    .view()
-                    .into_shape((num_total_points, 3))
-                    .unwrap()
-                    .axis_iter(Axis(0))
-                    .enumerate()
-                    .filter(|(idx, _)| mask[*idx] != 0)
-                    .flat_map(|(_, v)| [v[0], v[1], v[2]])
-                    .collect(),
-            )
-            .unwrap()
+            normals
+                .iter()
+                .zip(image_pcl.mask.iter())
+                .filter_map(|(normal, mask)| if *mask != 0 { Some(*normal) } else { None })
+                .collect()
         });
 
         let colors = image_pcl.colors.as_ref().map(|colors| {
-            ArcArray2::from_shape_vec(
-                (num_valid_points, 3),
-                colors
-                    .view()
-                    .into_shape((num_total_points, 3))
-                    .unwrap()
-                    .axis_iter(Axis(0))
-                    .enumerate()
-                    .filter(|(idx, _)| mask[*idx] != 0)
-                    .flat_map(|(_, v)| [v[0], v[1], v[2]])
-                    .collect(),
-            )
-            .unwrap()
+            colors
+                .iter()
+                .zip(image_pcl.mask.iter())
+                .filter_map(|(color, mask)| if *mask != 0 { Some(*color) } else { None })
+                .collect()
         });
 
         PointCloud {
@@ -434,11 +409,7 @@ mod tests {
             assert_eq!(480, normals.shape()[0]);
             assert_eq!(640, normals.shape()[1]);
 
-            let v = Vector3::new(
-                normals[[44, 42, 0]],
-                normals[[44, 42, 1]],
-                normals[[44, 42, 2]],
-            );
+            let v = normals[[44, 42]];
             assert_eq!(v.norm(), 1.0);
         }
     }

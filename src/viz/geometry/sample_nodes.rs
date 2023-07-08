@@ -1,4 +1,5 @@
-use ndarray::{Array2, Axis};
+use nalgebra::Vector3;
+use ndarray::Array1;
 
 use crate::{
     io::read_off,
@@ -13,12 +14,12 @@ pub fn teapot_node(manager: &Manager) -> NodeRef<VkMeshNode> {
         let mut geometry = read_off("tests/data/teapot.off").unwrap();
 
         geometry.normals = Some(compute_normals(
-            &geometry.points,
-            geometry.faces.as_ref().unwrap(),
+            &geometry.points.view(),
+            &geometry.faces.as_ref().unwrap().view(),
         ));
         geometry.colors = Some({
-            let mut colors = Array2::<u8>::zeros((geometry.len_vertices(), 3));
-            colors.axis_iter_mut(Axis(0)).for_each(|mut rgb| {
+            let mut colors = Array1::<Vector3<u8>>::zeros(geometry.len_vertices());
+            colors.iter_mut().for_each(|rgb| {
                 rgb[0] = 255;
             });
             colors

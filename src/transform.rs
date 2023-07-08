@@ -2,7 +2,7 @@ use nalgebra::{
     Isometry3, Matrix3, Matrix4, Quaternion, Rotation3, Translation3, UnitQuaternion, UnitVector3,
     Vector3, Vector6,
 };
-use ndarray::{Array2, Axis};
+use ndarray::Array1;
 
 use std::ops;
 
@@ -161,13 +161,9 @@ impl Transform {
     /// # Returns
     ///
     /// * Array of 3D points of shape (N, 3) transformed.
-    pub fn transform_vectors(&self, mut rhs: Array2<f32>) -> Array2<f32> {
-        for mut point in rhs.axis_iter_mut(Axis(0)) {
-            let v = self.transform_vector(&Vector3::new(point[0], point[1], point[2]));
-
-            point[0] = v[0];
-            point[1] = v[1];
-            point[2] = v[2];
+    pub fn transform_vectors(&self, mut rhs: Array1<Vector3<f32>>) -> Array1<Vector3<f32>> {
+        for point in rhs.iter_mut() {
+            *point = self.transform_vector(point);
         }
 
         rhs
@@ -182,13 +178,9 @@ impl Transform {
     /// # Returns
     ///
     /// * Array of 3D normals of shape (N, 3) transformed.
-    pub fn transform_normals(&self, mut rhs: Array2<f32>) -> Array2<f32> {
-        for mut point in rhs.axis_iter_mut(Axis(0)) {
-            let v = self.transform_normal(&Vector3::new(point[0], point[1], point[2]));
-
-            point[0] = v[0];
-            point[1] = v[1];
-            point[2] = v[2];
+    pub fn transform_normals(&self, mut rhs: Array1<Vector3<f32>>) -> Array1<Vector3<f32>> {
+        for point in rhs.iter_mut() {
+            *point = self.transform_normal(point);
         }
 
         rhs
@@ -302,6 +294,7 @@ pub trait TransformableMove<Type> {
 #[cfg(test)]
 mod tests {
     use crate::transform::LieGroup;
+    use crate::utils::access::FlattenVector3;
 
     use super::Transform;
     use nalgebra::Vector6;
@@ -327,7 +320,11 @@ mod tests {
     #[test]
     fn test_mul_op() {
         let transform = Transform::eye();
-        let points = array![[1., 2., 3.], [4., 5., 6.], [7., 8., 9.]];
+        let points = array![
+            Vector3::new(1., 2., 3.),
+            Vector3::new(4., 5., 6.),
+            Vector3::new(7., 8., 9.)
+        ];
         let mult_result = transform.transform_vectors(points.clone());
 
         assert_eq!(mult_result, points);
@@ -338,7 +335,12 @@ mod tests {
         ));
 
         assert!(assert_array(
-            &transform.transform_vectors(array![[1.0, 2.0, 3.0], [1.0, 2.0, 3.0]]),
+            &transform
+                .transform_vectors(Array1::from_iter([
+                    Vector3::new(1.0, 2.0, 3.0),
+                    Vector3::new(1.0, 2.0, 3.0)
+                ]))
+                .flatten_vector3(),
             &array![[-1.0, 2.0, 0.0], [-1.0, 2.0, 0.0]]
         ));
     }
@@ -349,11 +351,11 @@ mod tests {
             Translation3::<f32>::new(0., 0., 3.),
             UnitQuaternion::<f32>::from_scaled_axis(Vector3::y() * std::f32::consts::PI),
         ));
-        let mut points = array![[1.0, 2.0, 3.0], [1.0, 2.0, 3.0]];
+        let mut points = array![Vector3::new(1.0, 2.0, 3.0), Vector3::new(1.0, 2.0, 3.0)];
         points = transform.transform_vectors(points);
 
         assert!(assert_array(
-            &points,
+            &points.flatten_vector3(),
             &array![[-1.0, 2.0, 0.0], [-1.0, 2.0, 0.0]]
         ));
     }
@@ -363,7 +365,9 @@ mod tests {
         let transform = Transform::exp(&LieGroup::Se3(Vector6::new(1.0, 2.0, 3.0, 0.4, 0.5, 0.3)));
 
         assert!(assert_array(
-            &transform.transform_vectors(array![[5.5, 6.4, 7.8]]),
+            &transform
+                .transform_vectors(array![Vector3::new(5.5, 6.4, 7.8)])
+                .flatten_vector3(),
             &array![[8.9848175, 6.9635687, 9.880962]]
         ));
 
@@ -396,7 +400,12 @@ mod tests {
 
         let transform = &transform1 * &transform2;
         assert!(assert_array(
-            &transform.transform_vectors(array![[1.0, 2.0, 3.0], [1.0, 2.0, 3.0]]),
+            &transform
+                .transform_vectors(array![
+                    Vector3::new(1.0, 2.0, 3.0),
+                    Vector3::new(1.0, 2.0, 3.0)
+                ])
+                .flatten_vector3(),
             &array![[2.9999998, 2.0, 5.0], [2.9999998, 2.0, 5.0]]
         ));
     }

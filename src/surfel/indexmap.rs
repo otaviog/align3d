@@ -1,7 +1,7 @@
 use nalgebra::Vector3;
 use ndarray::Array2;
 
-use crate::{camera::PinholeCamera, utils::window_iter::window};
+use crate::camera::PinholeCamera;
 use rayon::prelude::*;
 
 /// IndexMap is a 2D array of indices of surfels in the surfel model.
@@ -40,16 +40,18 @@ impl IndexMap {
     where
         T: ParallelIterator<Item = (usize, Vector3<f32>)>,
     {
-
         self.map.fill(-1);
-        for (v, u, id) in model_points.filter_map(|(id, point)| {
-            if let Some((u, v)) = camera.project_to_image(&point) {
-                let (u, v) = (u as usize * self.scale, v as usize * self.scale);
-                Some((v, u, id as i64))
-            } else {
-                None
-            }
-        }).collect::<Vec<_>>() {
+        for (v, u, id) in model_points
+            .filter_map(|(id, point)| {
+                if let Some((u, v)) = camera.project_to_image(&point) {
+                    let (u, v) = (u as usize * self.scale, v as usize * self.scale);
+                    Some((v, u, id as i64))
+                } else {
+                    None
+                }
+            })
+            .collect::<Vec<_>>()
+        {
             self.map[(v, u)] = id;
         }
     }
@@ -70,11 +72,8 @@ mod tests {
     use std::time::Instant;
 
     use super::*;
-    use crate::{
-        unit_test::{sample_pcl_ds1, TestPclDataset},
-        utils::access::ToVector3,
-    };
-    use ndarray::Axis;
+    use crate::unit_test::{sample_pcl_ds1, TestPclDataset};
+
     use rstest::rstest;
 
     #[rstest]
@@ -84,22 +83,15 @@ mod tests {
         let (intrinsics, extrinsics) = sample_pcl_ds1.camera(0);
         let camera = PinholeCamera::new(intrinsics, extrinsics.unwrap());
 
-        indexmap.render_indices_par(
-            pcl.points
-                .axis_iter(Axis(0))
-                .into_par_iter()
-                .enumerate()
-                .map(|(id, point)| (id, point.to_vector3())),
-            &camera,
-        );
-        
         let start = Instant::now();
+
         indexmap.render_indices_par(
             pcl.points
-                .axis_iter(Axis(0))
-                .into_par_iter()
+                .as_slice()
+                .unwrap()
+                .par_iter()
                 .enumerate()
-                .map(|(id, point)| (id, point.to_vector3())),
+                .map(|(id, point)| (id, *point)),
             &camera,
         );
 
@@ -119,18 +111,18 @@ mod tests {
 
         indexmap.render_indices(
             pcl.points
-                .axis_iter(Axis(0))
+                .iter()
                 .enumerate()
-                .map(|(id, point)| (id, point.to_vector3())),
+                .map(|(id, point)| (id, *point)),
             &camera,
         );
-        
+
         let start = Instant::now();
         indexmap.render_indices(
             pcl.points
-                .axis_iter(Axis(0))
+                .iter()
                 .enumerate()
-                .map(|(id, point)| (id, point.to_vector3())),
+                .map(|(id, point)| (id, *point)),
             &camera,
         );
 

@@ -1,7 +1,7 @@
 use std::{cell::RefCell, rc::Rc, sync::Arc};
 
 use nalgebra::Vector3;
-use ndarray::Axis;
+
 use vulkano::{
     buffer::{
         allocator::{SubbufferAllocator, SubbufferAllocatorCreateInfo},
@@ -62,7 +62,7 @@ impl VkPointCloud {
             points: Buffer::from_iter(memory_allocator, create_info.clone(), alloc_info.clone(),
                 pointcloud
                     .points
-                    .axis_iter(Axis(0))
+                    .iter()
                     .map(|v| PositionF32::new(v[0], v[1], v[2])),
             )
             .unwrap(),
@@ -71,7 +71,7 @@ impl VkPointCloud {
                     .normals
                     .as_ref()
                     .unwrap()
-                    .axis_iter(Axis(0))
+                    .iter()
                     .map(|v| NormalF32::new(v[0], v[1], v[2])),
             )
             .unwrap(),
@@ -80,7 +80,7 @@ impl VkPointCloud {
                     .colors
                     .as_ref()
                     .unwrap()
-                    .axis_iter(Axis(0))
+                    .iter()
                     .map(|v| ColorU8::new(v[2], v[1], v[0])),
             )
             .unwrap(),

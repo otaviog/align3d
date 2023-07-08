@@ -1,5 +1,4 @@
 use nalgebra::Vector3;
-use ndarray::s;
 use num::Float;
 
 use crate::{
@@ -65,10 +64,7 @@ impl<'target_lt> ImageIcp<'target_lt> {
             source.point_cloud_view().iter().for_each(
                 |(linear_index, source_point, source_normal)| {
                     let source_point = optim_transform.transform_vector(&source_point);
-                    let (u, v) = self
-                        .target
-                        .camera
-                        .project(&source_point);
+                    let (u, v) = self.target.camera.project(&source_point);
 
                     let (u_int, v_int) = ((u + 0.5) as i32, (v + 0.5) as i32);
                     if u_int < 0
@@ -87,10 +83,7 @@ impl<'target_lt> ImageIcp<'target_lt> {
                             return; // exit closure
                         }
                         let source_normal = optim_transform.transform_normal(&source_normal);
-                        let target_normal = {
-                            let elem = target_normals.slice(s![v_int, u_int, ..]);
-                            Vector3::new(elem[0], elem[1], elem[2])
-                        };
+                        let target_normal = target_normals[(v_int as usize, u_int as usize)];
 
                         if trig::angle_between_vectors(&source_normal, &target_normal)
                             >= self.params.max_normal_angle

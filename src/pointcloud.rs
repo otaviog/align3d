@@ -2,12 +2,13 @@ use crate::{
     io::Geometry,
     transform::{Transform, Transformable},
 };
-use ndarray::{prelude::*, ArcArray2, Array2};
+use nalgebra::Vector3;
+use ndarray::prelude::*;
 
 pub struct PointCloud {
-    pub points: Array2<f32>,
-    pub normals: Option<Array2<f32>>,
-    pub colors: Option<ArcArray2<u8>>,
+    pub points: Array1<Vector3<f32>>,
+    pub normals: Option<Array1<Vector3<f32>>>,
+    pub colors: Option<Array1<Vector3<u8>>>,
 }
 
 impl PointCloud {
@@ -21,9 +22,9 @@ impl PointCloud {
 
     pub fn zeros(len: usize) -> Self {
         Self {
-            points: Array2::<f32>::zeros((len, 3)),
-            normals: Some(Array2::<f32>::zeros((len, 3))),
-            colors: Some(ArcArray2::<u8>::zeros((len, 3))),
+            points: Array1::zeros(len),
+            normals: Some(Array1::zeros(len)),
+            colors: Some(Array1::zeros(len)),
         }
     }
 
@@ -68,37 +69,10 @@ impl From<PointCloud> for Geometry {
         Geometry {
             points: pcl.points,
             normals: pcl.normals,
-            colors: pcl.colors.map(|colors| colors.into_owned()),
+            colors: pcl.colors,
             faces: None,
             texcoords: None,
         }
-    }
-}
-
-#[cfg(with_rerun)]
-impl PointCloud {
-    pub fn rerun_msg(&self, name: &str) -> Result<rerun::MsgSender, rerun::MsgSenderError> {
-        use rerun::external::glam;
-
-        let mut points = Vec::with_capacity(self.len());
-        let mut colors = Vec::with_capacity(self.len());
-        for (point, color) in self
-            .points
-            .outer_iter()
-            .zip(self.colors.iter().flat_map(|colors| colors.outer_iter()))
-        {
-            points.push(rerun::components::Point3D::from(glam::Vec3::new(
-                point[0], point[1], point[2],
-            )));
-
-            colors.push(rerun::components::ColorRGBA::from_rgb(
-                color[0], color[1], color[2],
-            ));
-        }
-
-        Ok(rerun::MsgSender::new(name)
-            .with_component(&points)?
-            .with_component(&colors)?)
     }
 }
 

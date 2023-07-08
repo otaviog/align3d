@@ -1,24 +1,25 @@
+use nalgebra::{Vector2, Vector3};
 use ndarray::prelude::*;
 
 /// Generic representation of attributes found in 3D model/object/geometry files.
 pub struct Geometry {
     /// The 3D points. Shape is (Nx3).
-    pub points: Array2<f32>,
+    pub points: Array1<Vector3<f32>>,
     /// The RGB colors. Shape is (Nx3).
-    pub colors: Option<Array2<u8>>,
+    pub colors: Option<Array1<Vector3<u8>>>,
     /// Per vertices normals. Shape is (Nx3)
-    pub normals: Option<Array2<f32>>,
+    pub normals: Option<Array1<Vector3<f32>>>,
     /// The indices to connect vertices that make faces in the geometry.
     /// Shape is (Nx3), we always convert to triangles.
     pub faces: Option<Array2<usize>>,
     /// The texture coordinates.
-    pub texcoords: Option<Array2<f32>>,
+    pub texcoords: Option<Array1<Vector2<f32>>>,
 }
 
 impl Geometry {
     /// Number of vertices.
     pub fn len_vertices(&self) -> usize {
-        self.points.nrows()
+        self.points.len()
     }
 
     /// Number of faces. Zero if `faces` is None.
@@ -32,7 +33,7 @@ pub struct GeometryBuilder {
 }
 
 impl GeometryBuilder {
-    pub fn new(points: Array2<f32>) -> Self {
+    pub fn new(points: Array1<Vector3<f32>>) -> Self {
         Self {
             geometry: Geometry {
                 points,
@@ -44,17 +45,17 @@ impl GeometryBuilder {
         }
     }
 
-    pub fn with_points(mut self, points: Array2<f32>) -> Self {
+    pub fn with_points(mut self, points: Array1<Vector3<f32>>) -> Self {
         self.geometry.points = points;
         self
     }
 
-    pub fn with_colors(mut self, colors: Array2<u8>) -> Self {
+    pub fn with_colors(mut self, colors: Array1<Vector3<u8>>) -> Self {
         self.geometry.colors = Some(colors);
         self
     }
 
-    pub fn with_normals(mut self, normals: Array2<f32>) -> Self {
+    pub fn with_normals(mut self, normals: Array1<Vector3<f32>>) -> Self {
         self.geometry.normals = Some(normals);
         self
     }
@@ -64,7 +65,7 @@ impl GeometryBuilder {
         self
     }
 
-    pub fn with_texcoords(mut self, texcoords: Array2<f32>) -> Self {
+    pub fn with_texcoords(mut self, texcoords: Array1<Vector2<f32>>) -> Self {
         self.geometry.texcoords = Some(texcoords);
         self
     }
