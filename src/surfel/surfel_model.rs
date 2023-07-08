@@ -1,10 +1,10 @@
+use std::sync::Arc;
+
 use nalgebra::Vector3;
 use ndarray::parallel::prelude::ParallelIterator;
 use parking_lot::{MappedMutexGuard, Mutex, MutexGuard};
+use rayon::prelude::*;
 
-use vulkano::memory::ExternalMemoryHandleTypes;
-
-use std::sync::Arc;
 use vulkano::buffer::subbuffer::BufferWriteGuard;
 use vulkano::buffer::{Buffer, BufferContents, BufferCreateInfo};
 use vulkano::command_buffer::allocator::{
@@ -13,6 +13,7 @@ use vulkano::command_buffer::allocator::{
 use vulkano::command_buffer::{AutoCommandBufferBuilder, CommandBufferUsage, CopyBufferInfo};
 use vulkano::device::{Device, Queue};
 use vulkano::memory::allocator::{AllocationCreateInfo, MemoryUsage};
+use vulkano::memory::ExternalMemoryHandleTypes;
 use vulkano::pipeline::graphics::vertex_input::Vertex;
 use vulkano::sync::{self, GpuFuture};
 use vulkano::{
@@ -21,7 +22,6 @@ use vulkano::{
 };
 
 use super::Surfel;
-use rayon::prelude::*;
 
 /// Simplest allocator that just keeps a list of free indices.
 struct SimpleAllocator {
@@ -79,6 +79,59 @@ impl SurfelData {
             age: vec![0; size],
             mask: vec![false; size],
         }
+    }
+}
+
+/// Use this struct to write surfels in CPU.
+pub struct CpuSurfelWriter<'model> {
+    model: &'model mut SurfelData,
+    allocator: &'model mut SimpleAllocator,
+}
+
+impl<'model> CpuSurfelWriter<'model> {
+    /// Update the surfel at the given index.
+    ///
+    /// # Arguments
+    ///
+    /// * `index` - The index of the surfel to update.
+    /// * `surfel` - The new surfel data.
+    pub fn update(&mut self, index: usize, surfel: &Surfel) {
+        self.model.position[index] = surfel.position;
+        self.model.normal[index] = surfel.normal;
+        self.model.color[index] = surfel.color;
+        self.model.radius[index] = surfel.radius;
+        self.model.age[index] = surfel.age;
+        self.model.confidence[index] = surfel.confidence;
+        self.model.mask[index] = true;
+    }
+
+    /// Add a new surfel to the model. It'll allocate a new surfel and update it with the given surfel.
+    ///
+    /// # Arguments
+    ///
+    /// * `surfel` - The surfel to add.
+    ///
+    /// # Returns
+    ///
+    /// The index of the new surfel.
+    ///
+    /// # Panics
+    ///
+    /// If there is no more space in the model to allocate new buffer.
+    pub fn add(&mut self, surfel: &Surfel) -> usize {
+        let id = self.allocator.allocate().unwrap();
+        self.update(id, surfel);
+        id
+    }
+
+    /// Free the surfel at the given index.
+    ///
+    /// # Arguments
+    ///
+    /// * `index` - The index of the surfel to free.
+    pub fn free(&mut self, index: usize) {
+        self.model.mask[index] = false;
+        self.allocator.free(index);
     }
 }
 
@@ -214,6 +267,7 @@ impl VkSurfelData {
         }
     }
 
+    /// Create a writer to update the surfel data in GPU.
     pub fn writer(&'_ mut self) -> VkSurfelWriter<'_> {
         VkSurfelWriter {
             position_conf: self.position_conf.write().unwrap(),
@@ -223,6 +277,7 @@ impl VkSurfelData {
     }
 }
 
+/// Writer to update the surfel data in GPU.
 pub struct VkSurfelWriter<'buffer> {
     position_conf: BufferWriteGuard<'buffer, [VkSurfelPositionConf]>,
     normal_radius: BufferWriteGuard<'buffer, [VkSurfelNormalRadius]>,
@@ -258,62 +313,11 @@ impl<'buffer> VkSurfelWriter<'buffer> {
     }
 }
 
-/// Use this struct to write surfels to the surfel model. It'll store/free surfels from
-/// the CPU and GPU memory at the same time.
-pub struct CpuSurfelWriter<'model> {
-    model: &'model mut SurfelData,
-    allocator: &'model mut SimpleAllocator,
-}
-
-impl<'model> CpuSurfelWriter<'model> {
-    /// Update the surfel at the given index.
-    ///
-    /// # Arguments
-    ///
-    /// * `index` - The index of the surfel to update.
-    /// * `surfel` - The new surfel data.
-    pub fn update(&mut self, index: usize, surfel: &Surfel) {
-        self.model.position[index] = surfel.position;
-        self.model.normal[index] = surfel.normal;
-        self.model.color[index] = surfel.color;
-        self.model.radius[index] = surfel.radius;
-        self.model.age[index] = surfel.age;
-        self.model.confidence[index] = surfel.confidence;
-        self.model.mask[index] = true;
-    }
-
-    /// Add a new surfel to the model. It'll allocate a new surfel and update it with the given surfel.
-    ///
-    /// # Arguments
-    ///
-    /// * `surfel` - The surfel to add.
-    ///
-    /// # Returns
-    ///
-    /// The index of the new surfel.
-    ///
-    /// # Panics
-    ///
-    /// If there is no more space in the model to allocate new buffer.
-    pub fn add(&mut self, surfel: &Surfel) -> usize {
-        let id = self.allocator.allocate().unwrap();
-        self.update(id, surfel);
-        id
-    }
-
-    /// Free the surfel at the given index.
-    ///
-    /// # Arguments
-    ///
-    /// * `index` - The index of the surfel to free.
-    pub fn free(&mut self, index: usize) {
-        self.model.mask[index] = false;
-        self.allocator.free(index);
-    }
-}
-
+/// Vulkan surfel model storage. We use two buffers for graphics and processing.
 pub struct VkSurfelStorage {
+    /// Surfel data for rendering; this is the data that is currently being rendered.
     pub graphics: VkSurfelData,
+    // This is for processing; this is the data that is currently being processed.
     process: VkSurfelData,
 }
 
@@ -388,44 +392,6 @@ impl VkSurfelStorage {
     }
 }
 
-pub struct SuperWriter<'vk, 'cpu> {
-    pub gpu: VkSurfelWriter<'vk>,
-    pub cpu: &'cpu mut CpuSurfelWriter<'cpu>,
-}
-
-impl<'vk, 'cpu> SuperWriter<'vk, 'cpu> {
-    pub fn update(&mut self, index: usize, surfel: &Surfel) {
-        self.cpu.update(index, surfel);
-        self.gpu.update(index, surfel);
-    }
-
-    pub fn add(&mut self, surfel: &Surfel) -> usize {
-        let id = self.cpu.add(surfel);
-        self.gpu.update(id, surfel);
-        id
-    }
-
-    pub fn free(&mut self, index: usize) {
-        self.cpu.free(index);
-        self.gpu.unmask(index);
-    }
-}
-
-pub struct SuperGuard<'cpu> {
-    vk_storage_guard: MappedMutexGuard<'cpu, VkSurfelStorage>,
-    cpu_writer: CpuSurfelWriter<'cpu>,
-}
-
-impl<'cpu> SuperGuard<'cpu> {
-    pub fn get<'a>(&'a mut self) -> SuperWriter<'cpu, 'cpu> 
-    where 'a: 'cpu  {
-        SuperWriter::<'cpu, 'cpu> {
-            gpu: self.vk_storage_guard.write(),
-            cpu: &mut self.cpu_writer,
-        }
-    }
-}
-
 /// A surfel model is a collection of surfels. It's used to store surfels on the CPU and GPU.
 /// It stores on GPU for fast rendering and on CPU for fast processing.
 /// It has two copies on GPU, one for rendering and one for copying into the rendering one.
@@ -437,7 +403,7 @@ pub struct SurfelModel {
     size: usize,
 }
 
-impl<'model> SurfelModel {
+impl SurfelModel {
     /// Create a new surfel model in Vulkano with the given size.
     pub fn new(memory_allocator: &(impl MemoryAllocator + ?Sized), size: usize) -> Self {
         SurfelModel {
@@ -448,60 +414,17 @@ impl<'model> SurfelModel {
         }
     }
 
-    /// Get a writer to write surfels to the model.
-    // pub fn write(&'b mut self) -> Result<SurfelModelWriter<'b>, BufferError> {
-    //     let vk_data_ptr = self.vk_data.clone();
-    //
-    //     let vk_data = vk_data_ptr.lock().unwrap();
-    //     let position_conf = vk_data.process.position_conf.write()?;
-    //     let normal_radius = vk_data.process.normal_radius.write()?;
-    //     let color_mask_age = vk_data.process.color_mask_age.write()?;
-    //
-    //     Ok(SurfelModelWriter {
-    //         position_conf,
-    //         normal_radius,
-    //         color_mask_age,
-    //         model: &mut self.data,
-    //         allocator: &mut self.allocator,
-    //     })
-    // }
-
-    //pub fn write(&mut self) -> Result<SurfelModelWriter, BufferError> {
-    //    let vk_data_ptr = self.vk_data.clone();
-    //
-    //    let vk_data = vk_data_ptr.lock().unwrap();
-    //    let position_conf = vk_data.process.position_conf.write()?;
-    //    let normal_radius = vk_data.process.normal_radius.write()?;
-    //    let color_mask_age = vk_data.process.color_mask_age.write()?;
-    //
-    //    Ok(SurfelModelWriter {
-    //        position_conf,
-    //        normal_radius,
-    //        color_mask_age,
-    //        model: &mut self.data,
-    //        allocator: &mut self.allocator,
-    //    })
-    //}
-
-    pub fn write_cpu(&'_ mut self) -> CpuSurfelWriter<'_> {
+    /// Gets a writer to update the surfel data on CPU.
+    pub fn get_cpu_writer(&'_ mut self) -> CpuSurfelWriter<'_> {
         CpuSurfelWriter {
             model: &mut self.data,
             allocator: &mut self.allocator,
         }
     }
 
+    /// Gets a writer to update the surfel data on GPU.
     pub fn lock_gpu(&self) -> MappedMutexGuard<VkSurfelStorage> {
         MutexGuard::map(self.vk_data.lock(), |vk_data| vk_data)
-    }
-
-    pub fn write<'a, 'b>(&'a mut self) -> SuperGuard<'b> where 'a: 'b {
-        SuperGuard {
-            vk_storage_guard: MutexGuard::map(self.vk_data.lock(), |vk_data| vk_data),
-            cpu_writer: CpuSurfelWriter {
-                model: &mut self.data,
-                allocator: &mut self.allocator,
-            },
-        }
     }
 
     /// Gets the total number of surfels that this model can store.

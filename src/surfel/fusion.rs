@@ -50,12 +50,12 @@ impl SurfelFusion {
         }
     }
 
-    pub fn integrate<'a, 'x, 'y>(
+    pub fn integrate(
         &mut self,
-        model: &'a mut SurfelModel,
+        model: &mut SurfelModel,
         range_image: &RangeImage,
         camera: &PinholeCamera,
-    ) -> FusionSummary where 'a: 'x, 'a: 'y, 'x: 'y {
+    ) -> FusionSummary {
         enum SurfelUpdate {
             Update(usize, Surfel),
             Add(Surfel),
@@ -117,10 +117,8 @@ impl SurfelFusion {
                 .min_by_key(|(_index, ray_distance, _model_surfel)| {
                     ordered_float::OrderedFloat(*ray_distance)
                 }) {
-                    if ri_surfel.radius >= model_surfel.radius * 1.5 {
-                        //if true {
-                        return SurfelUpdate::Update(index, model_surfel.merge(&ri_surfel));
-                    }
+                    // if ri_surfel.radius >= model_surfel.radius * 1.5 
+                    return SurfelUpdate::Update(index, model_surfel.merge(&ri_surfel));
                 } else {
                     return SurfelUpdate::Add(ri_surfel);
                 }
@@ -143,14 +141,11 @@ impl SurfelFusion {
 
         self.timestamp += 1;
 
-        //let mut vk_data = model.vk_data.lock().unwrap();
-
-        //let mut writer = vk_data.write(model.data);
-
         let mut update_count = 0;
         let mut add_count = 0;
+        let mut gpu_updates = Vec::with_capacity(updates.len());
         {
-            let mut cpu_writer = model.write_cpu();
+            let mut cpu_writer = model.get_cpu_writer();
 
             {
                 for surfel_update in &updates {
@@ -161,14 +156,15 @@ impl SurfelFusion {
                         }
                         SurfelUpdate::Add(surfel) => {
                             add_count += 1;
-                            //writer.add(&surfel);
+                            let id = cpu_writer.add(&surfel);
+                            gpu_updates.push(SurfelUpdate::Update(id, surfel.clone()));
                         }
                         SurfelUpdate::Discard => {}
                     }
                 }
 
                 for id in &free_list {
-                    //writer.free(*id);
+                    cpu_writer.free(*id);
                 }
             }
         }
@@ -176,46 +172,20 @@ impl SurfelFusion {
         {
             let mut gpu_writer = model.lock_gpu();
             let mut writer = gpu_writer.write();
-            for surfel_update in &updates {
+            for surfel_update in &gpu_updates {
                 match surfel_update {
                     SurfelUpdate::Update(id, surfel) => {
-                        update_count += 1;
                         writer.update(*id, surfel);
                     }
-                    SurfelUpdate::Add(surfel) => {
-                        add_count += 1;
-                        //writer.add(&surfel);
-                    }
-                    SurfelUpdate::Discard => {}
+                    _ => {}
                 }
             }
 
             for id in &free_list {
-                //writer.free(*id);
+                writer.unmask(*id);
             }
         }
-        'x: {
-            let mut writer_t = model.write::<'a, 'x>();
-            'y: {
-                let writer = writer_t.get::<'y>();
-                // for surfel_update in &updates {
-                //     match surfel_update {
-                //         SurfelUpdate::Update(id, surfel) => {
-                //             update_count += 1;
-                //             writer.update(*id, surfel);
-                //         }
-                //         SurfelUpdate::Add(surfel) => {
-                //             add_count += 1;
-                //             //writer.add(&surfel);
-                //         }
-                //         SurfelUpdate::Discard => {}
-                //     }
-                // }
-                drop(writer);
-            }
 
-            drop(writer_t);
-        }
         return FusionSummary {
             num_added: add_count,
             num_updated: update_count,

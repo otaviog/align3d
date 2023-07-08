@@ -22,7 +22,7 @@ use vulkano::{
 
 use crate::{
     bounds::Sphere3Df,
-    surfel::{VkSurfelColorMaskAge, SurfelModel, VkSurfelPositionConf, VkSurfelNormalRadius, VkSurfelStorage},
+    surfel::{VkSurfelColorMaskAge, VkSurfelPositionConf, VkSurfelNormalRadius, VkSurfelStorage},
     viz::{
         controllers::FrameStepInfo,
         misc::get_normal_matrix,
@@ -30,7 +30,8 @@ use crate::{
         Manager,
     },
 };
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
+use parking_lot::Mutex;
 
 pub struct SurfelNode {
     pub properties: NodeProperties,
@@ -141,7 +142,7 @@ impl Node for SurfelNode {
                     .unwrap()
             });
 
-        let mut model = self.model.lock().unwrap();
+        let mut model = self.model.lock();
         
         model.swap_graphics(context.device.clone(), context.queue.clone());
 

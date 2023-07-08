@@ -13,12 +13,12 @@ use align3d::{
 
 fn main() {
     let mut manager = Manager::default();
-    let model = Arc::new(Mutex::new(SurfelModel::new(
+    let mut model = SurfelModel::new(
         &manager.memory_allocator,
         4_000_000,
-    )));
-    let render_model = model.clone();
+    );
 
+    let render_model = model.vk_data.clone();
     let node = render_model.make_node(&mut manager);
     let mut geo_viewer = GeoViewer::from_manager(manager);
 
@@ -37,13 +37,12 @@ fn main() {
             SurfelFusionParameters::default(),
         );
 
-        for i in [0, 4, 8, 12] {
+        for i in 0..dataset.len() {
             let rgbd_frame = dataset.get(i).unwrap();
             let pinhole_camera = rgbd_frame.get_pinhole_camera().unwrap();
             let ri_frame = ribuilder.build(rgbd_frame);
 
-            let mut wmodel = model.lock().unwrap();
-            let summary = fusion.integrate(&mut wmodel, &ri_frame[0], &pinhole_camera);
+            let summary = fusion.integrate(&mut model, &ri_frame[0], &pinhole_camera);
             println!("Frame {i} fused {:?}", summary);
         }
     });

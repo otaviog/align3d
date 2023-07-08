@@ -75,6 +75,7 @@ dependencies = [
  "nshare",
  "num",
  "ordered-float",
+ "parking_lot",
  "ply-rs",
  "pprof",
  "rand 0.8.5",
