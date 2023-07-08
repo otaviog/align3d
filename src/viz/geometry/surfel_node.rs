@@ -140,6 +140,7 @@ impl Node for SurfelNode {
                     .build(context.device.clone())
                     .unwrap()
             });
+
         let mut model = self.model.lock().unwrap();
         model.swap_graphics(context.device.clone(), context.queue.clone());
 

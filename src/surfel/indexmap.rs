@@ -9,6 +9,7 @@ use rayon::prelude::*;
 pub struct IndexMap {
     /// The map is a 2D array of indices of surfels in the surfel model.
     pub map: Array2<i64>,
+    zbuffer: Array2<f32>,
     /// The map is scaled by a factor of `scale` so we avoid collisions between surfels.
     pub scale: usize,
 }
@@ -18,6 +19,7 @@ impl IndexMap {
     pub fn new(width: usize, height: usize, scale: usize) -> Self {
         IndexMap {
             map: Array2::zeros((height * scale, width * scale)),
+            zbuffer: Array2::zeros((height * scale, width * scale)),
             scale,
         }
     }
@@ -28,10 +30,14 @@ impl IndexMap {
         camera: &PinholeCamera,
     ) {
         self.map.fill(-1);
+        self.zbuffer.fill(f32::MAX);
         for (id, point) in model_points {
-            if let Some((u, v)) = camera.project_to_image(&point) {
+            if let Some((u, v, z)) = camera.project_to_image(&point) {
                 let (u, v) = (u as usize * self.scale, v as usize * self.scale);
-                self.map[(v, u)] = id as i64;
+                if self.zbuffer[(v, u)] > z {
+                    self.zbuffer[(v, u)] = z;
+                    self.map[(v, u)] = id as i64;
+                }
             }
         }
     }
@@ -41,18 +47,22 @@ impl IndexMap {
         T: ParallelIterator<Item = (usize, Vector3<f32>)>,
     {
         self.map.fill(-1);
-        for (v, u, id) in model_points
+        self.zbuffer.fill(f32::MAX);
+        for (v, u, z, id) in model_points
             .filter_map(|(id, point)| {
-                if let Some((u, v)) = camera.project_to_image(&point) {
+                if let Some((u, v, z)) = camera.project_to_image(&point) {
                     let (u, v) = (u as usize * self.scale, v as usize * self.scale);
-                    Some((v, u, id as i64))
+                    Some((v, u, z, id as i64))
                 } else {
                     None
                 }
             })
             .collect::<Vec<_>>()
         {
-            self.map[(v, u)] = id;
+            if self.zbuffer[(v, u)] > z {
+                self.zbuffer[(v, u)] = z;
+                self.map[(v, u)] = id as i64;
+            }
         }
     }
 

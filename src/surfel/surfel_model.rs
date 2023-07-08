@@ -444,4 +444,23 @@ impl<'b> SurfelModel {
                 },
             )
     }
+
+    pub fn age_confidence_par_iter<'a>(&'a self) -> impl ParallelIterator<Item = (usize, u32, f32)> + 'a {
+        self.data
+            .mask
+            .iter()
+            .zip(self.data.age.iter())
+            .zip(self.data.confidence.iter())
+            .enumerate()
+            .par_bridge()
+            .filter_map(
+                move |(i, ((mask, age), conf))| {
+                    if *mask {
+                        Some((i, *age, *conf))
+                    } else {
+                        None
+                    }
+                },
+            )
+    }
 }

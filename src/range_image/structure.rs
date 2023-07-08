@@ -315,6 +315,23 @@ impl RangeImage {
     pub fn is_valid(&self, u: usize, v: usize) -> bool {
         self.mask[(v, u)] != 0
     }
+
+    pub fn indexed_iter<'a>(
+        &'a self,
+    ) -> impl Iterator<Item = (usize, usize, Vector3<f32>, Vector3<f32>, Vector3<u8>)> + 'a {
+        let normals = self.normals.as_ref().unwrap();
+        let colors = self.colors.as_ref().unwrap();
+        self.mask.indexed_iter().filter_map(move |((v, u), m)| {
+            if *m > 0 {
+                let point = self.points[[v, u]];
+                let normal = normals[[v, u]];
+                let color = colors[[v, u]];
+                Some((v, u, point, normal, color))
+            } else {
+                None
+            }
+        })
+    }
 }
 
 impl From<&RangeImage> for PointCloud {

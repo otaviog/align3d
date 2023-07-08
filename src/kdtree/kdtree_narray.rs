@@ -1,4 +1,3 @@
-use nalgebra::Vector3;
 use ndarray::prelude::*;
 
 use std::cmp::Ordering;

@@ -1,5 +1,6 @@
-use nalgebra::{Vector2, Vector3};
+use nalgebra::Vector2;
 use ndarray::Array2;
+use rayon::prelude::*;
 
 use super::{indexmap::IndexMap, surfel_model::SurfelModel, surfel_type::SurfelBuilder};
 use crate::surfel::Surfel;
@@ -19,25 +20,6 @@ impl Default for SurfelFusionParameters {
             confidence_remove_threshold: 15.0,
             age_remove_threshold: 10,
         }
-    }
-}
-
-impl<'a> RangeImage {
-    pub fn indexed_iter(
-        &'a self,
-    ) -> impl Iterator<Item = (usize, usize, Vector3<f32>, Vector3<f32>, Vector3<u8>)> + 'a {
-        let normals = self.normals.as_ref().unwrap();
-        let colors = self.colors.as_ref().unwrap();
-        self.mask.indexed_iter().filter_map(move |((v, u), m)| {
-            if *m > 0 {
-                let point = self.points[[v, u]];
-                let normal = normals[[v, u]];
-                let color = colors[[v, u]];
-                Some((v, u, point, normal, color))
-            } else {
-                None
-            }
-        })
     }
 }
 
@@ -74,93 +56,109 @@ impl SurfelFusion {
         range_image: &RangeImage,
         camera: &PinholeCamera,
     ) -> FusionSummary {
-        let mut update_list = Vec::with_capacity(range_image.valid_points_count());
-        let mut add_list = Vec::with_capacity(range_image.valid_points_count());
-        let mut free_list = Vec::with_capacity(40000);
+        enum SurfelUpdate {
+            Update(usize, Surfel),
+            Add(Surfel),
+            Discard,
+        }
 
-        //let recording = RecordingStreamBuilder::new("minimal").connect(rerun::default_server_addr())?;
+        //self.indexmap.render_indices_par(model.position_par_iter(), camera);
+        self.indexmap.render_indices(model.position_iter(), camera);
+        let mut model_map =
+            Array2::<Option<(usize, Surfel)>>::from_elem(self.indexmap.map.dim(), None);
+        self.indexmap.map.indexed_iter().for_each(|((v, u), id)| {
+            if *id > -1 {
+                model_map[(v, u)] = Some((*id as usize, model.get(*id as usize).unwrap()));
+            }
+        });
 
-        {
-            self.indexmap.render_indices(model.position_iter(), camera);
-            let mut model_map =
-                Array2::<Option<(usize, Surfel)>>::from_elem(self.indexmap.map.dim(), None);
-            self.indexmap.map.indexed_iter().for_each(|((v, u), id)| {
-                if *id > -1 {
-                    model_map[(v, u)] = Some((*id as usize, model.get(*id as usize).unwrap()));
-                }
-            });
+        let surfel_builder = SurfelBuilder::new(&camera.intrinsics);
 
-            let surfel_builder = SurfelBuilder::new(&camera.intrinsics);
-            range_image
-                .indexed_iter()
-                .for_each(|(v, u, point, normal, color)| {
-                    let ri_surfel =
-                        camera
-                            .camera_to_world
-                            .transform(surfel_builder.from_range_pixel(
-                                point,
-                                normal,
-                                color,
-                                Vector2::new(u as f32, v as f32),
-                                self.timestamp,
-                            ));
+        let updates = range_image
+            .indexed_iter()
+            .par_bridge()
+            .map(|(v, u, point, normal, color)| {
+                let ri_surfel = camera
+                    .camera_to_world
+                    .transform(surfel_builder.from_range_pixel(
+                        point,
+                        normal,
+                        color,
+                        Vector2::new(u as f32, v as f32),
+                        self.timestamp,
+                    ));
 
-                    let ray_cam_ri = ri_surfel.position - camera.camera_to_world.translation();
-                    let ray_cam_ri_norm = 1.0 / ray_cam_ri.norm();
-                    if let Some((index, _ray_dist, model_surfel)) = window(
-                        model_map.view(),
-                        u * self.indexmap.scale,
-                        v * self.indexmap.scale,
-                        8,
-                    )
-                    .filter_map(|v| v)
-                    .filter_map(|(index, model_surfel)| {
-                        if (ri_surfel.position - model_surfel.position).norm()
-                            > (model_surfel.radius + ri_surfel.radius) * 5.0
-                        {
-                            return None;
-                        }
-
-                        if angle_between_normals(&ri_surfel.normal, &model_surfel.normal)
-                            < 30.0_f32.to_radians()
-                        {
-                            let ray_dist =
-                                model_surfel.position.cross(&ray_cam_ri).norm() * ray_cam_ri_norm;
-                            Some((index, ray_dist, model_surfel))
-                        } else {
-                            None
-                        }
-                    })
-                    .min_by_key(|(_index, ray_distance, _model_surfel)| {
-                        ordered_float::OrderedFloat(*ray_distance)
-                    }) {
-                        //if  ri_surfel.radius >= model_surfel.radius*1.5 {
-                        if true {
-                            update_list.push((index, model_surfel.merge(&ri_surfel)));
-                        }
-                    } else {
-                        add_list.push(ri_surfel);
+                let ray_cam_ri = ri_surfel.position - camera.camera_to_world.translation();
+                let ray_cam_ri_norm = 1.0 / ray_cam_ri.norm();
+                if let Some((index, _ray_dist, model_surfel)) = window(
+                    model_map.view(),
+                    u * self.indexmap.scale,
+                    v * self.indexmap.scale,
+                    8,
+                )
+                .filter_map(|v| v)
+                .filter_map(|(index, model_surfel)| {
+                    if (ri_surfel.position - model_surfel.position).norm()
+                        > (model_surfel.radius + ri_surfel.radius) * 5.0
+                    {
+                        return None;
                     }
-                });
 
-            for (id, age, conf) in model.age_confidence_iter() {
+                    if angle_between_normals(&ri_surfel.normal, &model_surfel.normal)
+                        < 30.0_f32.to_radians()
+                    {
+                        let ray_dist =
+                            model_surfel.position.cross(&ray_cam_ri).norm() * ray_cam_ri_norm;
+                        Some((index, ray_dist, model_surfel))
+                    } else {
+                        None
+                    }
+                })
+                .min_by_key(|(_index, ray_distance, _model_surfel)| {
+                    ordered_float::OrderedFloat(*ray_distance)
+                }) {
+                    if ri_surfel.radius >= model_surfel.radius * 1.5 {
+                        //if true {
+                        return SurfelUpdate::Update(index, model_surfel.merge(&ri_surfel));
+                    }
+                } else {
+                    return SurfelUpdate::Add(ri_surfel);
+                }
+                SurfelUpdate::Discard
+            })
+            .collect::<Vec<_>>();
+
+        let free_list = model
+            .age_confidence_iter()
+            .filter_map(|(id, age, conf)| {
                 if (self.timestamp - age) > self.params.age_remove_threshold
                     && conf < self.params.confidence_remove_threshold
                 {
-                    free_list.push(id);
+                    Some(id)
+                } else {
+                    None
                 }
-            }
+            })
+            .collect::<Vec<_>>();
 
-            self.timestamp += 1;
-        }
+        self.timestamp += 1;
 
         let mut writer = model.write().unwrap();
-        for (id, surfel) in &update_list {
-            writer.update(*id, &surfel);
-        }
 
-        for surfel in &add_list {
-            writer.add(surfel);
+        let mut update_count = 0;
+        let mut add_count = 0;
+        for surfel_update in &updates {
+            match surfel_update {
+                SurfelUpdate::Update(id, surfel) => {
+                    update_count += 1;
+                    writer.update(*id, surfel);
+                }
+                SurfelUpdate::Add(surfel) => {
+                    add_count += 1;
+                    writer.add(&surfel);
+                }
+                SurfelUpdate::Discard => {}
+            }
         }
 
         for id in &free_list {
@@ -168,8 +166,8 @@ impl SurfelFusion {
         }
 
         return FusionSummary {
-            num_added: add_list.len(),
-            num_updated: update_list.len(),
+            num_added: add_count,
+            num_updated: update_count,
             num_removed: free_list.len(),
         };
     }
@@ -188,7 +186,7 @@ mod tests {
     use super::*;
 
     #[rstest]
-    #[ignore]
+    //#[ignore]
     fn test_surfel_fusion(sample_range_img_ds2: TestRangeImageDataset) {
         let manager = Manager::default();
 

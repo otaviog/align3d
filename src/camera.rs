@@ -173,9 +173,11 @@ impl PinholeCamera {
     /// # Returns
     ///
     /// * (x and y) coordinates.
-    pub fn project(&self, point: &Vector3<f32>) -> (f32, f32) {
-        self.intrinsics
-            .project(&self.world_to_camera.transform_vector(point))
+    pub fn project(&self, point: &Vector3<f32>) -> (f32, f32, f32) {
+        let point = self.world_to_camera.transform_vector(point);
+        let (u, v) = self.intrinsics
+            .project(&point);
+        (u,v, point[2])
     }
 
     /// Returns the projected 3D point if it is visible in the image.
@@ -187,16 +189,16 @@ impl PinholeCamera {
     /// # Returns
     ///
     /// * (x and y) coordinates if the point is visible, None otherwise.
-    pub fn project_to_image(&self, point: &Vector3<f32>) -> Option<(f32, f32)> {
-        let (x, y) = self.project(point);
+    pub fn project_to_image(&self, point: &Vector3<f32>) -> Option<(f32, f32, f32)> {
+        let (x, y, z) = self.project(point);
 
         if x >= 0.0
             && x < self.width_f32 as f32
             && y >= 0.0
             && y < self.height_f32 as f32
         {
-            //Some((x, self.height_f32 - y))
-            Some((x, y))
+            //Some((x, self.height_f32 - y, z))
+            Some((x, y, z))
         } else {
             None
         }
@@ -216,12 +218,12 @@ mod tests {
         );
 
         let point = nalgebra::Vector3::new(1.0, 1.0, 1.0);
-        let (x, y) = camera.project(&point);
+        let (x, y, _) = camera.project(&point);
         assert_eq!(x, 50.0);
         assert_eq!(y, 50.0);
 
         let point = nalgebra::Vector3::new(1.0, 1.5, 1.0);
-        let (x, y) = camera.project(&point);
+        let (x, y, _) = camera.project(&point);
         assert_eq!(x, 50.0);
         assert_eq!(y, 75.0);
     }
@@ -234,12 +236,12 @@ mod tests {
         );
 
         let point = nalgebra::Vector3::new(1.0, 1.0, 1.0);
-        let (x, y) = camera.project_to_image(&point).unwrap();
+        let (x, y, _) = camera.project_to_image(&point).unwrap();
         assert_eq!(x, 50.0);
         assert_eq!(y, 50.0);
 
         let point = nalgebra::Vector3::new(1.0, 1.5, 1.0);
-        let (x, y) = camera.project_to_image(&point).unwrap();
+        let (x, y, _) = camera.project_to_image(&point).unwrap();
         assert_eq!(x, 50.0);
         assert_eq!(y, 25.0);
     }
