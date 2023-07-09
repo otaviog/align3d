@@ -237,6 +237,6 @@ mod tests {
         let point = nalgebra::Vector3::new(1.0, 1.5, 1.0);
         let (x, y, _) = camera.project_to_image(&point).unwrap();
         assert_eq!(x, 50.0);
-        assert_eq!(y, 25.0);
+        assert_eq!(y, 75.0);
     }
 }

@@ -16,7 +16,7 @@ where
     let height = arr.shape()[0] as isize;
 
     (start..=end)
-        .flat_map(move |du| (start..=end).map(move |dv| (du, dv)))
+        .flat_map(move |dv| (start..=end).map(move |du| (du, dv)))
         .filter_map(move |(du, dv)| {
             let x = (u as isize) + du;
             let y = (v as isize) + dv;
@@ -54,6 +54,6 @@ mod tests {
 
         let iter = window(arr.view(), 2, 0, 3);
         let vec: Vec<_> = iter.collect();
-        assert_eq!(vec, vec![0, 1, 0, 4, 0, 7]);
+        assert_eq!(vec, vec![0, 0, 0, 1, 2, 3]);
     }
 }
