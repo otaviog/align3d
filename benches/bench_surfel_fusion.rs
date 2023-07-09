@@ -6,7 +6,7 @@ use align3d::viz::Manager;
 use criterion::{criterion_group, criterion_main, Criterion};
 use pprof::criterion::{Output, PProfProfiler};
 
-fn integration_benchmark(c: &mut Criterion) {
+fn integrate_benchmark(c: &mut Criterion) {
     const NUM_ITER: usize = 4;
     let manager = Manager::default();
     let dataset = SlamTbDataset::load("tests/data/rgbd/sample1").unwrap();
