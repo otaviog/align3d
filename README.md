@@ -151,6 +151,7 @@ The project has the following Road map:
 * [x] Bug fixes in PCL ICP.
 * [ ] Optimize Image Icp performance
 * [ ] Optimize 3D rendering pipeline
+* [ ] Python bindings
 * [ ] Improve UX of the 3D viewer
 * [x] Surfel fusion v1.0.0
       * Only merging of incoming to model surfels.
