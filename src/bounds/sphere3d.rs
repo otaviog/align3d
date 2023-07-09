@@ -1,5 +1,5 @@
 use nalgebra::Vector3;
-use ndarray::{Array2, Axis};
+use ndarray::ArrayView1;
 
 use crate::{
     transform::{Transform, Transformable},
@@ -20,22 +20,24 @@ impl Sphere3Df {
         }
     }
 
-    pub fn from_points(points: &Array2<f32>) -> Self {
-        let center = points.mean_axis(Axis(0)).unwrap();
+    pub fn from_points(points: &ArrayView1<Vector3<f32>>) -> Self {
+        let center: Vector3<f32> =
+            nalgebra::convert(points.iter().fold(Vector3::<f64>::zeros(), |accum, point| {
+                let point: Vector3<f64> = nalgebra::convert(*point);
+                accum + point
+            }));
+
         let radius = points
-            .axis_iter(Axis(0))
-            .map(|row| {
-                let sub = &row - &center;
+            .iter()
+            .map(|point| {
+                let sub = point - center;
                 sub.dot(&sub)
             })
             .reduce(f32::max)
             .unwrap()
             .sqrt();
 
-        Self {
-            center: Vector3::new(center[0], center[1], center[2]),
-            radius,
-        }
+        Self { center, radius }
     }
 
     pub fn from_point_iter<I>(point_iter: I) -> Self

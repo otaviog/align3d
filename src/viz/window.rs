@@ -15,8 +15,9 @@ use vulkano::{
         acquire_next_image, AcquireError, Surface, Swapchain, SwapchainCreateInfo,
         SwapchainCreationError, SwapchainPresentInfo,
     },
-    sync::{self, FlushError, GpuFuture},
+    sync::{self, GpuFuture},
 };
+
 use vulkano_win::VkSurfaceBuild;
 use winit::{
     event::{ElementState, Event, VirtualKeyCode, WindowEvent},
@@ -42,6 +43,7 @@ pub struct Window {
     scene: NodeRef<dyn Node>,
     command_buffer_allocator: StandardCommandBufferAllocator,
     pub on_key: Option<KeyCallback>,
+    frame_counter: usize,
 }
 
 fn window_size_dependent_setup(
@@ -91,6 +93,7 @@ impl Window {
                 Default::default(),
             ),
             on_key: None,
+            frame_counter: 0,
         }
     }
 
@@ -105,7 +108,6 @@ impl Window {
         projection_matrix: &nalgebra_glm::Mat4,
         window_state: &FrameStepInfo,
     ) -> PrimaryAutoCommandBuffer {
-        // Builds the command buffer
         let mut builder = AutoCommandBufferBuilder::primary(
             &self.command_buffer_allocator,
             self.queue.queue_family_index(),
@@ -113,7 +115,6 @@ impl Window {
         )
         .unwrap();
 
-        // Render pass
         builder
             .begin_render_pass(
                 RenderPassBeginInfo {
@@ -128,6 +129,7 @@ impl Window {
         (*self.scene).borrow().collect_command_buffers(
             &mut CommandBuffersContext::new(
                 self.device.clone(),
+                self.queue.clone(),
                 &mut builder,
                 pipelines,
                 render_pass,
@@ -137,8 +139,6 @@ impl Window {
             window_state,
         );
         builder.end_render_pass().unwrap();
-
-        // Finish building the command buffer by calling `build`.
         builder.build().unwrap()
     }
 
@@ -174,13 +174,10 @@ impl Window {
                     min_image_count: surface_capabilities.min_image_count,
                     image_format,
                     image_extent: dimensions.into(),
-                    image_usage: ImageUsage {
-                        color_attachment: true,
-                        ..Default::default()
-                    },
+                    image_usage: ImageUsage::COLOR_ATTACHMENT,
                     composite_alpha: surface_capabilities
                         .supported_composite_alpha
-                        .iter()
+                        .into_iter()
                         .next()
                         .unwrap(),
                     ..Default::default()
@@ -227,8 +224,6 @@ impl Window {
         );
 
         let mut recreate_swapchain = false;
-
-        let mut previous_frame_end = Some(sync::now(self.device.clone()).boxed());
         let mut pipelines = HashMap::<String, Arc<GraphicsPipeline>>::new();
 
         let scene_sphere = (self.scene).borrow().properties().get_bounding_sphere();
@@ -316,9 +311,6 @@ impl Window {
                         window_state.viewport_size =
                             [dimensions.width as f32, dimensions.height as f32];
 
-                        // Clean up resources from the previous frame.
-                        previous_frame_end.as_mut().unwrap().cleanup_finished();
-
                         // Swap chain recreation
                         if recreate_swapchain {
                             let (new_swapchain, new_images) =
@@ -336,8 +328,6 @@ impl Window {
                                 };
 
                             swapchain = new_swapchain;
-                            // Because framebuffers contains an Arc on the old swapchain, we need to
-                            // recreate framebuffers as well.
                             framebuffers = window_size_dependent_setup(
                                 &memory_allocator,
                                 &new_images,
@@ -360,6 +350,7 @@ impl Window {
                         if suboptimal {
                             recreate_swapchain = true;
                         };
+
                         let command_buffer = self.get_command_buffers(
                             framebuffers[image_index as usize].clone(),
                             &mut viewport,
@@ -370,9 +361,7 @@ impl Window {
                             &window_state,
                         );
 
-                        let future = previous_frame_end
-                            .take()
-                            .unwrap()
+                        sync::now(self.device.clone())
                             .join(acquire_future)
                             .then_execute(self.queue.clone(), command_buffer)
                             .unwrap()
@@ -383,20 +372,11 @@ impl Window {
                                     image_index,
                                 ),
                             )
-                            .then_signal_fence_and_flush();
-
-                        match future {
-                            Ok(future) => {
-                                previous_frame_end = Some(future.boxed());
-                            }
-                            Err(FlushError::OutOfDate) => {
-                                recreate_swapchain = true;
-                                previous_frame_end = Some(sync::now(self.device.clone()).boxed());
-                            }
-                            Err(e) => {
-                                panic!("Failed to flush future: {e:?}");
-                            }
-                        }
+                            .then_signal_fence_and_flush()
+                            .unwrap()
+                            .wait(None)
+                            .unwrap();
+                        self.frame_counter += 1;
                     }
                     _ => (),
                 }

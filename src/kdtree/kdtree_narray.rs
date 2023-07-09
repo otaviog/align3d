@@ -1,4 +1,3 @@
-use nalgebra::Vector3;
 use ndarray::prelude::*;
 
 use std::cmp::Ordering;
@@ -58,53 +57,6 @@ impl KdTree {
         let indices = Vec::from_iter(0..points.shape()[0]);
         KdTree {
             root: Box::new(rec(points, indices, 0)),
-        }
-    }
-
-    /// Find the nearest neighbor to a query point. This version is for 3D points only.
-    ///
-    /// # Arguments
-    ///
-    /// * point - The query point.
-    ///
-    /// # Returns
-    ///
-    /// A tuple containing the index of the nearest neighbor and the distance to it.
-    pub fn nearest3d(&self, point: &Vector3<f32>) -> (usize, f32) {
-        let mut curr_node = &self.root;
-        let mut current_dim = 0;
-
-        loop {
-            match curr_node.as_ref() {
-                KdNode::NonLeaf {
-                    middle_value: mid,
-                    left,
-                    right,
-                } => {
-                    curr_node = if point[current_dim] < *mid {
-                        left
-                    } else {
-                        right
-                    };
-                    current_dim = (current_dim + 1) % 3;
-                }
-                KdNode::Leaf {
-                    points: leaf_points,
-                    indices,
-                } => {
-                    let mut min_dist = f32::MAX;
-                    let mut min_idx = 0;
-                    for (idx, leaf_point) in leaf_points.rows().into_iter().enumerate() {
-                        let leaf_point = Vector3::new(leaf_point[0], leaf_point[1], leaf_point[2]);
-                        let dist = (point - leaf_point).norm_squared();
-                        if dist < min_dist {
-                            min_dist = dist;
-                            min_idx = idx;
-                        }
-                    }
-                    return (indices[min_idx], min_dist);
-                }
-            }
         }
     }
 
@@ -170,7 +122,6 @@ fn smallest_diff(
 mod tests {
     use std::time::Instant;
 
-    use nalgebra::Vector3;
     use ndarray::prelude::*;
     use rand::rngs::SmallRng;
     use rand::seq::SliceRandom;
@@ -193,12 +144,6 @@ mod tests {
 
         let found = tree.nearest(&queries.view(), crate::Array1Recycle::Empty);
         assert_eq!(found, array![3, 2, 0, 1]);
-
-        for (query, expected) in queries.outer_iter().zip(&[3, 2, 0, 1]) {
-            let query = Vector3::new(query[0], query[1], query[2]);
-            let (idx, _) = tree.nearest3d(&query);
-            assert_eq!(idx, *expected);
-        }
     }
 
     #[test]
@@ -224,13 +169,7 @@ mod tests {
         let tree = KdTree::new(&randomized_points.view());
 
         let found_indices = tree.nearest(&ordered_points.view(), Array1Recycle::Empty);
-        assert_eq!(Array::from_vec(random_indices.clone()), found_indices);
-
-        for (query, expected) in ordered_points.outer_iter().zip(random_indices.iter()) {
-            let query = Vector3::new(query[0], query[1], query[2]);
-            let (idx, _) = tree.nearest3d(&query);
-            assert_eq!(idx, *expected);
-        }
+        assert_eq!(Array::from_vec(random_indices), found_indices);
     }
 
     #[test]

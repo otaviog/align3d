@@ -29,3 +29,4 @@ pub mod image;
 pub mod utils;
 
 pub mod bin_utils;
+pub mod surfel;

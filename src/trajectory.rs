@@ -2,7 +2,7 @@ use std::ops::Index;
 
 use crate::transform::Transform;
 
-/// Trajectory of camera poses.
+/// Trajectory of camera poses. Use it to store or create trajectories while aligning scans.
 #[derive(Clone, Debug)]
 pub struct Trajectory {
     /// Camera poses, transforms points from camera to world.

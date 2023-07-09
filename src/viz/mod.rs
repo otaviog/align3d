@@ -25,3 +25,5 @@ pub use geoviewer::GeoViewer;
 
 #[cfg(test)]
 pub mod unit_test;
+
+mod misc;

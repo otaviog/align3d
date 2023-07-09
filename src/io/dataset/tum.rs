@@ -4,7 +4,7 @@ use nalgebra::{Quaternion, Vector3};
 use nshare::ToNdarray2;
 
 use crate::{
-    camera::Camera,
+    camera::CameraIntrinsics,
     image::{IntoArray3, RgbdFrame, RgbdImage},
     trajectory::Trajectory,
     transform::Transform,
@@ -24,7 +24,7 @@ fn read_file_list(filepath: &PathBuf) -> Result<Vec<(f64, String)>, DatasetError
     let reader = std::io::BufReader::new(file);
     let file_list: Vec<(f64, String)> = reader
         .lines()
-        .filter_map(|line| line.ok())
+        .map_while(Result::ok)
         .filter(|line| !line.trim().starts_with('#'))
         .map(|line| {
             let tokens: Vec<&str> = line.split(&[',', '\t', ' ']).collect();
@@ -72,7 +72,7 @@ fn load_trajectory(filepath: &str) -> Result<Vec<(f64, Transform)>, DatasetError
     let reader = std::io::BufReader::new(file);
     let trajectory = reader
         .lines()
-        .filter_map(|line| line.ok())
+        .map_while(Result::ok)
         .filter(|line| !line.trim().starts_with('#'))
         .map(|line| {
             let tokens: Vec<f64> = line
@@ -145,15 +145,9 @@ impl RgbdDataset for TumRgbdDataset {
             .into_ndarray2();
         let mut rgbd_image = RgbdImage::new(rgb_image, depth_image);
         rgbd_image.depth_scale = Some(1.0 / 5000.0);
-        let camera = Camera {
-            fx: 525.0,
-            fy: 525.0,
-            cx: 319.5,
-            cy: 239.5,
-            camera_to_world: Some(self.trajectory[index].clone()),
-        };
 
-        Ok(RgbdFrame::new(camera, rgbd_image))
+        let (camera, transform) = self.camera(index);
+        Ok(RgbdFrame::new(camera, rgbd_image, transform))
     }
 
     fn len(&self) -> usize {
@@ -166,6 +160,18 @@ impl RgbdDataset for TumRgbdDataset {
 
     fn trajectory(&self) -> Option<Trajectory> {
         Some(self.trajectory.clone())
+    }
+
+    fn camera(&self, index: usize) -> (CameraIntrinsics, Option<Transform>) {
+        let camera = CameraIntrinsics {
+            fx: 525.0,
+            fy: 525.0,
+            cx: 319.5,
+            cy: 239.5,
+            width: 640,
+            height: 480,
+        };
+        (camera, Some(self.trajectory[index].clone()))
     }
 }
 

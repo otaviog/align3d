@@ -1,3 +1,4 @@
+use nalgebra::{ClosedAdd, Vector3};
 use ndarray::prelude::*;
 use num::Zero;
 use std::fs::File;
@@ -35,19 +36,17 @@ impl TextParserContext {
     }
 }
 
-fn read_off_elements<T: Clone + FromStr + Zero + Copy>(
+fn read_off_elements<T: Clone + Zero + nalgebra::Scalar + ClosedAdd + FromStr + Copy>(
     num_elements: usize,
     parser_context: &mut TextParserContext,
-) -> Result<Array2<T>, LoadError> {
-    let mut elements = Array2::<T>::zeros((num_elements, 3));
+) -> Result<Array1<Vector3<T>>, LoadError> {
+    let mut elements = Array1::<Vector3<T>>::zeros(num_elements);
     for i in 0..num_elements {
         let line = parser_context.read_line()?;
         if let [Ok(x), Ok(y), Ok(z)] =
             line.split(' ').map(|x| x.parse::<T>()).collect::<Vec<_>>()[..]
         {
-            elements[[i, 0]] = x;
-            elements[[i, 1]] = y;
-            elements[[i, 2]] = z;
+            elements[i] = Vector3::new(x, y, z);
         } else {
             return Err(parser_context.gen_error(format!("Invalid vertex. Got `{line}`")));
         }

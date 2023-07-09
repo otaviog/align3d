@@ -1,8 +1,7 @@
-use std::{cell::RefCell, collections::HashMap, rc::Rc, sync::Arc};
-
 use image::{ImageBuffer, Rgba, RgbaImage};
+use std::{cell::RefCell, collections::HashMap, rc::Rc, sync::Arc};
 use vulkano::{
-    buffer::{BufferUsage, CpuAccessibleBuffer},
+    buffer::{Buffer, BufferCreateInfo, BufferUsage, Subbuffer},
     command_buffer::{
         allocator::StandardCommandBufferAllocator, AutoCommandBufferBuilder, CommandBufferUsage,
         CopyImageToBufferInfo, RenderPassBeginInfo, SubpassContents,
@@ -10,7 +9,10 @@ use vulkano::{
     device::{Device, Queue},
     format::Format,
     image::{view::ImageView, ImageDimensions, StorageImage},
-    memory::allocator::{FreeListAllocator, GenericMemoryAllocator, StandardMemoryAllocator},
+    memory::allocator::{
+        AllocationCreateInfo, FreeListAllocator, GenericMemoryAllocator, MemoryUsage,
+        StandardMemoryAllocator,
+    },
     pipeline::{graphics::viewport::Viewport, GraphicsPipeline},
     render_pass::{Framebuffer, FramebufferCreateInfo, RenderPass},
     sync,
@@ -39,7 +41,7 @@ pub struct OffscreenRenderer {
 /// Render result image. This class holds a GPU buffer accessible from CPU
 /// which can be mapped or converted into image.
 pub struct RenderImage {
-    image_buffer: Arc<CpuAccessibleBuffer<[u8]>>,
+    image_buffer: Subbuffer<[u8]>,
     width: u32,
     height: u32,
 }
@@ -137,13 +139,16 @@ impl OffscreenRenderer {
             self.viewport.dimensions[0] as usize,
             self.viewport.dimensions[1] as usize,
         );
-        let image_buffer = CpuAccessibleBuffer::from_iter(
+        let image_buffer = Buffer::from_iter(
             &self.memory_allocator,
-            BufferUsage {
-                transfer_dst: true,
+            BufferCreateInfo {
+                usage: BufferUsage::TRANSFER_DST,
                 ..Default::default()
             },
-            false,
+            AllocationCreateInfo {
+                usage: MemoryUsage::Download,
+                ..Default::default()
+            },
             (0..height * width * 4).map(|_| 0u8),
         )
         .expect("failed to create buffer");
@@ -168,6 +173,7 @@ impl OffscreenRenderer {
         scene.borrow().collect_command_buffers(
             &mut CommandBuffersContext {
                 device: self.device.clone(),
+                queue: self.queue.clone(),
                 builder: &mut builder,
                 pipelines: &mut self.pipelines,
                 render_pass: self.render_pass.clone(),

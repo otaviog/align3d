@@ -1,11 +1,11 @@
 use nalgebra::Vector3;
-use ndarray::{Array2, Array3, ArrayView2, ArrayView3};
+use ndarray::{Array2, ArrayView2};
 
 fn get_neighborhood_mean_point(
     src_v: usize,
     src_u: usize,
     src_mask: &ArrayView2<u8>,
-    src_points: &ArrayView3<f32>,
+    src_points: &ArrayView2<Vector3<f32>>,
 ) -> Option<Vector3<f32>> {
     let local_points = {
         let mut local_points = Vec::<Vector3<f32>>::new();
@@ -13,11 +13,7 @@ fn get_neighborhood_mean_point(
             for j in 0..2 {
                 let (i, j) = (src_v + i, src_u + j);
                 if src_mask[[i, j]] == 1 {
-                    let point = Vector3::new(
-                        src_points[(i, j, 0)],
-                        src_points[(i, j, 1)],
-                        src_points[(i, j, 2)],
-                    );
+                    let point = src_points[(i, j)];
                     local_points.push(point);
                 }
             }
@@ -44,13 +40,13 @@ fn get_neighborhood_mean_point(
 }
 
 pub fn resize_range_points(
-    src_points: &ArrayView3<f32>,
+    src_points: &ArrayView2<Vector3<f32>>,
     src_mask: &ArrayView2<u8>,
     dst_width: usize,
     dst_height: usize,
-) -> (Array3<f32>, Array2<u8>) {
+) -> (Array2<Vector3<f32>>, Array2<u8>) {
     // TODO: Make mure rustacean: use iterators, etc.
-    let mut dst_points = Array3::zeros((dst_height, dst_width, 3));
+    let mut dst_points = Array2::zeros((dst_height, dst_width));
     let mut dst_mask = Array2::zeros((dst_height, dst_width));
     let (src_height, src_width) = (src_points.shape()[0], src_points.shape()[1]);
 
@@ -70,9 +66,7 @@ pub fn resize_range_points(
             dst_mask[(dst_v, dst_u)] = 1;
 
             // dst_points.slice_mut(s![dst_v, dst_u, ..]).assign(&nearest_point.into_ndarray2());
-            dst_points[(dst_v, dst_u, 0)] = nearest_point[0];
-            dst_points[(dst_v, dst_u, 1)] = nearest_point[1];
-            dst_points[(dst_v, dst_u, 2)] = nearest_point[2];
+            dst_points[(dst_v, dst_u)] = nearest_point;
         }
     }
 
@@ -80,14 +74,14 @@ pub fn resize_range_points(
 }
 
 pub fn resize_range_normals(
-    src_normals: &ArrayView3<f32>,
+    src_normals: &ArrayView2<Vector3<f32>>,
     src_mask: &ArrayView2<u8>,
     dst_width: usize,
     dst_height: usize,
-) -> Array3<f32> {
+) -> Array2<Vector3<f32>> {
     // TODO: Make mure rustacean: use iterators, etc.
 
-    let mut dst_points = Array3::zeros((dst_height, dst_width, 3));
+    let mut dst_points = Array2::zeros((dst_height, dst_width));
     let (src_height, src_width) = (src_normals.shape()[0], src_normals.shape()[1]);
 
     let height_ratio = src_height as f32 / dst_height as f32;
@@ -102,10 +96,7 @@ pub fn resize_range_normals(
                     Some(value) => value,
                     None => continue,
                 };
-
-            dst_points[(dst_v, dst_u, 0)] = nearest_point[0];
-            dst_points[(dst_v, dst_u, 1)] = nearest_point[1];
-            dst_points[(dst_v, dst_u, 2)] = nearest_point[2];
+            dst_points[(dst_v, dst_u)] = nearest_point;
         }
     }
 
@@ -141,8 +132,8 @@ mod tests {
 
         write_ply(
             "tests/outputs/downsample_points.ply",
-            &GeometryBuilder::new(points.into_shape((width * height, 3)).unwrap())
-                .with_normals(normals.into_shape((width * height, 3)).unwrap())
+            &GeometryBuilder::new(points.into_shape(width * height).unwrap())
+                .with_normals(normals.into_shape(width * height).unwrap())
                 .build(),
         )
         .expect("Error while writing the results");

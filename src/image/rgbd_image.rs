@@ -1,6 +1,11 @@
 use ndarray::{Array2, Array3};
 
-use crate::{bilateral::BilateralFilter, camera::Camera, sampling::Downsample};
+use crate::{
+    bilateral::BilateralFilter,
+    camera::{CameraIntrinsics, PinholeCamera},
+    sampling::Downsample,
+    transform::Transform,
+};
 
 use super::{py_scale_down, IntoImageRgb8};
 
@@ -53,19 +58,38 @@ impl Downsample for RgbdImage {
     }
 }
 
+/// A struct that holds a camera intrinsics, a camera pose and an RGB-D image. Used by RGBD dataset readers.
 pub struct RgbdFrame {
-    pub camera: Camera,
+    /// The camera intrinsics.
+    pub camera: CameraIntrinsics,
+    /// The camera pose in the world coordinate system. None if the dataset has no ground truth.
+    pub camera_to_world: Option<Transform>,
+    /// The RGB-D image.
     pub image: RgbdImage,
     // pub timestamp: Option<f64>,
 }
 
 impl RgbdFrame {
-    pub fn new(camera: Camera, image: RgbdImage) -> Self {
-        Self { camera, image }
+    pub fn new(
+        camera: CameraIntrinsics,
+        image: RgbdImage,
+        camera_to_world: Option<Transform>,
+    ) -> Self {
+        Self {
+            camera,
+            image,
+            camera_to_world,
+        }
     }
 
-    pub fn into_parts(self) -> (Camera, RgbdImage) {
-        (self.camera, self.image)
+    pub fn into_parts(self) -> (CameraIntrinsics, RgbdImage, Option<Transform>) {
+        (self.camera, self.image, self.camera_to_world)
+    }
+
+    pub fn get_pinhole_camera(&self) -> Option<PinholeCamera> {
+        self.camera_to_world
+            .as_ref()
+            .map(|camera_to_world| PinholeCamera::new(self.camera.clone(), camera_to_world.clone()))
     }
 }
 
@@ -76,6 +100,7 @@ impl Downsample for RgbdFrame {
         RgbdFrame {
             camera: self.camera.scale(0.5),
             image: self.image.downsample(scale),
+            camera_to_world: self.camera_to_world.clone(),
         }
     }
 }
