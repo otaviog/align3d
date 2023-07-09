@@ -42,7 +42,7 @@ criterion_group! {
     name = benches;
 
     config = Criterion::default().with_profiler(PProfProfiler::new(100, Output::Flamegraph(None)));
-    targets = integration_benchmark
+    targets = integrate_benchmark
 }
 
 criterion_main!(benches);
