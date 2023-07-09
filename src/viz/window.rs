@@ -391,7 +391,6 @@ impl Window {
                         //     Err(e) => {
                         //         panic!("Failed to flush future: {e:?}");
                         //     }
-                        // }
                     }
                     _ => (),
                 }
