@@ -12,12 +12,12 @@ use num::Float;
 
 /// Standard Iterative Closest Point (ICP) algorithm for aligning two point clouds.
 /// This implementation uses the point-to-plane distance.
-pub struct Icp<'target_lt> {
+pub struct Icp<'target> {
     // Parameters of the ICP algorithm.
     pub params: IcpParams,
     // Initial transformation to start the algorithm. Default is the identity.
     pub initial_transform: Transform,
-    target: &'target_lt PointCloud,
+    target: &'target PointCloud,
     kdtree: R3dTree,
 }
 
@@ -28,7 +28,7 @@ impl<'target> Icp<'target> {
     ///
     /// * params - Parameters of the ICP algorithm.
     /// * target - Target point cloud.
-    pub fn new(params: IcpParams, target: &'target_lt PointCloud) -> Self {
+    pub fn new(params: IcpParams, target: &'target PointCloud) -> Self {
         Self {
             params,
             initial_transform: Transform::eye(),

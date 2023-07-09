@@ -224,8 +224,6 @@ impl Window {
         );
 
         let mut recreate_swapchain = false;
-
-        let mut _previous_frame_end = Some(sync::now(self.device.clone()).boxed());
         let mut pipelines = HashMap::<String, Arc<GraphicsPipeline>>::new();
 
         let scene_sphere = (self.scene).borrow().properties().get_bounding_sphere();
@@ -379,18 +377,6 @@ impl Window {
                             .wait(None)
                             .unwrap();
                         self.frame_counter += 1;
-
-                        // let amatch future {
-                        //     Ok(future) => {
-                        //         previous_frame_end = Some(future.boxed());
-                        //     }
-                        //     Err(FlushError::OutOfDate) => {
-                        //         recreate_swapchain = true;
-                        //         previous_frame_end = Some(sync::now(self.device.clone()).boxed());
-                        //     }
-                        //     Err(e) => {
-                        //         panic!("Failed to flush future: {e:?}");
-                        //     }
                     }
                     _ => (),
                 }

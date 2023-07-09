@@ -57,6 +57,7 @@ kdam = "0.3.0"
 rayon = "1.7.0"
 ordered-float = "3.7.0"
 parking_lot = "0.12.1"
+spin = "0.9.8"
 
 
 [dev-dependencies]
