@@ -6,7 +6,7 @@ use parking_lot::{MappedMutexGuard, Mutex, MutexGuard};
 use rayon::prelude::*;
 
 use vulkano::buffer::subbuffer::BufferWriteGuard;
-use vulkano::buffer::{Buffer, BufferContents, BufferCreateInfo};
+use vulkano::buffer::{Buffer, BufferContents, BufferCreateInfo, BufferError};
 use vulkano::command_buffer::allocator::{
     StandardCommandBufferAllocator, StandardCommandBufferAllocatorCreateInfo,
 };
@@ -135,10 +135,11 @@ impl<'model> CpuSurfelWriter<'model> {
     }
 }
 
-/// Vertex containg position and confidence.
+/// Vertex containing position and confidence. We store both in the same vertex to save space.
 #[derive(BufferContents, Vertex)]
 #[repr(C)]
 pub struct VkSurfelPositionConf {
+    /// Position and confidence.
     #[format(R32G32B32A32_SFLOAT)]
     pub position_confidence: [f32; 4],
 }
@@ -151,10 +152,11 @@ impl VkSurfelPositionConf {
     }
 }
 
-/// Vertex containing normal and radius.
+/// Vertex containing normal and radius. We store both in the same vertex to save space.
 #[derive(BufferContents, Vertex)]
 #[repr(C)]
 pub struct VkSurfelNormalRadius {
+    /// Normal and radius.
     #[format(R32G32B32A32_SFLOAT)]
     pub normal_radius: [f32; 4],
 }
@@ -180,7 +182,7 @@ impl VkSurfelColorMaskAge {
         Self {
             rgbmask_age: [
                 ((r as u32) << 24) | ((g as u32) << 16) | ((b as u32) << 8) | (mask as u32),
-                age as u32,
+                age,
             ],
         }
     }
@@ -259,8 +261,8 @@ impl VkSurfelData {
             .unwrap(),
             color_mask_age: Buffer::from_iter(
                 memory_allocator,
-                create_info.clone(),
-                alloc_info.clone(),
+                create_info,
+                alloc_info,
                 (0..size).map(|_| VkSurfelColorMaskAge::new(0, 0, 0, 0, 0)),
             )
             .unwrap(),
@@ -268,12 +270,12 @@ impl VkSurfelData {
     }
 
     /// Create a writer to update the surfel data in GPU.
-    pub fn writer(&'_ mut self) -> VkSurfelWriter<'_> {
-        VkSurfelWriter {
-            position_conf: self.position_conf.write().unwrap(),
-            normal_radius: self.normal_radius.write().unwrap(),
-            color_mask_age: self.color_mask_age.write().unwrap(),
-        }
+    pub fn writer(&'_ mut self) -> Result<VkSurfelWriter<'_>, BufferError> {
+        Ok(VkSurfelWriter {
+            position_conf: self.position_conf.write()?,
+            normal_radius: self.normal_radius.write()?,
+            color_mask_age: self.color_mask_age.write()?,
+        })
     }
 }
 
@@ -371,8 +373,8 @@ impl VkSurfelStorage {
             .unwrap();
 
         let command_buffer = builder.build().unwrap();
-        let future = sync::now(device.clone())
-            .then_execute(queue.clone(), command_buffer)
+        let future = sync::now(device)
+            .then_execute(queue, command_buffer)
             .unwrap()
             .then_signal_fence_and_flush()
             .unwrap();
@@ -383,7 +385,7 @@ impl VkSurfelStorage {
         self.process.position_conf.len() as usize
     }
 
-    pub fn write(&mut self) -> VkSurfelWriter {
+    pub fn get_writer(&mut self) -> VkSurfelWriter {
         VkSurfelWriter {
             position_conf: self.process.position_conf.write().unwrap(),
             normal_radius: self.process.normal_radius.write().unwrap(),
@@ -457,7 +459,7 @@ impl SurfelModel {
     }
 
     /// Iterator over the allocated surfel position.
-    pub fn position_iter<'a>(&'a self) -> impl Iterator<Item = (usize, Vector3<f32>)> + 'a {
+    pub fn position_iter(&'_ self) -> impl Iterator<Item = (usize, Vector3<f32>)> + '_ {
         self.data
             .position
             .iter()
@@ -467,9 +469,7 @@ impl SurfelModel {
     }
 
     /// Parallel iterator over the allocated surfel position.
-    pub fn position_par_iter<'a>(
-        &'a self,
-    ) -> impl ParallelIterator<Item = (usize, Vector3<f32>)> + 'a {
+    pub fn position_par_iter(&'_ self) -> impl ParallelIterator<Item = (usize, Vector3<f32>)> + '_ {
         self.data
             .position
             .iter()
@@ -488,7 +488,7 @@ impl SurfelModel {
     }
 
     /// Iterator over the allocated age and confidence of surfels.
-    pub fn age_confidence_iter<'a>(&'a self) -> impl Iterator<Item = (usize, u32, f32)> + 'a {
+    pub fn age_confidence_iter(&'_ self) -> impl Iterator<Item = (usize, u32, f32)> + '_ {
         self.data
             .mask
             .iter()
@@ -506,9 +506,9 @@ impl SurfelModel {
             )
     }
 
-    pub fn age_confidence_par_iter<'a>(
-        &'a self,
-    ) -> impl ParallelIterator<Item = (usize, u32, f32)> + 'a {
+    pub fn age_confidence_par_iter(
+        &'_ self,
+    ) -> impl ParallelIterator<Item = (usize, u32, f32)> + '_ {
         self.data
             .mask
             .iter()

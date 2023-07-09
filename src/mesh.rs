@@ -11,8 +11,8 @@ pub fn compute_normals(
             let p0 = points[face[0]];
             let p1 = points[face[1]];
             let p2 = points[face[2]];
-            let v0 = &p1 - &p0;
-            let v1 = &p2 - &p0;
+            let v0 = p1 - p0;
+            let v1 = p2 - p0;
 
             let v0 = nalgebra::Vector3::new(v0[0], v0[1], v0[2]);
             let v1 = nalgebra::Vector3::new(v1[0], v1[1], v1[2]);
@@ -34,7 +34,7 @@ pub fn compute_normals(
         .zip(face_normals)
         .for_each(|(face, face_normal)| {
             for f in [face[0], face[1], face[2]] {
-                let normal_sum = &vertex_normals[f] + &face_normal;
+                let normal_sum = vertex_normals[f] + face_normal;
                 vertex_normals[f] = normal_sum;
                 vertex_face_count[f] += 1;
             }

@@ -10,7 +10,9 @@ use vulkano::{
     descriptor_set::{
         allocator::StandardDescriptorSetAllocator, PersistentDescriptorSet, WriteDescriptorSet,
     },
-    memory::allocator::{AllocationCreateInfo, MemoryUsage, StandardMemoryAllocator, MemoryAllocator},
+    memory::allocator::{
+        AllocationCreateInfo, MemoryAllocator, MemoryUsage, StandardMemoryAllocator,
+    },
     pipeline::{
         graphics::{
             depth_stencil::DepthStencilState,
@@ -19,7 +21,8 @@ use vulkano::{
             viewport::{Viewport, ViewportState},
         },
         GraphicsPipeline, Pipeline, PipelineBindPoint,
-    }, render_pass::Subpass
+    },
+    render_pass::Subpass,
 };
 
 use crate::{
@@ -28,8 +31,9 @@ use crate::{
     range_image::RangeImage,
     viz::{
         controllers::FrameStepInfo,
+        misc::get_normal_matrix,
         node::{node_ref, CommandBuffersContext, MakeNode, Node, NodeProperties, NodeRef},
-        Manager, misc::get_normal_matrix,
+        Manager,
     },
 };
 
@@ -59,14 +63,20 @@ impl VkPointCloud {
         let number_of_points = pointcloud.len();
 
         Arc::new(Self {
-            points: Buffer::from_iter(memory_allocator, create_info.clone(), alloc_info.clone(),
+            points: Buffer::from_iter(
+                memory_allocator,
+                create_info.clone(),
+                alloc_info.clone(),
                 pointcloud
                     .points
                     .iter()
                     .map(|v| PositionF32::new(v[0], v[1], v[2])),
             )
             .unwrap(),
-            normals: Buffer::from_iter(memory_allocator, create_info.clone(), alloc_info.clone(),
+            normals: Buffer::from_iter(
+                memory_allocator,
+                create_info.clone(),
+                alloc_info.clone(),
                 pointcloud
                     .normals
                     .as_ref()
@@ -75,7 +85,10 @@ impl VkPointCloud {
                     .map(|v| NormalF32::new(v[0], v[1], v[2])),
             )
             .unwrap(),
-            colors: Buffer::from_iter(memory_allocator, create_info.clone(), alloc_info.clone(),
+            colors: Buffer::from_iter(
+                memory_allocator,
+                create_info,
+                alloc_info,
                 pointcloud
                     .colors
                     .as_ref()
@@ -182,7 +195,11 @@ impl Node for VkPointCloudNode {
                 let fs = fs::load(context.device.clone()).unwrap();
 
                 GraphicsPipeline::start()
-                    .vertex_input_state([PositionF32::per_vertex(), NormalF32::per_vertex(), ColorU8::per_vertex()])
+                    .vertex_input_state([
+                        PositionF32::per_vertex(),
+                        NormalF32::per_vertex(),
+                        ColorU8::per_vertex(),
+                    ])
                     .vertex_shader(vs.entry_point("main").unwrap(), ())
                     .input_assembly_state(
                         InputAssemblyState::new().topology(PrimitiveTopology::PointList),
@@ -206,12 +223,12 @@ impl Node for VkPointCloudNode {
             Arc::new(StandardMemoryAllocator::new_default(context.device.clone()));
 
         let uniform_buffer = SubbufferAllocator::new(
-                memory_allocator.clone(),
-                SubbufferAllocatorCreateInfo {
-                    buffer_usage: BufferUsage::UNIFORM_BUFFER,
-                    ..Default::default()
-                },
-            );
+            memory_allocator,
+            SubbufferAllocatorCreateInfo {
+                buffer_usage: BufferUsage::UNIFORM_BUFFER,
+                ..Default::default()
+            },
+        );
 
         let uniform_buffer_subbuffer = {
             let view_matrix = context.view_matrix * self.properties.transformation;

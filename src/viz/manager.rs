@@ -23,7 +23,7 @@ impl Default for Manager {
     fn default() -> Self {
         let library = VulkanLibrary::new().expect("Vulkan is not supported by this system");
         let mut required_extensions = vulkano_win::required_extensions(&library);
-        required_extensions.khr_external_memory_capabilities =true;
+        required_extensions.khr_external_memory_capabilities = true;
 
         let instance = Instance::new(
             library.clone(),

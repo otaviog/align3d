@@ -5,7 +5,12 @@ use criterion::{criterion_group, criterion_main, Criterion};
 fn criterion_benchmark(c: &mut Criterion) {
     let geometry = read_off("tests/data/teapot.off").unwrap();
     c.bench_function("compute_normals", |b| {
-        b.iter(|| compute_normals(&geometry.points, geometry.faces.as_ref().unwrap()));
+        b.iter(|| {
+            compute_normals(
+                &geometry.points.view(),
+                &geometry.faces.as_ref().unwrap().view(),
+            )
+        });
     });
 }
 

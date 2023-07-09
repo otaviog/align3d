@@ -11,12 +11,11 @@ pub struct PointCloudView<'a> {
 }
 
 type NdArrayIter2<'a, T> = Iter<'a, T, ndarray::Dim<[usize; 2]>>;
+type ZipIterator<'a> =
+    Zip<Zip<NdArrayIter2<'a, Vector3<f32>>, NdArrayIter2<'a, Vector3<f32>>>, NdArrayIter2<'a, u8>>;
 
 pub struct PointCloudViewIterator<'a> {
-    iter: Zip<
-        Zip<NdArrayIter2<'a, Vector3<f32>>, NdArrayIter2<'a, Vector3<f32>>>,
-        NdArrayIter2<'a, u8>,
-    >,
+    iter: ZipIterator<'a>,
     linear_index: usize,
 }
 

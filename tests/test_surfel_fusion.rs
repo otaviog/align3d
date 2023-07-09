@@ -1,7 +1,4 @@
-use std::{
-    sync::{Arc, Mutex},
-    thread,
-};
+use std::thread;
 
 use align3d::{
     bilateral::BilateralFilter,
@@ -13,10 +10,7 @@ use align3d::{
 
 fn main() {
     let mut manager = Manager::default();
-    let mut model = SurfelModel::new(
-        &manager.memory_allocator,
-        4_000_000,
-    );
+    let mut model = SurfelModel::new(&manager.memory_allocator, 4_000_000);
 
     let render_model = model.vk_data.clone();
     let node = render_model.make_node(&mut manager);

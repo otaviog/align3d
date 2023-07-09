@@ -1,5 +1,5 @@
 use nalgebra::Vector3;
-use ndarray::{ArrayBase, Ix1, ViewRepr, Array2, Array1};
+use ndarray::{Array1, Array2, ArrayBase, Ix1, ViewRepr};
 
 use crate::error::A3dError;
 
@@ -38,7 +38,9 @@ impl<T: Copy> UnflattenVector3<T> for Array2<T> {
     fn unflatten_vector3(&self) -> Result<Self::Output, A3dError> {
         let dim = self.dim();
         if dim.1 != 3 {
-            return Err(A3dError::Assertion("Invalid dim size. Must be 3 2nd dimension".to_string()));
+            return Err(A3dError::Assertion(
+                "Invalid dim size. Must be 3 2nd dimension".to_string(),
+            ));
         }
 
         Ok(Array1::from_shape_fn(dim.0, |i| {

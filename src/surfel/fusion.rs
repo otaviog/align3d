@@ -59,7 +59,6 @@ impl SurfelFusion {
         enum SurfelUpdate {
             Update(usize, Surfel),
             Add(Surfel),
-            Discard,
         }
 
         //self.indexmap.render_indices_par(model.position_par_iter(), camera);
@@ -74,7 +73,7 @@ impl SurfelFusion {
 
         let surfel_builder = SurfelBuilder::new(&camera.intrinsics);
 
-        let updates = range_image
+        let add_update_list = range_image
             .indexed_iter()
             .par_bridge()
             .map(|(v, u, point, normal, color)| {
@@ -96,7 +95,7 @@ impl SurfelFusion {
                     v * self.indexmap.scale,
                     8,
                 )
-                .filter_map(|v| v)
+                .flatten()
                 .filter_map(|(index, model_surfel)| {
                     if (ri_surfel.position - model_surfel.position).norm()
                         > (model_surfel.radius + ri_surfel.radius) * 5.0
@@ -117,12 +116,11 @@ impl SurfelFusion {
                 .min_by_key(|(_index, ray_distance, _model_surfel)| {
                     ordered_float::OrderedFloat(*ray_distance)
                 }) {
-                    // if ri_surfel.radius >= model_surfel.radius * 1.5 
-                    return SurfelUpdate::Update(index, model_surfel.merge(&ri_surfel));
+                    // if ri_surfel.radius >= model_surfel.radius * 1.5
+                    SurfelUpdate::Update(index, model_surfel.merge(&ri_surfel))
                 } else {
-                    return SurfelUpdate::Add(ri_surfel);
+                    SurfelUpdate::Add(ri_surfel)
                 }
-                SurfelUpdate::Discard
             })
             .collect::<Vec<_>>();
 
@@ -143,12 +141,12 @@ impl SurfelFusion {
 
         let mut update_count = 0;
         let mut add_count = 0;
-        let mut gpu_updates = Vec::with_capacity(updates.len());
+        let mut gpu_add_list = Vec::with_capacity(add_update_list.len());
         {
             let mut cpu_writer = model.get_cpu_writer();
 
             {
-                for surfel_update in &updates {
+                for surfel_update in &add_update_list {
                     match surfel_update {
                         SurfelUpdate::Update(id, surfel) => {
                             update_count += 1;
@@ -156,10 +154,9 @@ impl SurfelFusion {
                         }
                         SurfelUpdate::Add(surfel) => {
                             add_count += 1;
-                            let id = cpu_writer.add(&surfel);
-                            gpu_updates.push(SurfelUpdate::Update(id, surfel.clone()));
+                            let id = cpu_writer.add(surfel);
+                            gpu_add_list.push((id, *surfel));
                         }
-                        SurfelUpdate::Discard => {}
                     }
                 }
 
@@ -171,14 +168,15 @@ impl SurfelFusion {
 
         {
             let mut gpu_writer = model.lock_gpu();
-            let mut writer = gpu_writer.write();
-            for surfel_update in &gpu_updates {
-                match surfel_update {
-                    SurfelUpdate::Update(id, surfel) => {
-                        writer.update(*id, surfel);
-                    }
-                    _ => {}
+            let mut writer = gpu_writer.get_writer();
+            for au_item in &add_update_list {
+                if let SurfelUpdate::Update(id, surfel) = au_item {
+                    writer.update(*id, surfel);
                 }
+            }
+
+            for surfel_update in &gpu_add_list {
+                writer.update(surfel_update.0, &surfel_update.1);
             }
 
             for id in &free_list {
@@ -186,11 +184,11 @@ impl SurfelFusion {
             }
         }
 
-        return FusionSummary {
+        FusionSummary {
             num_added: add_count,
             num_updated: update_count,
             num_removed: free_list.len(),
-        };
+        }
     }
 }
 

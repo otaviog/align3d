@@ -53,7 +53,6 @@ impl ToImageRgb8 for Array2<Vector3<u8>> {
     }
 }
 
-
 pub fn py_scale_down(src_img: &ImageBuffer<Rgb<u8>, Vec<u8>>, sigma: f32) -> Array3<u8> {
     let (src_height, src_width) = (src_img.height() as usize, src_img.width() as usize);
     let src_img = blur(src_img, sigma).into_array3();

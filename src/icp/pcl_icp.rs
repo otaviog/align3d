@@ -67,8 +67,8 @@ impl<'target_lt> Icp<'target_lt> {
         for _ in 0..self.params.max_iterations {
             for (source_point, source_normal) in izip!(source.points.iter(), source_normals.iter())
             {
-                let source_point = optim_transform.transform_vector(&source_point);
-                let source_normal = optim_transform.transform_normal(&source_normal);
+                let source_point = optim_transform.transform_vector(source_point);
+                let source_normal = optim_transform.transform_normal(source_normal);
 
                 let (found_index, found_sqr_distance) = self.kdtree.nearest(&source_point);
                 if found_sqr_distance > max_distance_sqr {

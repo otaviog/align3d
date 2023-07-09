@@ -1,7 +1,7 @@
 use align3d::bilateral::BilateralFilter;
 use align3d::io::dataset::{RgbdDataset, SlamTbDataset};
 use align3d::range_image::RangeImageBuilder;
-use align3d::surfel::{SurfelFusion, SurfelFusionParameters, SurfelModel, RangeImage2};
+use align3d::surfel::{SurfelFusion, SurfelFusionParameters, SurfelModel};
 use align3d::viz::Manager;
 use criterion::{criterion_group, criterion_main, Criterion};
 use pprof::criterion::{Output, PProfProfiler};
@@ -22,20 +22,17 @@ fn integration_benchmark(c: &mut Criterion) {
 
         let range_image = rimage_builder.build(frame)[0].clone();
 
-        rimages.push(RangeImage2::from(&range_image));
+        rimages.push(range_image);
         cameras.push(camera);
-        
     }
 
     c.bench_function("Fusion integration", |b| {
-        let mut model = SurfelModel::new(&manager.memory_allocator, 1600_000);
-        
+        let mut model = SurfelModel::new(&manager.memory_allocator, 1_600_000);
+
         let mut surfel_fusion = SurfelFusion::new(640, 480, 4, SurfelFusionParameters::default());
         b.iter(|| {
             for (range_image, camera) in rimages.iter().zip(cameras.iter()) {
-                //let range_image = rimages[i];
-                //let camera = cameras[i];
-                let summary = surfel_fusion.integrate(&mut model, &range_image, &camera);
+                surfel_fusion.integrate(&mut model, range_image, camera);
             }
         });
     });
@@ -43,7 +40,7 @@ fn integration_benchmark(c: &mut Criterion) {
 
 criterion_group! {
     name = benches;
-    
+
     config = Criterion::default().with_profiler(PProfProfiler::new(100, Output::Flamegraph(None)));
     targets = integration_benchmark
 }

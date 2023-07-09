@@ -1,4 +1,4 @@
-use nalgebra::{Vector3, ClosedAdd};
+use nalgebra::{ClosedAdd, Vector3};
 use ndarray::prelude::*;
 use num::Zero;
 use std::fs::File;

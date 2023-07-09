@@ -4,7 +4,7 @@ mod surfel_model;
 
 pub use fusion::{SurfelFusion, SurfelFusionParameters};
 pub use surfel_model::{
-    SurfelModel, VkSurfelStorage, VkSurfelColorMaskAge, VkSurfelNormalRadius, VkSurfelPositionConf,
+    SurfelModel, VkSurfelColorMaskAge, VkSurfelNormalRadius, VkSurfelPositionConf, VkSurfelStorage,
 };
 
 mod surfel_type;

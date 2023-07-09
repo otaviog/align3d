@@ -1,6 +1,6 @@
 use crate::camera::CameraIntrinsics;
 
-use crate::image::{rgb_to_luma_u8, ToImageRgb8, RgbdFrame, RgbdImage};
+use crate::image::{rgb_to_luma_u8, RgbdFrame, RgbdImage, ToImageRgb8};
 use crate::intensity_map::IntensityMap;
 
 use image::imageops::blur;
@@ -13,8 +13,6 @@ use crate::io::Geometry;
 use crate::pointcloud::PointCloud;
 
 use super::resize::{resize_range_normals, resize_range_points};
-
-
 
 /// A point cloud that comes from an image-based measurement. It representation holds its grid structure.
 #[derive(Debug, Clone)]
@@ -43,11 +41,7 @@ fn py_scale_down2(src_img: &ImageBuffer<Rgb<u8>, Vec<u8>>, sigma: f32) -> Array2
     let (dst_height, dst_width) = (src_height / 2, src_width / 2);
     Array2::from_shape_fn((dst_height, dst_width), |(i_dst, j_dst)| {
         let pixel = src_img.get_pixel((j_dst * 2) as u32, (i_dst * 2) as u32);
-        Vector3::new(
-            pixel[0] as u8,
-            pixel[1] as u8,
-            pixel[2] as u8,
-        )
+        Vector3::new(pixel[0], pixel[1], pixel[2])
     })
 }
 
@@ -316,9 +310,9 @@ impl RangeImage {
         self.mask[(v, u)] != 0
     }
 
-    pub fn indexed_iter<'a>(
-        &'a self,
-    ) -> impl Iterator<Item = (usize, usize, Vector3<f32>, Vector3<f32>, Vector3<u8>)> + 'a {
+    pub fn indexed_iter(
+        &'_ self,
+    ) -> impl Iterator<Item = (usize, usize, Vector3<f32>, Vector3<f32>, Vector3<u8>)> + '_ {
         let normals = self.normals.as_ref().unwrap();
         let colors = self.colors.as_ref().unwrap();
         self.mask.indexed_iter().filter_map(move |((v, u), m)| {

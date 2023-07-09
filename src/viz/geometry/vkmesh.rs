@@ -236,7 +236,7 @@ impl Node for VkMeshNode {
             Arc::new(StandardMemoryAllocator::new_default(context.device.clone()));
 
         let uniform_buffer = SubbufferAllocator::new(
-            memory_allocator.clone(),
+            memory_allocator,
             SubbufferAllocatorCreateInfo {
                 buffer_usage: BufferUsage::UNIFORM_BUFFER,
                 ..Default::default()

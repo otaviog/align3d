@@ -1,11 +1,11 @@
 use ndarray::ArrayView2;
 
-pub fn window<'a, T>(
-    arr: ArrayView2<'a, T>,
+pub fn window<T>(
+    arr: ArrayView2<'_, T>,
     u: usize,
     v: usize,
     n: usize,
-) -> impl Iterator<Item = T> + 'a
+) -> impl Iterator<Item = T> + '_
 where
     T: Copy,
 {

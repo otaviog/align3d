@@ -2,10 +2,11 @@ use rstest::fixture;
 
 use crate::{
     bilateral::BilateralFilter,
+    camera::CameraIntrinsics,
     io::dataset::{DatasetError, RgbdDataset, SlamTbDataset},
     range_image::RangeImage,
     transform::Transform,
-    Array2Recycle, camera::CameraIntrinsics,
+    Array2Recycle,
 };
 
 pub struct TestRangeImageDataset {

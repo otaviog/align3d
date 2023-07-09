@@ -1,4 +1,4 @@
-use vulkano::{pipeline::graphics::vertex_input::Vertex, buffer::BufferContents};
+use vulkano::{buffer::BufferContents, pipeline::graphics::vertex_input::Vertex};
 
 #[derive(BufferContents, Vertex)]
 #[repr(C)]
@@ -12,7 +12,6 @@ impl Array2f32 {
         Self { position: [x, y] }
     }
 }
-
 
 #[derive(BufferContents, Vertex)]
 #[repr(C)]
@@ -35,7 +34,6 @@ pub struct NormalF32 {
     #[format(R32G32B32_SFLOAT)]
     pub normal: [f32; 3],
 }
-
 
 impl NormalF32 {
     pub fn new(x: f32, y: f32, z: f32) -> Self {
@@ -86,7 +84,6 @@ pub struct ScalarU32 {
     #[format(R32_UINT)]
     pub value: u32,
 }
-
 
 #[cfg(test)]
 mod tests {

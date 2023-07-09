@@ -60,7 +60,6 @@ impl KdTree {
         }
     }
 
-
     /// Find the nearest neighbor to a query point. N-Dimensional version.
     ///
     /// # Arguments
@@ -170,7 +169,7 @@ mod tests {
         let tree = KdTree::new(&randomized_points.view());
 
         let found_indices = tree.nearest(&ordered_points.view(), Array1Recycle::Empty);
-        assert_eq!(Array::from_vec(random_indices.clone()), found_indices);
+        assert_eq!(Array::from_vec(random_indices), found_indices);
     }
 
     #[test]

@@ -16,7 +16,7 @@ impl PointCloud {
         Self {
             points: geometry.points,
             normals: geometry.normals,
-            colors: geometry.colors.map(|colors| colors.into()),
+            colors: geometry.colors,
         }
     }
 

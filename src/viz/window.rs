@@ -363,7 +363,7 @@ impl Window {
                             &window_state,
                         );
 
-                        let future = sync::now(self.device.clone())
+                        sync::now(self.device.clone())
                             .join(acquire_future)
                             .then_execute(self.queue.clone(), command_buffer)
                             .unwrap()

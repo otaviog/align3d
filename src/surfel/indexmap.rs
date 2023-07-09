@@ -42,7 +42,7 @@ impl IndexMap {
         }
     }
 
-    pub fn render_indices_par<T>(&mut self, model_points: T, camera: &PinholeCamera)
+    pub fn _render_indices_par<T>(&mut self, model_points: T, camera: &PinholeCamera)
     where
         T: ParallelIterator<Item = (usize, Vector3<f32>)>,
     {
@@ -61,12 +61,12 @@ impl IndexMap {
         {
             if self.zbuffer[(v, u)] > z {
                 self.zbuffer[(v, u)] = z;
-                self.map[(v, u)] = id as i64;
+                self.map[(v, u)] = id;
             }
         }
     }
 
-    pub fn summary(&self) -> String {
+    pub fn _summary(&self) -> String {
         format!(
             "IndexMap: {}x{}x{} (w x h x scale), mean: {}",
             self.map.shape()[1] / self.scale,
@@ -95,7 +95,7 @@ mod tests {
 
         let start = Instant::now();
 
-        indexmap.render_indices_par(
+        indexmap._render_indices_par(
             pcl.points
                 .as_slice()
                 .unwrap()
@@ -107,7 +107,7 @@ mod tests {
 
         println!(
             "{}, time: {} seconds",
-            indexmap.summary(),
+            indexmap._summary(),
             start.elapsed().as_secs_f64()
         );
     }
@@ -138,7 +138,7 @@ mod tests {
 
         println!(
             "{}, time: {} seconds",
-            indexmap.summary(),
+            indexmap._summary(),
             start.elapsed().as_secs_f64()
         );
     }

@@ -4,7 +4,7 @@ use std::path::Path;
 
 use super::{Geometry, LoadError};
 use nalgebra::Vector3;
-use ndarray::{Array2, Axis, Array1};
+use ndarray::{Array1, Array2, Axis};
 use ply_rs::ply::{
     Addable, DefaultElement, ElementDef, Encoding, Ply, Property, PropertyDef, PropertyType,
     ScalarType,
@@ -175,14 +175,11 @@ where
                 ));
             });
 
-            normals
-                .iter()
-                .enumerate()
-                .for_each(|(i, normal)| {
-                    vertex_array[i].insert("nx".to_string(), Property::Float(normal[0]));
-                    vertex_array[i].insert("ny".to_string(), Property::Float(normal[1]));
-                    vertex_array[i].insert("nz".to_string(), Property::Float(normal[2]));
-                });
+            normals.iter().enumerate().for_each(|(i, normal)| {
+                vertex_array[i].insert("nx".to_string(), Property::Float(normal[0]));
+                vertex_array[i].insert("ny".to_string(), Property::Float(normal[1]));
+                vertex_array[i].insert("nz".to_string(), Property::Float(normal[2]));
+            });
         }
 
         if let Some(colors) = &geom.colors {
@@ -193,14 +190,11 @@ where
                 ));
             });
 
-            colors
-                .iter()
-                .enumerate()
-                .for_each(|(i, color)| {
-                    vertex_array[i].insert("red".to_string(), Property::UChar(color[0]));
-                    vertex_array[i].insert("green".to_string(), Property::UChar(color[1]));
-                    vertex_array[i].insert("blue".to_string(), Property::UChar(color[2]));
-                });
+            colors.iter().enumerate().for_each(|(i, color)| {
+                vertex_array[i].insert("red".to_string(), Property::UChar(color[0]));
+                vertex_array[i].insert("green".to_string(), Property::UChar(color[1]));
+                vertex_array[i].insert("blue".to_string(), Property::UChar(color[2]));
+            });
         }
 
         ply.header.elements.add(vertex_element);

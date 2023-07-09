@@ -24,7 +24,7 @@ fn read_file_list(filepath: &PathBuf) -> Result<Vec<(f64, String)>, DatasetError
     let reader = std::io::BufReader::new(file);
     let file_list: Vec<(f64, String)> = reader
         .lines()
-        .filter_map(|line| line.ok())
+        .map_while(Result::ok)
         .filter(|line| !line.trim().starts_with('#'))
         .map(|line| {
             let tokens: Vec<&str> = line.split(&[',', '\t', ' ']).collect();
@@ -72,7 +72,7 @@ fn load_trajectory(filepath: &str) -> Result<Vec<(f64, Transform)>, DatasetError
     let reader = std::io::BufReader::new(file);
     let trajectory = reader
         .lines()
-        .filter_map(|line| line.ok())
+        .map_while(Result::ok)
         .filter(|line| !line.trim().starts_with('#'))
         .map(|line| {
             let tokens: Vec<f64> = line

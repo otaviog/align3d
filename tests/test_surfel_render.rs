@@ -1,11 +1,9 @@
-use std::sync::{Arc, Mutex};
-
 use align3d::{
     bilateral::BilateralFilter,
     io::dataset::{RgbdDataset, SlamTbDataset},
     range_image::RangeImageBuilder,
     surfel::{SurfelBuilder, SurfelModel},
-    viz::{GeoViewer, Manager, node::MakeNode},
+    viz::{node::MakeNode, GeoViewer, Manager},
 };
 
 fn main() {
@@ -19,19 +17,22 @@ fn main() {
     let ri_frame = ribuilder.build(rgbd_frame);
 
     let mut manager = Manager::default();
-    let model = Arc::new(Mutex::new(SurfelModel::new(&manager.memory_allocator, 500_000)));
-    
+    let model = SurfelModel::new(&manager.memory_allocator, 500_000);
+
     let surfel_builder = SurfelBuilder::new(&intrinsics);
-    let mut model_lock = model.lock().unwrap();
-    let mut model_writer = model_lock.write().unwrap();
-     
-    for surfel in surfel_builder.from_range_image(&ri_frame[0]) {
-        model_writer.add(&surfel);
+    let mut gpu_guard = model.lock_gpu();
+    let mut writer = gpu_guard.get_writer();
+    for (i, surfel) in surfel_builder
+        .from_range_image(&ri_frame[0])
+        .iter()
+        .enumerate()
+    {
+        writer.update(i, surfel);
     }
-    drop(model_writer);
-    drop(model_lock);
-    
-    let node = model.make_node(&mut manager);
+    drop(writer);
+    drop(gpu_guard);
+
+    let node = model.vk_data.make_node(&mut manager);
 
     let mut geo_viewer = GeoViewer::from_manager(manager);
     geo_viewer.add_node(node);

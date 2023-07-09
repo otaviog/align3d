@@ -160,7 +160,7 @@ impl PinholeCamera {
             world_to_camera: camera_to_world.inverse(),
             camera_to_world,
             width_f32,
-            height_f32
+            height_f32,
         }
     }
 
@@ -175,9 +175,8 @@ impl PinholeCamera {
     /// * (x and y) coordinates.
     pub fn project(&self, point: &Vector3<f32>) -> (f32, f32, f32) {
         let point = self.world_to_camera.transform_vector(point);
-        let (u, v) = self.intrinsics
-            .project(&point);
-        (u,v, point[2])
+        let (u, v) = self.intrinsics.project(&point);
+        (u, v, point[2])
     }
 
     /// Returns the projected 3D point if it is visible in the image.
@@ -192,11 +191,7 @@ impl PinholeCamera {
     pub fn project_to_image(&self, point: &Vector3<f32>) -> Option<(f32, f32, f32)> {
         let (x, y, z) = self.project(point);
 
-        if x >= 0.0
-            && x < self.width_f32 as f32
-            && y >= 0.0
-            && y < self.height_f32 as f32
-        {
+        if x >= 0.0 && x < self.width_f32 && y >= 0.0 && y < self.height_f32 {
             //Some((x, self.height_f32 - y, z))
             Some((x, y, z))
         } else {
@@ -204,7 +199,6 @@ impl PinholeCamera {
         }
     }
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -214,7 +208,7 @@ mod tests {
     pub fn test_project() {
         let camera = super::PinholeCamera::new(
             super::CameraIntrinsics::from_simple_intrinsic(50.0, 50.0, 0.0, 0.0, 100, 100),
-            Transform::eye()
+            Transform::eye(),
         );
 
         let point = nalgebra::Vector3::new(1.0, 1.0, 1.0);
@@ -232,7 +226,7 @@ mod tests {
     pub fn test_project_to_image() {
         let camera = super::PinholeCamera::new(
             super::CameraIntrinsics::from_simple_intrinsic(50.0, 50.0, 0.0, 0.0, 100, 100),
-            Transform::eye()
+            Transform::eye(),
         );
 
         let point = nalgebra::Vector3::new(1.0, 1.0, 1.0);
