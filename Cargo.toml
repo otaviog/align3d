@@ -127,3 +127,7 @@ harness = false
 [[bench]]
 name = "bench_surfel_fusion"
 harness = false
+
+[[bench]]
+name = "bench_image_icp"
+harness = false

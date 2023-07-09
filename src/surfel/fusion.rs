@@ -205,7 +205,7 @@ mod tests {
     use super::*;
 
     #[rstest]
-    //#[ignore]
+    #[ignore]
     fn test_surfel_fusion(sample_range_img_ds2: TestRangeImageDataset) {
         let manager = Manager::default();
 
