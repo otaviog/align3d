@@ -21,7 +21,7 @@ pub struct Icp<'target_lt> {
     kdtree: R3dTree,
 }
 
-impl<'target_lt> Icp<'target_lt> {
+impl<'target> Icp<'target> {
     /// Create a new ICP instance.
     ///
     /// # Arguments
