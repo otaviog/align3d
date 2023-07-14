@@ -67,14 +67,6 @@ impl<'target_lt> ImageIcp<'target_lt> {
                     let (u, v) = self.target.camera.project(&source_point);
 
                     let (u_int, v_int) = ((u + 0.5) as i32, (v + 0.5) as i32);
-                    if u_int < 0
-                        || u_int >= self.target.width() as i32
-                        || v_int < 0
-                        || v_int >= self.target.height() as i32
-                    {
-                        return; // exit closure
-                    }
-
                     if let Some(target_point) =
                         self.target.get_point(v_int as usize, u_int as usize)
                     {

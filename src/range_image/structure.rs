@@ -8,6 +8,7 @@ use image::{ImageBuffer, Rgb};
 use nalgebra::Vector3;
 
 use ndarray::{Array1, Array2};
+// use rayon::prelude::{ParallelBridge, ParallelIterator};
 
 use crate::io::Geometry;
 use crate::pointcloud::PointCloud;
@@ -154,12 +155,20 @@ impl RangeImage {
 
         let mut normals = Array2::<Vector3<f32>>::zeros((height, width));
 
-        for row in 0..height {
-            for col in 0..width {
-                if self.mask[(row, col)] != 1 {
-                    continue;
-                };
-
+        normals
+            .indexed_iter_mut()
+            .zip(self.mask.iter())
+            .filter_map(
+                |(idx_iter, mask)| {
+                    if *mask == 1 {
+                        Some(idx_iter)
+                    } else {
+                        None
+                    }
+                },
+            )
+            //.par_bridge()
+            .for_each(|((row, col), val)| {
                 let center = self.points[(row, col)];
                 let left = self
                     .get_point(row, (col as i32 - 1) as usize)
@@ -203,15 +212,13 @@ impl RangeImage {
                     top - center
                 };
 
-                let normal = left_to_right.cross(&bottom_to_top).normalize();
+                let normal = left_to_right.cross(&bottom_to_top); //.normalize();
 
                 let normal_magnitude = normal.magnitude();
                 if normal_magnitude > 1e-6_f32 {
-                    normals[(row, col)] = normal / normal_magnitude;
+                    *val = normal / normal_magnitude;
                 }
-            }
-        }
-
+            });
         self.normals = Some(normals);
 
         self
@@ -370,6 +377,8 @@ impl From<&RangeImage> for Geometry {
 
 #[cfg(test)]
 mod tests {
+    use std::time::Instant;
+
     use super::*;
     use crate::{
         image::IntoLumaImage,
@@ -408,7 +417,11 @@ mod tests {
         let (cam, rgbd_image, _) = sample1.get(0).unwrap().into_parts();
 
         let mut im_pcl = RangeImage::from_rgbd_image(&cam, &rgbd_image);
+        
         im_pcl.compute_normals();
+        let now = Instant::now();
+        im_pcl.compute_normals();
+        println!("Normals computed in {:?}", now.elapsed());
         write_ply(
             "tests/outputs/out-range-image-normals.ply",
             &Geometry::from(&im_pcl),

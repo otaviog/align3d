@@ -33,8 +33,14 @@ pub fn bloei_luma8() -> Array2<u8> {
 
 #[rstest]
 fn test_bilateral_filter(bloei_luma8: Array2<u8>) {
+    // Warm up.
+    let _filtered_image =
+        BilateralFilter::new(100.0, 10.0).filter(&bloei_luma8, Array2Recycle::Empty);
+
+    let now = std::time::Instant::now();
     let filtered_image =
         BilateralFilter::new(100.0, 10.0).filter(&bloei_luma8, Array2Recycle::Empty);
+    println!("Elapsed: {:?}", now.elapsed());
 
     into_image_luma(bloei_luma8)
         .save("tests/outputs/bilateral_filter-input.png")

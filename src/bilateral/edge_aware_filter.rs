@@ -93,14 +93,14 @@ where
                                 }
                             };
 
-                            let set = (
-                                (prev_value.0 + next_value.0 + 2.0 * curr_value.0) / 4.0,
-                                (prev_value.1 + next_value.1 + 2.0 * curr_value.1) / 4.0,
+                            let (value, weight) = (
+                                (prev_value.0 + next_value.0 + 2.0 * curr_value.0) * 0.25,
+                                (prev_value.1 + next_value.1 + 2.0 * curr_value.1) * 0.25,
                             );
 
                             unsafe {
-                                *d_ptr = set.0;
-                                *d_ptr.add(1) = set.1;
+                                *d_ptr = value;
+                                *d_ptr.add(1) = weight;
 
                                 b_ptr = b_ptr.offset(channel_stride);
                                 d_ptr = d_ptr.offset(channel_stride);
