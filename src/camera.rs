@@ -62,9 +62,10 @@ impl CameraIntrinsics {
     ///
     /// * (x and y) coordinates.
     pub fn project(&self, point: &Vector3<f32>) -> (f32, f32) {
+        let z = point[2];
         (
-            point[0] * self.fx as f32 / point[2] + self.cx as f32,
-            point[1] * self.fy as f32 / point[2] + self.cy as f32,
+            point[0] * self.fx as f32 / z + self.cx as f32,
+            point[1] * self.fy as f32 / z + self.cy as f32,
         )
     }
 

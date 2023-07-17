@@ -131,3 +131,7 @@ harness = false
 [[bench]]
 name = "bench_image_icp"
 harness = false
+
+[[bench]]
+name = "bench_compute_normals"
+harness = false

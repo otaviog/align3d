@@ -417,9 +417,9 @@ mod tests {
 
         let mut im_pcl = RangeImage::from_rgbd_image(&cam, &rgbd_image);
 
-        im_pcl.compute_normals2();
+        im_pcl.compute_normals();
         let now = Instant::now();
-        im_pcl.compute_normals2();
+        im_pcl.compute_normals();
         println!("Normals computed in {:?}", now.elapsed());
         write_ply(
             "tests/outputs/out-range-image-normals.ply",
