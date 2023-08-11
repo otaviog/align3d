@@ -2,7 +2,6 @@ use ndarray::{Array2, Array4, Axis};
 use num::{clamp, ToPrimitive};
 use std::cmp::{max, min};
 
-
 /// Bilateral grid. A data structure for representing images
 /// within its intensity space.
 ///
@@ -110,19 +109,21 @@ where
         let space_pad = self.space_pad as f64;
         let color_pad = self.color_pad as f64;
 
-        
-        image.iter().zip(dst_image.indexed_iter_mut()).for_each(|(color, ((row, col), dst))| {
-            let trilinear = self.trilinear(
-                row as f64 * inv_sigma_space + space_pad,
-                col as f64 * inv_sigma_space + space_pad,
-                {
-                    let diff: I = (*color - self.color_min).into();
-                    diff.to_f64().unwrap() * inv_sigma_color + color_pad
-                },
-            );
+        image
+            .iter()
+            .zip(dst_image.indexed_iter_mut())
+            .for_each(|(color, ((row, col), dst))| {
+                let trilinear = self.trilinear(
+                    row as f64 * inv_sigma_space + space_pad,
+                    col as f64 * inv_sigma_space + space_pad,
+                    {
+                        let diff: I = (*color - self.color_min).into();
+                        diff.to_f64().unwrap() * inv_sigma_color + color_pad
+                    },
+                );
 
-            *dst = num::cast::cast(trilinear).unwrap();
-        });            
+                *dst = num::cast::cast(trilinear).unwrap();
+            });
     }
 
     pub fn trilinear(&self, row: f64, col: f64, channel: f64) -> f64 {
@@ -139,7 +140,6 @@ where
         let x_index = clamp(col as usize, 0, width - 1);
         let xx_index: usize = clamp((col + 1.0) as usize, 0, width - 1);
         let x_alpha = col - x_index as f64;
-
 
         #[rustfmt::skip]
         let value =

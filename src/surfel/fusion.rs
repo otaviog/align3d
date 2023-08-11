@@ -1,5 +1,6 @@
+use itertools::izip;
 use nalgebra::Vector2;
-use ndarray::Array2;
+use ndarray::{Array2, Axis};
 use rayon::prelude::*;
 
 use super::{indexmap::IndexMap, surfel_model::SurfelModel, surfel_type::SurfelBuilder};
@@ -73,56 +74,107 @@ impl SurfelFusion {
 
         let surfel_builder = SurfelBuilder::new(&camera.intrinsics);
 
-        let add_update_list = range_image
-            .indexed_iter()
-            .par_bridge()
-            .map(|(v, u, point, normal, color)| {
-                let ri_surfel = camera
-                    .camera_to_world
-                    .transform(surfel_builder.from_range_pixel(
-                        point,
-                        normal,
-                        color,
-                        Vector2::new(u as f32, v as f32),
-                        self.timestamp,
-                    ));
+        let normals = range_image.normals.as_ref().unwrap();
+        let colors = range_image.colors.as_ref().unwrap();
+        let chunk_size = 1024 * 10;
 
-                let ray_cam_ri = ri_surfel.position - camera.camera_to_world.translation();
-                let ray_cam_ri_norm = 1.0 / ray_cam_ri.norm();
-                if let Some((index, _ray_dist, model_surfel)) = window(
-                    model_map.view(),
-                    u * self.indexmap.scale,
-                    v * self.indexmap.scale,
-                    8,
+        let add_update_list: Vec<SurfelUpdate> = izip!(
+            range_image
+                .mask
+                .view()
+                .to_shape(range_image.len())
+                .unwrap()
+                .axis_chunks_iter(Axis(0), chunk_size),
+            range_image
+                .points
+                .view()
+                .to_shape(range_image.len())
+                .unwrap()
+                .axis_chunks_iter(Axis(0), chunk_size),
+            normals
+                .view()
+                .to_shape(range_image.len())
+                .unwrap()
+                .axis_chunks_iter(Axis(0), chunk_size),
+            colors
+                .view()
+                .to_shape(range_image.len())
+                .unwrap()
+                .axis_chunks_iter(Axis(0), chunk_size)
+        )
+        .enumerate()
+        .par_bridge()
+        .map(
+            |(chunk_i, (mask_chunk, point_chunk, normal_chunk, color_chunk))| {
+                izip!(
+                    mask_chunk.iter(),
+                    point_chunk.iter(),
+                    normal_chunk.iter(),
+                    color_chunk.iter()
                 )
-                .flatten()
-                .filter_map(|(index, model_surfel)| {
-                    if (ri_surfel.position - model_surfel.position).norm()
-                        > (model_surfel.radius + ri_surfel.radius) * 5.0
-                    {
-                        return None;
-                    }
-
-                    if angle_between_normals(&ri_surfel.normal, &model_surfel.normal)
-                        < 30.0_f32.to_radians()
-                    {
-                        let ray_dist =
-                            model_surfel.position.cross(&ray_cam_ri).norm() * ray_cam_ri_norm;
-                        Some((index, ray_dist, model_surfel))
+                .enumerate()
+                .filter_map(|(i, (&mask, point, normal, color))| {
+                    if mask != 0 {
+                        let point_index = chunk_i * chunk_size + i;
+                        let u = point_index % range_image.width();
+                        let v = point_index / range_image.width();
+                        Some((u, v, point, normal, color))
                     } else {
                         None
                     }
                 })
-                .min_by_key(|(_index, ray_distance, _model_surfel)| {
-                    ordered_float::OrderedFloat(*ray_distance)
-                }) {
-                    // if ri_surfel.radius >= model_surfel.radius * 1.5
-                    SurfelUpdate::Update(index, model_surfel.merge(&ri_surfel))
-                } else {
-                    SurfelUpdate::Add(ri_surfel)
-                }
-            })
-            .collect::<Vec<_>>();
+                .map(|(u, v, &point, &normal, &color)| {
+                    let ri_surfel =
+                        camera
+                            .camera_to_world
+                            .transform(surfel_builder.from_range_pixel(
+                                point,
+                                normal,
+                                color,
+                                Vector2::new(u as f32, v as f32),
+                                self.timestamp,
+                            ));
+
+                    let ray_cam_ri = ri_surfel.position - camera.camera_to_world.translation();
+                    let ray_cam_ri_norm = 1.0 / ray_cam_ri.norm();
+                    if let Some((index, _ray_dist, model_surfel)) = window(
+                        model_map.view(),
+                        u * self.indexmap.scale,
+                        v * self.indexmap.scale,
+                        8,
+                    )
+                    .flatten()
+                    .filter_map(|(index, model_surfel)| {
+                        if (ri_surfel.position - model_surfel.position).norm()
+                            > (model_surfel.radius + ri_surfel.radius) * 5.0
+                        {
+                            return None;
+                        }
+
+                        if angle_between_normals(&ri_surfel.normal, &model_surfel.normal)
+                            < 30.0_f32.to_radians()
+                        {
+                            let ray_dist =
+                                model_surfel.position.cross(&ray_cam_ri).norm() * ray_cam_ri_norm;
+                            Some((index, ray_dist, model_surfel))
+                        } else {
+                            None
+                        }
+                    })
+                    .min_by_key(|(_index, ray_distance, _model_surfel)| {
+                        ordered_float::OrderedFloat(*ray_distance)
+                    }) {
+                        // if ri_surfel.radius >= model_surfel.radius * 1.5
+                        SurfelUpdate::Update(index, model_surfel.merge(&ri_surfel))
+                    } else {
+                        SurfelUpdate::Add(ri_surfel)
+                    }
+                })
+                .collect::<Vec<_>>()
+            },
+        )
+        .flatten()
+        .collect::<Vec<_>>();
 
         let free_list = model
             .age_confidence_iter()

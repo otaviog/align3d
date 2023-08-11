@@ -70,7 +70,7 @@ impl<'target_lt> ImageIcp<'target_lt> {
 
         let mut best_residual = Float::infinity();
         let mut best_transform = optim_transform.clone();
-        let batch_size = 2048;
+        let batch_size = 16_384;
 
         // let normal_angle = self.params.max_normal_angle.cos();
 
@@ -133,7 +133,7 @@ impl<'target_lt> ImageIcp<'target_lt> {
 
                             // Color part.
                             let (target_color, du, dv) = intensity_map.bilinear_grad(u, v);
-                            let source_color = color as f32 * 0.00392156862745098; // / 255.0;
+                            let source_color = color as f32 * 0.003_921_569; // / 255.0;
                             let ((dfx, dcx), (dfy, dcy)) = self.target.camera.project_grad(&p);
                             let color_gradient =
                                 Vector3::new(du * dfx, dv * dfy, du * dcx + dv * dcy);
@@ -158,8 +158,8 @@ impl<'target_lt> ImageIcp<'target_lt> {
             .collect::<Vec<_>>()
             .iter()
             .for_each(|(geom, color)| {
-                color_optim.step_batch(&color);
-                geom_optim.step_batch(&geom)
+                color_optim.step_batch(color);
+                geom_optim.step_batch(geom)
             });
 
             geom_optim.combine(&color_optim, self.params.weight, self.params.color_weight);
