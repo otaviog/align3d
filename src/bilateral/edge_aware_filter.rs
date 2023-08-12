@@ -46,9 +46,9 @@ where
 {
     pub fn new(sigma_space: f64, sigma_color: f64) -> Self {
         Self {
-            _phantom: PhantomData::default(),
             sigma_space,
             sigma_color,
+            ..Default::default()
         }
     }
 

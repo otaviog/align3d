@@ -133,6 +133,17 @@ and show a window like this:
 
 (move the camera using WASD controls)
 
+
+# Benchmarking
+
+| Functionality | Input desc.                                    |[min, mean, max]                 |
+|---------------|------------------------------------------------|---------------------------------|
+| image icp     | 3-level pyramid of 640x480 inputs              | [101.91 ms 103.01 ms 104.29 ms] |
+| kdtree        | 500000 database vs 500000 queries of 3D points | [101.48 ms 101.75 ms 102.04 ms] |
+| compute_normals | 640x480 RGB-D frame                          | [1.1587 ms 1.1778 ms 1.2005 ms] |
+
+* Hardware: 11th Gen Intel® Core™ i7-11800H @ 2.30GHz × 16
+
 # Contributing
 
 Contributions to Align3D are welcome! If you find any issues or have suggestions for improvements, please create a new issue or submit a pull request.
