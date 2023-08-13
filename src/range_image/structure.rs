@@ -155,9 +155,12 @@ impl RangeImage {
 
         let mut normals = Array2::<Vector3<f32>>::zeros((height, width));
 
-        let mut ns = normals.view_mut().into_shape(width * height).unwrap();
         const CHUNK_SIZE: usize = 1024;
-        ns.axis_chunks_iter_mut(Axis(0), CHUNK_SIZE)
+        normals
+            .view_mut()
+            .into_shape(width * height)
+            .unwrap()
+            .axis_chunks_iter_mut(Axis(0), CHUNK_SIZE)
             .enumerate()
             .par_bridge()
             .for_each(|(i_chunk, mut normal_chunk)| {
