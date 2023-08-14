@@ -102,11 +102,11 @@ harness = false
 ##
 # Benchmarks
 
-[profile.bench]
-debug = true
-opt-level = 1               # Use slightly better optimizations.
-overflow-checks = false     # Disable integer overflow checks.
-debug-assertions = false # Disable debug assertions.
+# [profile.bench]
+# debug = true
+# opt-level = 1               # Use slightly better optimizations.
+# overflow-checks = false     # Disable integer overflow checks.
+# debug-assertions = false # Disable debug assertions.
 
 [[bench]]
 name = "bench_mesh"
@@ -130,4 +130,8 @@ harness = false
 
 [[bench]]
 name = "bench_image_icp"
+harness = false
+
+[[bench]]
+name = "bench_compute_normals"
 harness = false

@@ -10,6 +10,8 @@ fn image_icp_benchmark(c: &mut Criterion) {
 
     let image0 = {
         let mut image = RangeImage::from_rgbd_frame(&item);
+        image.compute_intensity();
+        image.compute_intensity_map();
         image.compute_normals();
         image
     };
@@ -17,6 +19,8 @@ fn image_icp_benchmark(c: &mut Criterion) {
     let item = dataset.get(5).unwrap();
     let image1 = {
         let mut image = RangeImage::from_rgbd_frame(&item);
+        image.compute_intensity();
+        image.compute_intensity_map();
         image.compute_normals();
         image
     };

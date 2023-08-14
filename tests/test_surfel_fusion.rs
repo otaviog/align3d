@@ -18,6 +18,7 @@ fn main() {
 
     let fusion_thread = thread::spawn(move || {
         let dataset = SlamTbDataset::load("tests/data/rgbd/sample2").unwrap();
+
         let (camera_intrinsics, _) = dataset.camera(0);
         let ribuilder = RangeImageBuilder::default()
             .with_bilateral_filter(Some(BilateralFilter::default()))

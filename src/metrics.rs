@@ -46,7 +46,8 @@ impl TransformMetrics {
             accum_metrics.angle += metrics.angle;
             accum_metrics.translation += metrics.translation;
         }
-
+        accum_metrics.angle /= pred_trajectory.len() as f32;
+        accum_metrics.translation /= pred_trajectory.len() as f32;
         Ok(accum_metrics)
     }
 

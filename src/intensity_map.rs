@@ -168,14 +168,6 @@ impl IntensityMap {
         u0_interp * (1.0 - v_frac) + u1_interp * v_frac
     }
 
-    pub fn bilinear_grad(&self, u: f32, v: f32) -> (f32, f32, f32) {
-        let value = self.bilinear(u, v);
-        let uh = self.bilinear(u + H, v);
-        let vh = self.bilinear(u, v + H);
-
-        (value, (uh - value) / H, (vh - value) / H)
-    }
-
     /// Returns the intensity value with bilinear interpolation if
     /// u or v are not round numbers, and `u` and `v` numerical gradients.
     ///
@@ -189,71 +181,12 @@ impl IntensityMap {
     /// * Bilinear interpolated value.
     /// * `u`'s gradient.
     /// * `v`'s gradient.
-    pub fn bilinear_grad2(&self, u: f32, v: f32) -> (f32, f32, f32) {
-        let ui = u as usize;
-        let vi = v as usize;
+    pub fn bilinear_grad(&self, u: f32, v: f32) -> (f32, f32, f32) {
+        let value = self.bilinear(u, v);
+        let uh = self.bilinear(u + H, v);
+        let vh = self.bilinear(u, v + H);
 
-        let u_frac = u - ui as f32;
-        let v_frac = v - vi as f32;
-
-        let value = {
-            let (val00, val10, val01, val11) = {
-                (
-                    self.map[(vi, ui)],
-                    self.map[(vi, ui + 1)],
-                    self.map[[vi + 1, ui]],
-                    self.map[(vi + 1, ui + 1)],
-                )
-            };
-
-            let u0_interp = val00 * (1.0 - u_frac) + val10 * u_frac;
-            let u1_interp = val01 * (1.0 - u_frac) + val11 * u_frac;
-            u0_interp * (1.0 - v_frac) + u1_interp * v_frac
-        };
-
-        let i01 = {
-            let v = v + H;
-            let vi = v as usize;
-            let v_frac = v - vi as f32;
-
-            let (val00, val10, val01, val11) = {
-                // Consider board padding
-                (
-                    self.map[(vi, ui)],
-                    self.map[(vi, ui + 1)],
-                    self.map[[vi + 1, ui]],
-                    self.map[(vi + 1, ui + 1)],
-                )
-            };
-
-            let u0_interp = val00 * (1.0 - u_frac) + val10 * u_frac;
-            let u1_interp = val01 * (1.0 - u_frac) + val11 * u_frac;
-            u0_interp * (1.0 - v_frac) + u1_interp * v_frac
-        };
-
-        let i10 = {
-            let u = u + H;
-            let ui = u as usize;
-            let u_frac = u - ui as f32;
-
-            let (val00, val10, val01, val11) = {
-                // Consider board padding
-                let vi = vi + 1;
-                let ui = ui + 1;
-                (
-                    self.map[(vi, ui)],
-                    self.map[(vi, ui + 1)],
-                    self.map[[vi + 1, ui]],
-                    self.map[(vi + 1, ui + 1)],
-                )
-            };
-
-            let u0_interp = val00 * (1.0 - u_frac) + val10 * u_frac;
-            let u1_interp = val01 * (1.0 - u_frac) + val11 * u_frac;
-            u0_interp * (1.0 - v_frac) + u1_interp * v_frac
-        };
-
-        (value, (value - i10) * H_INV, (i01 - value) * H_INV)
+        (value, (uh - value) * H_INV, (vh - value) * H_INV)
     }
 }
 

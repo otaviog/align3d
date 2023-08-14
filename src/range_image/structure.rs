@@ -7,7 +7,8 @@ use image::imageops::blur;
 use image::{ImageBuffer, Rgb};
 use nalgebra::Vector3;
 
-use ndarray::{Array1, Array2};
+use ndarray::{Array1, Array2, Axis};
+use rayon::prelude::{ParallelBridge, ParallelIterator};
 
 use crate::io::Geometry;
 use crate::pointcloud::PointCloud;
@@ -154,63 +155,71 @@ impl RangeImage {
 
         let mut normals = Array2::<Vector3<f32>>::zeros((height, width));
 
-        for row in 0..height {
-            for col in 0..width {
-                if self.mask[(row, col)] != 1 {
-                    continue;
-                };
+        const CHUNK_SIZE: usize = 1024;
+        normals
+            .view_mut()
+            .into_shape(width * height)
+            .unwrap()
+            .axis_chunks_iter_mut(Axis(0), CHUNK_SIZE)
+            .enumerate()
+            .par_bridge()
+            .for_each(|(i_chunk, mut normal_chunk)| {
+                let offset_index = i_chunk * CHUNK_SIZE;
+                normal_chunk.indexed_iter_mut().for_each(|(i, val)| {
+                    let normal_index = offset_index + i;
+                    let (row, col) = (normal_index / width, normal_index % width);
 
-                let center = self.points[(row, col)];
-                let left = self
-                    .get_point(row, (col as i32 - 1) as usize)
-                    .unwrap_or_else(nalgebra::Vector3::<f32>::zeros);
-                let right = self
-                    .get_point(row, col + 1)
-                    .unwrap_or_else(nalgebra::Vector3::<f32>::zeros);
+                    let center = self.points[(row, col)];
+                    let left = self
+                        .get_point(row, (col as i32 - 1) as usize)
+                        .unwrap_or_else(nalgebra::Vector3::<f32>::zeros);
+                    let right = self
+                        .get_point(row, col + 1)
+                        .unwrap_or_else(nalgebra::Vector3::<f32>::zeros);
 
-                let left_dist_squared = (left - center).norm_squared();
-                let right_dist_squared = (right - center).norm_squared();
-                let left_right_ratio = left_dist_squared / right_dist_squared;
+                    let left_dist_squared = (left - center).norm_squared();
+                    let right_dist_squared = (right - center).norm_squared();
+                    let left_right_ratio = left_dist_squared / right_dist_squared;
 
-                let left_to_right = if left_right_ratio < ratio_threshold_squared
-                    && left_right_ratio > 1f32 / ratio_threshold_squared
-                {
-                    right - left
-                } else if left_dist_squared < right_dist_squared {
-                    center - left
-                } else {
-                    right - center
-                };
+                    let left_to_right = if left_right_ratio < ratio_threshold_squared
+                        && left_right_ratio > 1f32 / ratio_threshold_squared
+                    {
+                        right - left
+                    } else if left_dist_squared < right_dist_squared {
+                        center - left
+                    } else {
+                        right - center
+                    };
 
-                let bottom = self
-                    .get_point(row + 1, col)
-                    .unwrap_or_else(nalgebra::Vector3::<f32>::zeros);
-                let top = self
-                    .get_point((row as i32 - 1) as usize, col)
-                    .unwrap_or_else(nalgebra::Vector3::<f32>::zeros);
+                    let bottom = self
+                        .get_point(row + 1, col)
+                        .unwrap_or_else(nalgebra::Vector3::<f32>::zeros);
+                    let top = self
+                        .get_point((row as i32 - 1) as usize, col)
+                        .unwrap_or_else(nalgebra::Vector3::<f32>::zeros);
 
-                let bottom_dist_squared = (bottom - center).norm_squared();
-                let top_dist_squared = (top - center).norm_squared();
-                let bottom_top_ratio = bottom_dist_squared / top_dist_squared;
+                    let bottom_dist_squared = (bottom - center).norm_squared();
+                    let top_dist_squared = (top - center).norm_squared();
+                    let bottom_top_ratio = bottom_dist_squared / top_dist_squared;
 
-                let bottom_to_top = if bottom_top_ratio < ratio_threshold_squared
-                    && bottom_top_ratio > 1f32 / ratio_threshold_squared
-                {
-                    top - bottom
-                } else if bottom_dist_squared < top_dist_squared {
-                    center - bottom
-                } else {
-                    top - center
-                };
+                    let bottom_to_top = if bottom_top_ratio < ratio_threshold_squared
+                        && bottom_top_ratio > 1f32 / ratio_threshold_squared
+                    {
+                        top - bottom
+                    } else if bottom_dist_squared < top_dist_squared {
+                        center - bottom
+                    } else {
+                        top - center
+                    };
 
-                let normal = left_to_right.cross(&bottom_to_top).normalize();
+                    let normal = left_to_right.cross(&bottom_to_top); //.normalize();
 
-                let normal_magnitude = normal.magnitude();
-                if normal_magnitude > 1e-6_f32 {
-                    normals[(row, col)] = normal / normal_magnitude;
-                }
-            }
-        }
+                    let normal_magnitude = normal.magnitude();
+                    if normal_magnitude > 1e-6_f32 {
+                        *val = normal / normal_magnitude;
+                    }
+                });
+            });
 
         self.normals = Some(normals);
 
@@ -370,6 +379,8 @@ impl From<&RangeImage> for Geometry {
 
 #[cfg(test)]
 mod tests {
+    use std::time::Instant;
+
     use super::*;
     use crate::{
         image::IntoLumaImage,
@@ -408,7 +419,11 @@ mod tests {
         let (cam, rgbd_image, _) = sample1.get(0).unwrap().into_parts();
 
         let mut im_pcl = RangeImage::from_rgbd_image(&cam, &rgbd_image);
+
         im_pcl.compute_normals();
+        let now = Instant::now();
+        im_pcl.compute_normals();
+        println!("Normals computed in {:?}", now.elapsed());
         write_ply(
             "tests/outputs/out-range-image-normals.ply",
             &Geometry::from(&im_pcl),

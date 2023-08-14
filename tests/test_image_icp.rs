@@ -36,7 +36,7 @@ fn main() {
             ..Default::default()
         },
     )
-    .customize(|level, mut params| {
+    .customize(|level, params| {
         match level {
             0 => params.max_iterations = 20, // 0 is the last level run
             1 => params.max_iterations = 10,

@@ -53,12 +53,15 @@ where
             (diff.to_f64().unwrap() / sigma_color) as usize + 1 + 2 * color_pad
         };
 
+        let inv_sigma_space = 1.0 / sigma_space;
+        let inv_sigma_color = 1.0 / sigma_color;
+
         let mut grid = Array4::<f64>::zeros((grid_height, grid_width, grid_depth, 2));
         for row in 0..image_height {
-            let grid_row = (row as f64 / sigma_space + 0.5) as usize + space_pad;
+            let grid_row = (row as f64 * inv_sigma_space + 0.5) as usize + space_pad;
 
             for col in 0..image_width {
-                let grid_col = (col as f64 / sigma_space + 0.5) as usize + space_pad;
+                let grid_col = (col as f64 * inv_sigma_space + 0.5) as usize + space_pad;
 
                 let color = image[(row, col)];
                 if color <= I::min_value() {
@@ -67,7 +70,7 @@ where
 
                 let channel = {
                     let diff: I = (color - color_min).into();
-                    (diff.to_f64().unwrap() / sigma_color + 0.5) as usize + color_pad
+                    (diff.to_f64().unwrap() * inv_sigma_color + 0.5) as usize + color_pad
                 };
                 grid[(grid_row, grid_col, channel, 0)] += color.to_f64().unwrap();
                 grid[(grid_row, grid_col, channel, 1)] += 1.0;
@@ -101,26 +104,26 @@ where
     }
 
     pub fn slice(&self, image: &Array2<I>, dst_image: &mut Array2<I>) {
-        let (image_height, image_width) = image.dim();
+        let inv_sigma_space = 1.0 / self.sigma_space;
+        let inv_sigma_color = 1.0 / self.sigma_color;
+        let space_pad = self.space_pad as f64;
+        let color_pad = self.color_pad as f64;
 
-        for row in 0..image_height {
-            for col in 0..image_width {
-                let color = image[(row, col)];
-
+        image
+            .iter()
+            .zip(dst_image.indexed_iter_mut())
+            .for_each(|(color, ((row, col), dst))| {
                 let trilinear = self.trilinear(
-                    row as f64 / self.sigma_space + self.space_pad as f64,
-                    col as f64 / self.sigma_space + self.space_pad as f64,
+                    row as f64 * inv_sigma_space + space_pad,
+                    col as f64 * inv_sigma_space + space_pad,
                     {
-                        let diff: I = (color - self.color_min).into();
-                        diff.to_f64().unwrap() / self.sigma_color + self.color_pad as f64
+                        let diff: I = (*color - self.color_min).into();
+                        diff.to_f64().unwrap() * inv_sigma_color + color_pad
                     },
                 );
 
-                unsafe {
-                    dst_image[(row, col)] = num::cast::cast(trilinear).unwrap_unchecked();
-                }
-            }
-        }
+                *dst = num::cast::cast(trilinear).unwrap();
+            });
     }
 
     pub fn trilinear(&self, row: f64, col: f64, channel: f64) -> f64 {
