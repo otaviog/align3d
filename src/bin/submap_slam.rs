@@ -1,13 +1,13 @@
 use std::thread;
 
-use akaze::Akaze;
+// use akaze::Akaze;
 use align3d::{
     bilateral::BilateralFilter,
     bin_utils::dataset::load_dataset,
     camera::{CameraIntrinsics, PinholeCamera},
     icp::{multiscale::MultiscaleAlign, MsIcpParams},
-    image::{IntoImageRgb8, RgbdFrame},
-    io::dataset::{SubsetDataset},
+    image::RgbdFrame,
+    io::dataset::SubsetDataset,
     metrics::TransformMetrics,
     range_image::{RangeImage, RangeImageBuilder},
     surfel::{SurfelFusion, SurfelFusionParameters, SurfelModel},
@@ -18,6 +18,13 @@ use align3d::{
 };
 use clap::Parser;
 use vulkano::memory::allocator::MemoryAllocator;
+
+enum OdometryMode {
+    FrameToFrame,
+    FrameToModel,
+    GroundTruth,
+}
+
 
 #[derive(Parser)]
 struct Args {
@@ -32,11 +39,6 @@ struct Args {
     show: bool,
 }
 
-enum OdometryMode {
-    FrameToFrame,
-    FrameToModel,
-    GroundTruth,
-}
 
 struct SubmapSlam {
     intrinsics: CameraIntrinsics,
@@ -73,7 +75,7 @@ impl SubmapSlam {
         }
     }
 
-    fn get_transform(&mut self, range_image: &Vec<RangeImage>, mode: OdometryMode) -> Transform {
+    fn get_transform(&mut self, range_image: &[RangeImage], mode: OdometryMode) -> Transform {
         match mode {
             OdometryMode::FrameToFrame => {
                 if let Some(prev_range_image) = self.prev_range_image.as_ref() {

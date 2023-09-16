@@ -100,8 +100,7 @@ mod tests {
     fn test_indexmap_par(sample_pcl_ds1: TestPclDataset) {
         let pcl = sample_pcl_ds1.get(13);
         let mut indexmap = IndexMap::new(640, 480, 4);
-        let (intrinsics, extrinsics) = sample_pcl_ds1.camera(0);
-        let camera = PinholeCamera::new(intrinsics, extrinsics.unwrap());
+        let camera = sample_pcl_ds1.pinhole_camera(0);
 
         let start = Instant::now();
 
@@ -126,8 +125,7 @@ mod tests {
     fn test_indexmap(sample_pcl_ds1: TestPclDataset) {
         let pcl = sample_pcl_ds1.get(13);
         let mut indexmap = IndexMap::new(640, 480, 4);
-        let (intrinsics, extrinsics) = sample_pcl_ds1.camera(0);
-        let camera = PinholeCamera::new(intrinsics, extrinsics.unwrap());
+        let camera  = sample_pcl_ds1.pinhole_camera(0);
 
         indexmap.render_indices(
             pcl.points

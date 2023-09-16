@@ -274,9 +274,7 @@ mod tests {
             .unwrap();
         for i in 0..NUM_ITER {
             let range_image = sample_range_img_ds2.get(i).unwrap();
-            let (intrinsics, transform) = sample_range_img_ds2.camera(i).clone();
-
-            let camera = PinholeCamera::new(intrinsics, transform.unwrap());
+            let camera = sample_range_img_ds2.pinhole_camera(i);
             let start = Instant::now();
 
             // guard

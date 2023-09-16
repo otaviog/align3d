@@ -592,9 +592,8 @@ mod tests {
             .iter()
             .enumerate()
         {
-            writer.update(i, &camera.camera_to_world.transform(surfel.clone()));
+            writer.update(i, &camera.camera_to_world.transform(*surfel));
         }
-        drop(writer);
 
         let image = model.render_to_rgbd_image(&camera, 1.0);
 

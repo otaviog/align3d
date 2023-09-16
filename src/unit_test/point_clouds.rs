@@ -1,7 +1,7 @@
 use ndarray::Array1;
 use rstest::fixture;
 
-use crate::{camera::CameraIntrinsics, io::read_off, pointcloud::PointCloud, transform::Transform};
+use crate::{camera::PinholeCamera, io::read_off, pointcloud::PointCloud, transform::Transform};
 
 use super::{sample_range_img_ds1, TestRangeImageDataset};
 
@@ -40,8 +40,8 @@ impl TestPclDataset {
         self.dataset.get_ground_truth(source_index, target_index)
     }
 
-    pub fn camera(&self, index: usize) -> (CameraIntrinsics, Option<Transform>) {
-        self.dataset.camera(index)
+    pub fn pinhole_camera(&self, index: usize) -> PinholeCamera {
+        self.dataset.pinhole_camera(index)
     }
 }
 

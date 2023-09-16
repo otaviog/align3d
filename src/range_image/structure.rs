@@ -108,11 +108,11 @@ impl RangeImage {
         let mut mask = Array2::<u8>::zeros((camera.height, camera.width));
         let points = Array2::from_shape_fn((camera.height, camera.width), |(i, j)| {
             let val = point_fn(i, j);
-            if val.is_none() {
-                Vector3::zeros()
-            } else {
+            if let Some(point) = val {
                 mask[[i, j]] = 1;
-                val.unwrap()
+                point
+            } else {
+                Vector3::zeros()
             }
         });
         let valid_points = mask.fold(0, |sum, &mask| sum + mask as usize);
