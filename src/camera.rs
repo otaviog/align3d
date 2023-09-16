@@ -191,6 +191,7 @@ impl PinholeCamera {
     /// * (x and y) coordinates if the point is visible, None otherwise.
     pub fn project_to_image(&self, point: &Vector3<f32>) -> Option<(f32, f32, f32)> {
         let (x, y, z) = self.project(point);
+        let (x, y) = (x.round(), y.round());
 
         if x >= 0.0 && x < self.width_f32 && y >= 0.0 && y < self.height_f32 {
             //Some((x, self.height_f32 - y, z))

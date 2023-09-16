@@ -25,6 +25,10 @@ path = "src/bin/odometry.rs"
 name = "readme_sample"
 path = "src/bin/readme_sample.rs"
 
+[[bin]]
+name = "submap_slam"
+path = "src/bin/submap_slam.rs"
+
 [features]
 with_rerun = []
 
@@ -58,6 +62,7 @@ rayon = "1.7.0"
 ordered-float = "3.7.0"
 parking_lot = "0.12.1"
 spin = "0.9.8"
+akaze = "0.7.0"
 
 
 [dev-dependencies]

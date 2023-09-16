@@ -34,11 +34,21 @@ impl IndexMap {
         for (id, point) in model_points {
             if let Some((u, v, z)) = camera.project_to_image(&point) {
                 let (u, v) = (u as usize * self.scale, v as usize * self.scale);
+
                 if self.zbuffer[(v, u)] > z {
                     self.zbuffer[(v, u)] = z;
                     self.map[(v, u)] = id as i64;
                 }
             }
+        }
+    }
+
+    pub fn get(&self, v: usize, u: usize) -> Option<usize> {
+        let index = self.map[(v * self.scale, u * self.scale)];
+        if index == -1 {
+            None
+        } else {
+            Some(index as usize)
         }
     }
 

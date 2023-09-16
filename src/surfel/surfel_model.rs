@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use nalgebra::Vector3;
 use ndarray::parallel::prelude::ParallelIterator;
+use ndarray::{Array2, Array3};
 use parking_lot::{MappedMutexGuard, Mutex, MutexGuard};
 use rayon::prelude::*;
 
@@ -21,6 +22,11 @@ use vulkano::{
     memory::allocator::MemoryAllocator,
 };
 
+use crate::camera::PinholeCamera;
+use crate::image::RgbdImage;
+use crate::range_image::RangeImage;
+
+use super::indexmap::IndexMap;
 use super::Surfel;
 
 /// Simplest allocator that just keeps a list of free indices.
@@ -504,5 +510,98 @@ impl SurfelModel {
                     }
                 },
             )
+    }
+
+    pub fn render_to_range_image(&self, camera: &PinholeCamera) -> RangeImage {
+        let mut indexmap = IndexMap::new(camera.intrinsics.width, camera.intrinsics.height, 1);
+        indexmap.render_indices(self.position_iter(), camera);
+        RangeImage::from_intrinsics_fn(
+            &camera.intrinsics,
+            |i, j| indexmap.get(i, j).map(|index| self.data.position[index]),
+            |i, j| indexmap.get(i, j).map(|index| self.data.normal[index]),
+            |i, j| indexmap.get(i, j).map(|index| self.data.color[index]),
+        )
+    }
+
+    pub fn render_to_rgbd_image(&self, camera: &PinholeCamera, depth_scale: f32) -> RgbdImage {
+        let mut indexmap = IndexMap::new(camera.intrinsics.width, camera.intrinsics.height, 1);
+        indexmap.render_indices(self.position_iter(), camera);
+        RgbdImage {
+            depth_scale: Some(depth_scale as f64),
+            color: Array3::from_shape_fn(
+                (camera.intrinsics.height, camera.intrinsics.width, 3),
+                |(i, j, k)| {
+                    indexmap
+                        .get(i, j)
+                        .map(|index| self.data.color[index][k])
+                        .unwrap_or(0)
+                },
+            ),
+            depth: Array2::from_shape_fn(
+                (camera.intrinsics.height, camera.intrinsics.width),
+                |(i, j)| {
+                    indexmap
+                        .get(i, j)
+                        .map(|index| {
+                            if let Some(camera_position) =
+                                camera.project_to_image(&self.data.position[index])
+                            {
+                                let depth = (camera_position.2 * depth_scale) as u16;
+                                if depth > 0 {
+                                    depth
+                                } else {
+                                    0
+                                }
+                            } else {
+                                0
+                            }
+                        })
+                        .unwrap_or(0)
+                },
+            ),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use rstest::rstest;
+
+    use crate::{
+        image::IntoImageRgb8,
+        surfel::SurfelBuilder,
+        transform::TransformableMove,
+        unit_test::{sample_range_img_ds2, TestRangeImageDataset},
+        viz::Manager,
+    };
+
+    use super::SurfelModel;
+
+    #[rstest]
+    pub fn test_render_to_rgbd_image(sample_range_img_ds2: TestRangeImageDataset) {
+        let ri_image = sample_range_img_ds2.get(0).unwrap();
+        let camera = sample_range_img_ds2.pinhole_camera(0);
+
+        let manager = Manager::default();
+        let mut model = SurfelModel::new(&manager.memory_allocator, 500_000);
+
+        let surfel_builder = SurfelBuilder::new(&ri_image.camera);
+        let mut writer = model.get_cpu_writer();
+        for (i, surfel) in surfel_builder
+            .from_range_image(&ri_image)
+            .iter()
+            .enumerate()
+        {
+            writer.update(i, &camera.camera_to_world.transform(surfel.clone()));
+        }
+        drop(writer);
+
+        let image = model.render_to_rgbd_image(&camera, 1.0);
+
+        image
+            .color
+            .into_image_rgb8()
+            .save("test_render_to_rgbd_image.png")
+            .unwrap();
     }
 }

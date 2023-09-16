@@ -93,6 +93,19 @@ impl Trajectory {
             times: self.times[start..end].to_vec(),
         }
     }
+
+    /// Gets the last pose and timestamp.
+    /// If the trajectory is empty, it returns `None`.
+    pub fn last(&self) -> Option<(Transform, f32)> {
+        if self.is_empty() {
+            None
+        } else {
+            Some((
+                self.camera_to_world[self.len() - 1].clone(),
+                self.times[self.len() - 1],
+            ))
+        }
+    }
 }
 
 impl FromIterator<(Transform, f32)> for Trajectory {

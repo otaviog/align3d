@@ -63,6 +63,8 @@ impl SubsetDataset {
     }
 }
 
+unsafe impl Send for SubsetDataset {}
+
 impl RgbdDataset for SubsetDataset {
     fn len(&self) -> usize {
         self.indices.len()

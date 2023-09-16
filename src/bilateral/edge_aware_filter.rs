@@ -30,7 +30,11 @@ where
         + num::NumCast,
 {
     fn default() -> Self {
-        BilateralFilter::new(4.50000000225, 29.9999880000072)
+        BilateralFilter {
+            sigma_space: 4.50000000225,
+            sigma_color: 29.9999880000072,
+            _phantom: PhantomData,
+        }
     }
 }
 
@@ -48,7 +52,7 @@ where
         Self {
             sigma_space,
             sigma_color,
-            ..Default::default()
+            _phantom: PhantomData,
         }
     }
 

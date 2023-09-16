@@ -12,10 +12,8 @@ impl Default for TrajectoryBuilder {
     /// Creates a new `TrajectoryBuilder`.
     /// It'll contain a single pose at the origin.
     fn default() -> Self {
-        let mut trajectory = Trajectory::default();
-        trajectory.push(Transform::eye(), 0.0);
         Self {
-            trajectory,
+            trajectory: Trajectory::default(),
             last: Transform::eye(),
             last_time: 0.0,
         }
@@ -34,5 +32,15 @@ impl TrajectoryBuilder {
     /// Creates the trajectory at its current state.
     pub fn build(self) -> Trajectory {
         self.trajectory
+    }
+
+    /// Returns the current camera pose in the world frame.
+    /// If the trajectory is empty, it returns `None`.
+    pub fn current_camera_to_world(&self) -> Option<Transform> {
+        if self.trajectory.is_empty() {
+            None
+        } else {
+            Some(self.trajectory.last().unwrap().0.clone())
+        }
     }
 }

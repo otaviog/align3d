@@ -99,6 +99,41 @@ impl RangeImage {
         Self::from_rgbd_image(&frame.camera, &frame.image)
     }
 
+    pub fn from_intrinsics_fn(
+        camera: &CameraIntrinsics,
+        point_fn: impl Fn(usize, usize) -> Option<Vector3<f32>>,
+        normal_fn: impl Fn(usize, usize) -> Option<Vector3<f32>>,
+        color_fn: impl Fn(usize, usize) -> Option<Vector3<u8>>,
+    ) -> RangeImage {
+        let mut mask = Array2::<u8>::zeros((camera.height, camera.width));
+        let points = Array2::from_shape_fn((camera.height, camera.width), |(i, j)| {
+            let val = point_fn(i, j);
+            if val.is_none() {
+                Vector3::zeros()
+            } else {
+                mask[[i, j]] = 1;
+                val.unwrap()
+            }
+        });
+        let valid_points = mask.fold(0, |sum, &mask| sum + mask as usize);
+        RangeImage {
+            camera: camera.clone(),
+            points,
+            mask,
+            valid_points,
+            intensities: None,
+            intensity_map: None,
+            normals: Some(Array2::from_shape_fn(
+                (camera.height, camera.width),
+                |(i, j)| normal_fn(i, j).unwrap_or(Vector3::zeros()),
+            )),
+            colors: Some(Array2::from_shape_fn(
+                (camera.height, camera.width),
+                |(i, j)| color_fn(i, j).unwrap_or(Vector3::zeros()),
+            )),
+        }
+    }
+
     /// Width of the image.
     pub fn width(&self) -> usize {
         self.points.shape()[1]

@@ -1,4 +1,4 @@
-use align3d::bin_utils::dataset::create_dataset_from_string;
+use align3d::bin_utils::dataset::load_dataset;
 use align3d::{io::dataset::SubsetDataset, viz::rgbd_dataset_viewer::RgbdDatasetViewer};
 use clap::Parser;
 
@@ -19,7 +19,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // TODO: finish this example
     let args = CommandLine::parse();
 
-    let dataset = create_dataset_from_string(args.format, args.dataset).unwrap();
+    let dataset = load_dataset(args.format, args.dataset).unwrap();
     let dataset = Box::new(SubsetDataset::new(
         dataset,
         [0, 15, 30, 45, 60, 75, 90, 120, 160, 250].into(),

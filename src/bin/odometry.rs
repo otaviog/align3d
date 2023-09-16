@@ -1,6 +1,6 @@
 use align3d::{
     bilateral::BilateralFilter,
-    bin_utils::dataset::create_dataset_from_string,
+    bin_utils::dataset::load_dataset,
     icp::{multiscale::MultiscaleAlign, MsIcpParams},
     io::dataset::SubsetDataset,
     metrics::TransformMetrics,
@@ -27,7 +27,7 @@ struct Args {
 fn main() {
     let args = Args::parse();
     let dataset = {
-        let mut dataset = create_dataset_from_string(args.format, args.dataset).unwrap();
+        let mut dataset = load_dataset(args.format, args.dataset).unwrap();
         if let Some(max_frames) = args.max_frames {
             dataset = Box::new(SubsetDataset::new(dataset, (0..max_frames).collect()));
         }

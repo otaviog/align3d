@@ -2,7 +2,7 @@ use rstest::fixture;
 
 use crate::{
     bilateral::BilateralFilter,
-    camera::CameraIntrinsics,
+    camera::{CameraIntrinsics, PinholeCamera},
     io::dataset::{DatasetError, RgbdDataset, SlamTbDataset},
     range_image::RangeImage,
     transform::Transform,
@@ -43,8 +43,17 @@ impl TestRangeImageDataset {
             .unwrap()
     }
 
+    #[deprecated(note = "Use `camera` instead.")]
     pub fn camera(&self, index: usize) -> (CameraIntrinsics, Option<Transform>) {
         self.dataset.camera(index)
+    }
+
+    pub fn pinhole_camera(&self, index: usize) -> PinholeCamera {
+        let (intrinsics, extrinsics) = self.dataset.camera(index);
+        PinholeCamera::new(
+            intrinsics,
+            extrinsics.expect("Unit test using wrong dataset, it must have ground truth."),
+        )
     }
 }
 
