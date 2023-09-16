@@ -27,7 +27,7 @@ pub struct RangeImage {
     /// Colors of the points, as array with shape: (height, width, 3)
     pub colors: Option<Array2<Vector3<u8>>>,
     /// Camera parameters that originated the image.
-    pub camera: CameraIntrinsics,
+    pub intrinsics: CameraIntrinsics,
     /// Intensities of the points, as array with shape: (height*width)
     pub intensities: Option<Array1<u8>>,
     /// Intensity map of the points, as array with shape: (height, width)
@@ -87,7 +87,7 @@ impl RangeImage {
             mask,
             normals: None,
             colors: Some(colors),
-            camera: camera.clone(),
+            intrinsics: camera.clone(),
             intensities: None,
             intensity_map: None,
             valid_points,
@@ -117,7 +117,7 @@ impl RangeImage {
         });
         let valid_points = mask.fold(0, |sum, &mask| sum + mask as usize);
         RangeImage {
-            camera: camera.clone(),
+            intrinsics: camera.clone(),
             points,
             mask,
             valid_points,
@@ -332,7 +332,7 @@ impl RangeImage {
             mask,
             normals,
             colors,
-            camera: self.camera.scale(0.5),
+            intrinsics: self.intrinsics.scale(0.5),
             intensities: None,
             intensity_map: None,
             valid_points,

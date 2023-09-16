@@ -110,7 +110,7 @@ impl<'target_lt> ImageIcp<'target_lt> {
                     .enumerate()
                     .for_each(|(batch_index, (&point, &color))| {
                         let p = optim_transform.transform_vector(&point);
-                        let (u, v) = self.target.camera.project(&p);
+                        let (u, v) = self.target.intrinsics.project(&p);
                         let (u_int, v_int) = ((u + 0.5) as i32, (v + 0.5) as i32);
                         if let Some(target_point) =
                             self.target.get_point(v_int as usize, u_int as usize)
@@ -134,7 +134,7 @@ impl<'target_lt> ImageIcp<'target_lt> {
                             // Color part.
                             let (target_color, du, dv) = intensity_map.bilinear_grad(u, v);
                             let source_color = color as f32 * 0.003_921_569; // / 255.0;
-                            let ((dfx, dcx), (dfy, dcy)) = self.target.camera.project_grad(&p);
+                            let ((dfx, dcx), (dfy, dcy)) = self.target.intrinsics.project_grad(&p);
                             let color_gradient =
                                 Vector3::new(du * dfx, dv * dfy, du * dcx + dv * dcy);
                             let (color_residual, color_jacobian) = color_distance.jacobian(
