@@ -1,5 +1,7 @@
+use std::collections::HashMap;
 use std::sync::Arc;
 
+use bitarray::BitArray;
 use nalgebra::Vector3;
 use ndarray::parallel::prelude::ParallelIterator;
 use ndarray::{Array2, Array3};
@@ -92,6 +94,7 @@ impl SurfelData {
 pub struct CpuSurfelWriter<'model> {
     model: &'model mut SurfelData,
     allocator: &'model mut SimpleAllocator,
+    sparse_features: &'model mut HashMap<usize, BitArray<64>>
 }
 
 impl<'model> CpuSurfelWriter<'model> {
@@ -138,6 +141,7 @@ impl<'model> CpuSurfelWriter<'model> {
     pub fn free(&mut self, index: usize) {
         self.model.mask[index] = false;
         self.allocator.free(index);
+        self.sparse_features.remove(&index);
     }
 }
 
@@ -409,6 +413,7 @@ pub struct SurfelModel {
     data: SurfelData,
     allocator: SimpleAllocator,
     size: usize,
+    pub sparse_features: HashMap<usize, BitArray<64>>
 }
 
 impl SurfelModel {
@@ -419,6 +424,7 @@ impl SurfelModel {
             data: SurfelData::new(size),
             allocator: SimpleAllocator::new(size),
             size,
+            sparse_features: HashMap::new()
         }
     }
 
@@ -427,6 +433,7 @@ impl SurfelModel {
         CpuSurfelWriter {
             model: &mut self.data,
             allocator: &mut self.allocator,
+            sparse_features: &mut self.sparse_features
         }
     }
 
@@ -585,7 +592,7 @@ mod tests {
         let manager = Manager::default();
         let mut model = SurfelModel::new(&manager.memory_allocator, 500_000);
 
-        let surfel_builder = SurfelBuilder::new(&ri_image.camera);
+        let surfel_builder = SurfelBuilder::new(&ri_image.intrinsics);
         let mut writer = model.get_cpu_writer();
         for (i, surfel) in surfel_builder
             .from_range_image(&ri_image)

@@ -1,12 +1,12 @@
-use std::thread;
+use std::{collections::HashMap, thread, iter};
 
-// use akaze::Akaze;
+use akaze::Akaze;
 use align3d::{
     bilateral::BilateralFilter,
     bin_utils::dataset::load_dataset,
     camera::{CameraIntrinsics, PinholeCamera},
     icp::{multiscale::MultiscaleAlign, MsIcpParams},
-    image::RgbdFrame,
+    image::{RgbdFrame, ToImageRgb8},
     io::dataset::SubsetDataset,
     metrics::TransformMetrics,
     range_image::{RangeImage, RangeImageBuilder},
@@ -16,7 +16,9 @@ use align3d::{
     transform::Transform,
     viz::{node::MakeNode, GeoViewer, Manager},
 };
+use bitarray::BitArray;
 use clap::Parser;
+use image::DynamicImage;
 use vulkano::memory::allocator::MemoryAllocator;
 
 enum OdometryMode {
@@ -24,7 +26,6 @@ enum OdometryMode {
     FrameToModel,
     GroundTruth,
 }
-
 
 #[derive(Parser)]
 struct Args {
@@ -39,7 +40,6 @@ struct Args {
     show: bool,
 }
 
-
 struct SubmapSlam {
     intrinsics: CameraIntrinsics,
     range_processing: RangeImageBuilder,
@@ -50,6 +50,7 @@ struct SubmapSlam {
     frame_count: usize,
     prev_range_image: Option<Vec<RangeImage>>,
     gt_trajectory: Option<Trajectory>,
+    akaze: Akaze,
 }
 
 impl SubmapSlam {
@@ -72,6 +73,7 @@ impl SubmapSlam {
             frame_count: 0,
             prev_range_image: None,
             gt_trajectory,
+            akaze: Akaze::default(),
         }
     }
 
@@ -117,7 +119,22 @@ impl SubmapSlam {
         }
     }
 
+    fn extract_akaze_features(
+        &self,
+        rgbd_frame: &RgbdFrame,
+    ) -> HashMap<(usize, usize), BitArray<64>> {
+        let (keypoints, features) =
+           self.akaze.extract(&DynamicImage::ImageRgb8(rgbd_frame.image.to_image_rgb8()));
+
+        HashMap::from_iter(iter::zip(keypoints, features).map(|(keypoint, feature)| {
+            let x = keypoint.point.0.round() as usize;
+            let y = keypoint.point.1.round() as usize;
+            ((x, y), feature)
+        }))
+    }
+
     fn process_frame(&mut self, rgbd_frame: RgbdFrame) {
+        let sparse_features = self.extract_akaze_features(&rgbd_frame);
         let range_image = self.range_processing.build(rgbd_frame);
 
         let transform = self.get_transform(&range_image, OdometryMode::FrameToFrame);
@@ -136,15 +153,18 @@ impl SubmapSlam {
                 metrics.angle.to_degrees()
             );
         }
+
+
         self.traj_builder
             .accumulate(&transform, Some(self.frame_count as f32));
-        self.fusion.integrate(
+        self.fusion.integrate_with_sparse_features(
             &mut self.model,
             range_image.first().unwrap(),
             &PinholeCamera::new(
                 self.intrinsics.clone(),
                 self.traj_builder.current_camera_to_world().unwrap(),
             ),
+            sparse_features
         );
 
         self.prev_range_image = Some(range_image);

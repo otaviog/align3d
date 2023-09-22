@@ -1,6 +1,10 @@
+use std::collections::HashMap;
+
+use bitarray::BitArray;
 use itertools::izip;
 use nalgebra::Vector2;
 use ndarray::{Array2, Axis};
+
 use rayon::prelude::*;
 
 use super::{indexmap::IndexMap, surfel_model::SurfelModel, surfel_type::SurfelBuilder};
@@ -57,12 +61,6 @@ impl SurfelFusion {
         range_image: &RangeImage,
         camera: &PinholeCamera,
     ) -> FusionSummary {
-        enum SurfelUpdate {
-            Update(usize, Surfel),
-            Add(Surfel),
-        }
-
-        //self.indexmap.render_indices_par(model.position_par_iter(), camera);
         self.indexmap.render_indices(model.position_iter(), camera);
         let mut model_map =
             Array2::<Option<(usize, Surfel)>>::from_elem(self.indexmap.map.dim(), None);
@@ -72,35 +70,39 @@ impl SurfelFusion {
             }
         });
 
-        let surfel_builder = SurfelBuilder::new(&camera.intrinsics);
+        enum SurfelUpdateCommand {
+            Update(usize, Surfel),
+            Add(Surfel),
+        }
 
+        let surfel_builder = SurfelBuilder::new(&camera.intrinsics);
         let normals = range_image.normals.as_ref().unwrap();
         let colors = range_image.colors.as_ref().unwrap();
-        let chunk_size = 1024 * 10;
 
-        let add_update_list: Vec<SurfelUpdate> = izip!(
+        const PROCESS_CHUNK_SIZE: usize = 1024 * 10;
+        let add_update_list: Vec<SurfelUpdateCommand> = izip!(
             range_image
                 .mask
                 .view()
                 .to_shape(range_image.len())
                 .unwrap()
-                .axis_chunks_iter(Axis(0), chunk_size),
+                .axis_chunks_iter(Axis(0), PROCESS_CHUNK_SIZE),
             range_image
                 .points
                 .view()
                 .to_shape(range_image.len())
                 .unwrap()
-                .axis_chunks_iter(Axis(0), chunk_size),
+                .axis_chunks_iter(Axis(0), PROCESS_CHUNK_SIZE),
             normals
                 .view()
                 .to_shape(range_image.len())
                 .unwrap()
-                .axis_chunks_iter(Axis(0), chunk_size),
+                .axis_chunks_iter(Axis(0), PROCESS_CHUNK_SIZE),
             colors
                 .view()
                 .to_shape(range_image.len())
                 .unwrap()
-                .axis_chunks_iter(Axis(0), chunk_size)
+                .axis_chunks_iter(Axis(0), PROCESS_CHUNK_SIZE)
         )
         .enumerate()
         .par_bridge()
@@ -115,7 +117,7 @@ impl SurfelFusion {
                 .enumerate()
                 .filter_map(|(i, (&mask, point, normal, color))| {
                     if mask != 0 {
-                        let point_index = chunk_i * chunk_size + i;
+                        let point_index = chunk_i * PROCESS_CHUNK_SIZE + i;
                         let u = point_index % range_image.width();
                         let v = point_index / range_image.width();
                         Some((u, v, point, normal, color))
@@ -137,7 +139,8 @@ impl SurfelFusion {
 
                     let ray_cam_ri = ri_surfel.position - camera.camera_to_world.translation();
                     let ray_cam_ri_norm = 1.0 / ray_cam_ri.norm();
-                    if let Some((index, _ray_dist, model_surfel)) = window(
+
+                    let found_merge_surfel = window(
                         model_map.view(),
                         u * self.indexmap.scale,
                         v * self.indexmap.scale,
@@ -163,11 +166,17 @@ impl SurfelFusion {
                     })
                     .min_by_key(|(_index, ray_distance, _model_surfel)| {
                         ordered_float::OrderedFloat(*ray_distance)
-                    }) {
+                    });
+
+                    if let Some((found_surfel_index, _ray_dist, model_surfel)) = found_merge_surfel
+                    {
                         // if ri_surfel.radius >= model_surfel.radius * 1.5
-                        SurfelUpdate::Update(index, model_surfel.merge(&ri_surfel))
+                        SurfelUpdateCommand::Update(
+                            found_surfel_index,
+                            model_surfel.merge(&ri_surfel),
+                        )
                     } else {
-                        SurfelUpdate::Add(ri_surfel)
+                        SurfelUpdateCommand::Add(ri_surfel)
                     }
                 })
                 .collect::<Vec<_>>()
@@ -193,21 +202,34 @@ impl SurfelFusion {
 
         let mut update_count = 0;
         let mut add_count = 0;
-        let mut gpu_add_list = Vec::with_capacity(add_update_list.len());
+
+        struct SurfelGpuUpdateCommand {
+            model_index: usize,
+            surfel: Surfel,
+        }
+
+        let mut gpu_update_commands = Vec::with_capacity(add_update_list.len());
         {
             let mut cpu_writer = model.get_cpu_writer();
 
             {
                 for surfel_update in &add_update_list {
                     match surfel_update {
-                        SurfelUpdate::Update(id, surfel) => {
+                        SurfelUpdateCommand::Update(model_index, surfel) => {
                             update_count += 1;
-                            cpu_writer.update(*id, surfel);
+                            cpu_writer.update(*model_index, surfel);
+                            gpu_update_commands.push(SurfelGpuUpdateCommand {
+                                model_index: *model_index,
+                                surfel: *surfel,
+                            });
                         }
-                        SurfelUpdate::Add(surfel) => {
+                        SurfelUpdateCommand::Add(surfel) => {
                             add_count += 1;
-                            let id = cpu_writer.add(surfel);
-                            gpu_add_list.push((id, *surfel));
+                            let new_index = cpu_writer.add(surfel);
+                            gpu_update_commands.push(SurfelGpuUpdateCommand {
+                                model_index: new_index,
+                                surfel: *surfel,
+                            });
                         }
                     }
                 }
@@ -221,19 +243,229 @@ impl SurfelFusion {
         {
             let mut gpu_writer = model.lock_gpu();
             let mut writer = gpu_writer.get_writer();
-            for au_item in &add_update_list {
-                if let SurfelUpdate::Update(id, surfel) = au_item {
-                    writer.update(*id, surfel);
-                }
-            }
 
-            for surfel_update in &gpu_add_list {
-                writer.update(surfel_update.0, &surfel_update.1);
+            for surfel_update in &gpu_update_commands {
+                writer.update(surfel_update.model_index, &surfel_update.surfel);
             }
 
             for id in &free_list {
                 writer.unmask(*id);
             }
+        }
+
+        FusionSummary {
+            num_added: add_count,
+            num_updated: update_count,
+            num_removed: free_list.len(),
+        }
+    }
+
+    pub fn integrate_with_sparse_features(
+        &mut self,
+        model: &mut SurfelModel,
+        range_image: &RangeImage,
+        camera: &PinholeCamera,
+        sparse_features: HashMap<(usize, usize), BitArray<64>>,
+    ) -> FusionSummary {
+        self.indexmap.render_indices(model.position_iter(), camera);
+        let mut model_map =
+            Array2::<Option<(usize, Surfel)>>::from_elem(self.indexmap.map.dim(), None);
+        self.indexmap.map.indexed_iter().for_each(|((v, u), id)| {
+            if *id > -1 {
+                model_map[(v, u)] = Some((*id as usize, model.get(*id as usize).unwrap()));
+            }
+        });
+        const PROCESS_CHUNK_SIZE: usize = 1024 * 10;
+
+        struct SourceSurfel {
+            surfel: Surfel,
+            u: usize,
+            v: usize,
+            sparse_feature: Option<BitArray<64>>,
+        }
+
+        let surfel_builder = SurfelBuilder::new(&camera.intrinsics);
+        let normals = range_image.normals.as_ref().unwrap();
+        let colors = range_image.colors.as_ref().unwrap();
+        let source_surfels = izip!(
+            range_image.mask.view().to_shape(range_image.len()).unwrap(),
+            range_image
+                .points
+                .view()
+                .to_shape(range_image.len())
+                .unwrap(),
+            normals.view().to_shape(range_image.len()).unwrap(),
+            colors.view().to_shape(range_image.len()).unwrap()
+        )
+        .enumerate()
+        .filter_map(|(point_index, (mask, point, normal, color))| {
+            if mask != 0 {
+                let u = point_index % range_image.width();
+                let v = point_index / range_image.width();
+                let surfel = camera
+                    .camera_to_world
+                    .transform(surfel_builder.from_range_pixel(
+                        point,
+                        normal,
+                        color,
+                        Vector2::new(u as f32, v as f32),
+                        self.timestamp,
+                    ));
+
+                Some(SourceSurfel {
+                    surfel,
+                    u,
+                    v,
+                    sparse_feature: sparse_features.get(&(u, v)).map(|v| v.clone()),
+                })
+            } else {
+                None
+            }
+        })
+        .collect::<Vec<_>>();
+
+        enum SurfelUpdateCommand {
+            Update(usize, Surfel, Option<BitArray<64>>),
+            Add(Surfel, Option<BitArray<64>>),
+        }
+        struct SurfelGpuUpdateCommand {
+            model_index: usize,
+            surfel: Surfel,
+        }
+
+        let add_update_list = source_surfels
+            .chunks(PROCESS_CHUNK_SIZE)
+            .par_bridge()
+            .map(|source_chunk| {
+                source_chunk
+                    .iter()
+                    .map(|ri_surfel| {
+                        let ray_cam_ri =
+                            ri_surfel.surfel.position - camera.camera_to_world.translation();
+                        let ray_cam_ri_norm = 1.0 / ray_cam_ri.norm();
+
+                        let u = ri_surfel.u;
+                        let v = ri_surfel.v;
+
+                        let found_merge_surfel = window(
+                            model_map.view(),
+                            u * self.indexmap.scale,
+                            v * self.indexmap.scale,
+                            8,
+                        )
+                        .flatten()
+                        .filter_map(|(index, model_surfel)| {
+                            if (ri_surfel.surfel.position - model_surfel.position).norm()
+                                > (model_surfel.radius + ri_surfel.surfel.radius) * 5.0
+                            {
+                                return None;
+                            }
+
+                            if angle_between_normals(&ri_surfel.surfel.normal, &model_surfel.normal)
+                                < 30.0_f32.to_radians()
+                            {
+                                let ray_dist = model_surfel.position.cross(&ray_cam_ri).norm()
+                                    * ray_cam_ri_norm;
+                                Some((index, ray_dist, model_surfel))
+                            } else {
+                                None
+                            }
+                        })
+                        .min_by_key(
+                            |(_index, ray_distance, _model_surfel)| {
+                                ordered_float::OrderedFloat(*ray_distance)
+                            },
+                        );
+
+                        if let Some((found_surfel_index, _ray_dist, model_surfel)) =
+                            found_merge_surfel
+                        {
+                            // Check if necessary: if ri_surfel.radius >= model_surfel.radius * 1.5
+                            SurfelUpdateCommand::Update(
+                                found_surfel_index,
+                                model_surfel.merge(&ri_surfel.surfel),
+                                ri_surfel.sparse_feature.clone(),
+                            )
+                        } else {
+                            SurfelUpdateCommand::Add(
+                                ri_surfel.surfel,
+                                ri_surfel.sparse_feature.clone(),
+                            )
+                        }
+                    })
+                    .collect::<Vec<_>>()
+            })
+            .flatten()
+            .collect::<Vec<_>>();
+
+        let free_list = model
+            .age_confidence_iter()
+            .filter_map(|(id, age, conf)| {
+                if (self.timestamp - age) > self.params.age_remove_threshold
+                    && conf < self.params.confidence_remove_threshold
+                {
+                    Some(id)
+                } else {
+                    None
+                }
+            })
+            .collect::<Vec<_>>();
+
+        self.timestamp += 1;
+
+        let mut update_count = 0;
+        let mut add_count = 0;
+
+        let mut gpu_update_commands = Vec::with_capacity(add_update_list.len());
+        let mut sparse_features = Vec::with_capacity(add_update_list.len() / 4);
+        {
+            let mut cpu_writer = model.get_cpu_writer();
+            {
+                for surfel_update in &add_update_list {
+                    let (model_index, surfel, sparse_feature) = match surfel_update {
+                        SurfelUpdateCommand::Update(model_index, surfel, sparse_feature) => {
+                            update_count += 1;
+                            cpu_writer.update(*model_index, &surfel);
+                            (*model_index, surfel, sparse_feature)
+                        }
+                        SurfelUpdateCommand::Add(surfel, sparse_feature) => {
+                            add_count += 1;
+                            let model_index = cpu_writer.add(&surfel);
+                            (model_index, surfel, sparse_feature)
+                        }
+                    };
+
+                    gpu_update_commands.push(SurfelGpuUpdateCommand {
+                        model_index,
+                        surfel: surfel.clone(),
+                    });
+
+                    if let Some(v) = sparse_feature {
+                        sparse_features.push((model_index, v.clone()));
+                    }
+                }
+
+                for id in &free_list {
+                    cpu_writer.free(*id);
+                }
+            }
+        }
+
+        {
+            let mut gpu_writer = model.lock_gpu();
+            let mut writer = gpu_writer.get_writer();
+
+            for surfel_update in &gpu_update_commands {
+                writer.update(surfel_update.model_index, &surfel_update.surfel);
+            }
+
+            for id in &free_list {
+                writer.unmask(*id);
+            }
+        }
+
+        for (model_index, v) in sparse_features {
+            model.sparse_features.insert(model_index, v.clone());
         }
 
         FusionSummary {
@@ -279,6 +511,54 @@ mod tests {
 
             // guard
             let summary = surfel_fusion.integrate(&mut model, &range_image, &camera);
+
+            duration_accum += start.elapsed().as_secs_f64();
+            println!(
+                "Iteration: {}, Summary: {:?}, Time elapsed: {:?}",
+                i,
+                summary,
+                start.elapsed()
+            );
+        }
+
+        if let Ok(report) = guard.report().build() {
+            let file = File::create("flamegraph.svg").unwrap();
+            report.flamegraph(file).unwrap();
+        }
+        println!(
+            "Time elapsed in is_visible() is: {:?}",
+            duration_accum / NUM_ITER as f64
+        );
+    }
+
+    #[rstest]
+    #[ignore]
+    fn test_surfel_fusion_sparse(sample_range_img_ds2: TestRangeImageDataset) {
+        let manager = Manager::default();
+
+        let mut model = SurfelModel::new(&manager.memory_allocator, 1_800_000);
+
+        let mut surfel_fusion = SurfelFusion::new(640, 480, 4, SurfelFusionParameters::default());
+
+        let mut duration_accum = 0.0;
+        const NUM_ITER: usize = 4;
+        let guard = pprof::ProfilerGuardBuilder::default()
+            .frequency(1000)
+            .blocklist(&["libc", "libgcc", "pthread", "vdso"])
+            .build()
+            .unwrap();
+        for i in 0..NUM_ITER {
+            let range_image = sample_range_img_ds2.get(i).unwrap();
+            let camera = sample_range_img_ds2.pinhole_camera(i);
+            let start = Instant::now();
+
+            // guard
+            let summary = surfel_fusion.integrate_with_sparse_features(
+                &mut model,
+                &range_image,
+                &camera,
+                HashMap::new(),
+            );
 
             duration_accum += start.elapsed().as_secs_f64();
             println!(

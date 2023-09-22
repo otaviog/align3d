@@ -66,7 +66,6 @@ pub struct RgbdFrame {
     pub camera_to_world: Option<Transform>,
     /// The RGB-D image.
     pub image: RgbdImage,
-    // pub timestamp: Option<f64>,
 }
 
 impl RgbdFrame {

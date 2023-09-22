@@ -6,6 +6,7 @@
     ],
     "words": [
         "accum",
+        "Akaze",
         "backproject",
         "bloei",
         "bytemuck",
@@ -31,6 +32,8 @@
         "Jacobians",
         "Jaesik",
         "kdtree",
+        "keypoint",
+        "keypoints",
         "Koltun",
         "Luma",
         "mult",

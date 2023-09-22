@@ -2,6 +2,8 @@ use image::{flat::SampleLayout, imageops::blur, ImageBuffer, Rgb, RgbImage};
 use nalgebra::Vector3;
 use ndarray::{Array2, Array3, ShapeBuilder};
 
+use super::RgbdImage;
+
 /// Trait to convert into ndarray::Array3, this is different than nshare version
 /// because it uses the shape [height, width, channels] instead of [channels, height, width].
 pub trait IntoArray3 {
@@ -40,15 +42,31 @@ impl IntoImageRgb8 for Array3<u8> {
 }
 
 pub trait ToImageRgb8 {
-    fn to_image_rgb8(self) -> RgbImage;
+    fn to_image_rgb8(&self) -> RgbImage;
 }
 
 impl ToImageRgb8 for Array2<Vector3<u8>> {
-    fn to_image_rgb8(self) -> RgbImage {
+    fn to_image_rgb8(&self) -> RgbImage {
         let (height, width) = self.dim();
         RgbImage::from_fn(width as u32, height as u32, |x, y| {
             let c = self[(y as usize, x as usize)];
             image::Rgb([c[0], c[1], c[2]])
+        })
+    }
+}
+
+impl ToImageRgb8 for RgbdImage {
+    fn to_image_rgb8(&self) -> RgbImage {
+        RgbImage::from_fn(self.width() as u32, self.height() as u32, |x, y| {
+            let y = y as usize;
+            let x = x as usize;
+            let (r, g, b) = (
+                self.color[(y, x, 0)],
+                self.color[(y, x, 1)],
+                self.color[(y, x, 2)],
+            );
+
+            image::Rgb([r, g, b])
         })
     }
 }

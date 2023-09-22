@@ -62,8 +62,8 @@ rayon = "1.7.0"
 ordered-float = "3.7.0"
 parking_lot = "0.12.1"
 spin = "0.9.8"
-akaze = "0.7.0"
-
+akaze = {path = "dependencies/cv/akaze"}
+bitarray = "0.9.3"
 
 [dev-dependencies]
 rstest = "0.15.0"
@@ -72,7 +72,7 @@ tempfile = "3.3.0"
 criterion = "0.4"
 
 [target.'cfg(unix)'.dev-dependencies]
-pprof = { version = "0.11", features = ["flamegraph", "criterion", "protobuf"]  }
+pprof = { version = "0.11", features = ["flamegraph", "criterion", "protobuf"] }
 
 [[test]]
 name = "viz-point_cloud"
