@@ -90,24 +90,30 @@ required-features = ["viz"]
 
 [[bench]]
 name = "bench_mesh"
+path = "benches/bench_mesh.rs"
 harness = false
 
 [[bench]]
 name = "bench_bilateral"
+path = "benches/bench_bilateral.rs"
 harness = false
 
 [[bench]]
 name = "bench_kdtree"
+path = "benches/bench_kdtree.rs"
 harness = false
 
 [[bench]]
 name = "bench_icp"
+path = "benches/bench_icp.rs"
 harness = false
 
 [[bench]]
 name = "bench_image_icp"
+path = "benches/bench_image_icp.rs"
 harness = false
 
 [[bench]]
 name = "bench_compute_normals"
+path = "benches/bench_compute_normals.rs"
 harness = false
