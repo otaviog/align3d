@@ -141,8 +141,8 @@ mod tests {
 
         let mut batch = GaussNewtonBatch::new(3, 6);
         batch.assign(0, 1.0, 1.0, &[1.0, 2.0, 3.0, 4.0, 5.0, 6.0]);
-        batch.assign(0, 2.0, 2.0, &[1.0, 2.0, 3.0, 4.0, 5.0, 6.0]);
-        batch.assign(0, 3.0, 3.0, &[1.0, 2.0, 3.0, 4.0, 5.0, 6.0]);
+        batch.assign(1, 2.0, 2.0, &[1.0, 2.0, 3.0, 4.0, 5.0, 6.0]);
+        batch.assign(2, 3.0, 3.0, &[1.0, 2.0, 3.0, 4.0, 5.0, 6.0]);
 
         gn.step_batch(&batch);
 
@@ -158,10 +158,9 @@ mod tests {
             [18.0, 36.0, 54.0, 72.0, 90.0, 108.0],
         ]
         .into_nalgebra();
+        assert_eq!(hessian, expected_hessian);
 
         let expected_gradient = array![6.0, 12.0, 18.0, 24.0, 30.0, 36.0].into_nalgebra();
-
-        assert_eq!(hessian, expected_hessian);
         assert_eq!(gradient, expected_gradient);
     }
 }
