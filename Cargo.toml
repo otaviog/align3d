@@ -30,7 +30,7 @@ ndarray-rand = "0.14.0"
 nshare = { version = "0.9.0", features = ["ndarray", "nalgebra"] }
 rand = "0.8.5"
 nalgebra = "0.30.1"
-num = "*"
+num = "0.4.0"
 ndarray-linalg = "0.12.0"
 approx = "0.5.1"
 image = "0.24.4"
