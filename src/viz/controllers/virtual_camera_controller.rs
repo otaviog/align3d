@@ -101,7 +101,7 @@ impl VirtualCameraControl for WASDVirtualCameraControl {
 mod test {
     use nalgebra::Vector3;
 
-    use crate::{bounds::Sphere3Df, viz::virtual_camera::VirtualCameraSphericalBuilder};
+    use crate::viz::{sphere3d::Sphere3Df, virtual_camera::VirtualCameraSphericalBuilder};
 
     use super::{VirtualCameraControl, WASDVirtualCameraControl};
 

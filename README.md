@@ -1,15 +1,15 @@
-# Align3D
+# Align3D - Iterative Closest Point in Rust
 
-Align3D is a versatile project written in Rust that aligns range images and point clouds using the Iterative Closest Point (ICP) algorithm.
-It provides functionalities to integrate range images into surfels, read and write .ply and .off files, read the TUM and IL-RGBD datasets, and visualize point clouds, surfels, and other geometries. 
-Additionally, it includes processing utilities such as normal vector computation for range images and a bilateral filter for depth images.
+Align3D provides alignment of range images and point clouds using the Iterative Closest Point (ICP) algorithm.
+
+It provides functionalities:
 
 * Alignment of range images and point clouds using the Iterative Closest Point (ICP) algorithm.
-* Integration of range images into surfels for efficient representation and rendering.
 * Reading and writing of .ply and .off files for easy data exchange.
-* Support for the TUM and IL-RGBD datasets for convenient input.
+* Support for the TUM and IL-RGBD datasets for input.
 * Visualization of point clouds, surfels, and other geometries to inspect the results.
 * Processing utilities like normal vector computation for range images and bilateral filtering for depth images.
+* Computation of odometry metrics
 
 Align3D leverages several Rust libraries to provide its functionality:
 
@@ -20,27 +20,11 @@ Align3D leverages several Rust libraries to provide its functionality:
 
 ## Getting it
 
-Clone the Align3D repository:
-
-```bash
-git clone https://github.com/otaviog/align3d
-```
-Change into the project directory:
-
-```bash
-cd align3d
-```
-
-Build the project using Cargo:
-
-```bash
-cargo build --release
-```
 
 Add to your project's `Cargo.toml`:
 
 ```toml
-align3d = {path = "<your/align3d/path>" }
+align3d = { git = "https://github.com/otaviog/align3d" }
 ```
 
 ## Sample use
@@ -160,16 +144,5 @@ While still being a experimental project, it shows the versatility and performan
 The project has the following Road map:
 
 * [x] Bug fixes in PCL ICP.
-* [ ] Optimize Image Icp performance
-* [ ] Optimize 3D rendering pipeline
+* [x] Optimize Image Icp performance
 * [ ] Python bindings
-* [ ] Improve UX of the 3D viewer
-* [x] Surfel fusion v1.0.0
-      * Only merging of incoming to model surfels.
-* [ ] Surfel fusion v1.1.0
-      * Use merging of model surfels and space carving.
-* [ ] Frame-to-model SLAM with surfels
-* [ ] Alignment using sparse features
-      * Sift and deep learning ones
-* [ ] Submap SLAM
-* [ ] Pose Graph build and optimization

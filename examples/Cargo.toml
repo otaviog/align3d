@@ -1,0 +1,23 @@
+[package]
+name = "examples"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+align3d = { path = "../", features = ["viz"]}
+clap = { version = "4.0.18", features = ["cargo", "derive"] }
+kdam = "0.3.0"
+
+[[bin]]
+name = "dataset_viewer"
+path = "src/bin/dataset_viewer.rs"
+
+[[bin]]
+name = "odometry"
+path = "src/bin/odometry.rs"
+
+[[bin]]
+name = "readme_sample"
+path = "src/bin/readme_sample.rs"

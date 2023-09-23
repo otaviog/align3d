@@ -5,10 +5,10 @@ use num::Float;
 use rayon::prelude::{ParallelBridge, ParallelIterator};
 
 use crate::{
+    extra_math,
     optim::{GaussNewton, GaussNewtonBatch},
     range_image::RangeImage,
     transform::{LieGroup, Transform},
-    trig,
 };
 
 use super::{
@@ -96,8 +96,8 @@ impl<'target_lt> ImageIcp<'target_lt> {
             )
             .par_bridge()
             .map(|(mask_chunk, point_chunk, color_chunk)| {
-                let mut color_batch = GaussNewtonBatch::new(batch_size);
-                let mut geom_batch = GaussNewtonBatch::new(batch_size);
+                let mut color_batch = GaussNewtonBatch::new(batch_size, 6);
+                let mut geom_batch = GaussNewtonBatch::new(batch_size, 6);
 
                 izip!(mask_chunk, point_chunk, color_chunk)
                     .filter_map(|(&mask, point, color)| {
@@ -120,7 +120,7 @@ impl<'target_lt> ImageIcp<'target_lt> {
                                 return; // exit closure
                             }
                             let target_normal = target_normals[(v_int as usize, u_int as usize)];
-                            if trig::angle_between_normals(&p, &target_normal)
+                            if extra_math::angle_between_normals(&p, &target_normal)
                                 >= self.params.max_normal_angle
                             //if target_normal.dot(&p) >= normal_angle
                             {

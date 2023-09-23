@@ -2,7 +2,7 @@ use std::{collections::HashMap, time::Duration};
 
 use winit::event::{ElementState, MouseButton, VirtualKeyCode};
 
-use crate::bounds::Sphere3Df;
+use crate::viz::sphere3d::Sphere3Df;
 
 pub struct FrameStepInfo {
     pub viewport_size: [f32; 2],

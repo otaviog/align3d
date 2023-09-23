@@ -103,12 +103,16 @@ where
             });
     }
 
-    pub fn slice(&self, image: &Array2<I>, dst_image: &mut Array2<I>) {
+    pub fn slice(&self, image: &Array2<I>) -> Array2<I>
+    where
+        I: num::Zero,
+    {
         let inv_sigma_space = 1.0 / self.sigma_space;
         let inv_sigma_color = 1.0 / self.sigma_color;
         let space_pad = self.space_pad as f64;
         let color_pad = self.color_pad as f64;
 
+        let mut dst_image = Array2::<I>::zeros(image.dim());
         image
             .iter()
             .zip(dst_image.indexed_iter_mut())
@@ -124,6 +128,7 @@ where
 
                 *dst = num::cast::cast(trilinear).unwrap();
             });
+        dst_image
     }
 
     pub fn trilinear(&self, row: f64, col: f64, channel: f64) -> f64 {
@@ -181,9 +186,8 @@ mod tests {
 
     #[rstest]
     fn verify_slice(bloei_luma16: Array2<u16>, mut bilateral_grid: BilateralGrid<u16>) {
-        let mut dest_image = bloei_luma16.clone();
         bilateral_grid.normalize();
-        bilateral_grid.slice(&bloei_luma16, &mut dest_image);
+        let dest_image = bilateral_grid.slice(&bloei_luma16);
 
         assert_eq!(dest_image.dim(), (600, 450));
         assert_eq!(dest_image[(421, 123)], 2266);

@@ -12,12 +12,12 @@ pub struct GaussNewtonBatch {
 }
 
 impl GaussNewtonBatch {
-    pub fn new(max_entries: usize) -> Self {
+    pub fn new(batch_size: usize, jacobian_size: usize) -> Self {
         Self {
-            jacobians: Array2::zeros((max_entries, 6)),
-            residuals: Array1::zeros(max_entries),
-            costs: Array1::zeros(max_entries),
-            dirty: Array1::from_elem(max_entries, true),
+            jacobians: Array2::zeros((batch_size, jacobian_size)),
+            residuals: Array1::zeros(batch_size),
+            costs: Array1::zeros(batch_size),
+            dirty: Array1::from_elem(batch_size, true),
         }
     }
 
@@ -32,10 +32,6 @@ impl GaussNewtonBatch {
         self.residuals[i] = residual;
         self.dirty[i] = false;
         self.costs[i] = cost;
-    }
-
-    pub fn reset(&mut self) {
-        self.dirty.fill(true);
     }
 }
 
@@ -85,14 +81,6 @@ impl<const DIM: usize> GaussNewton<DIM> {
         self.hessian += SMatrix::from_data(ArrayStorage(jt_j));
         self.gradient += jt_r;
         self.count += 1;
-    }
-
-    pub fn step_array(&mut self, residual_array: &Array1<f32>, jacobian_array: &Array2<f32>) {
-        for (residual, jacobian) in izip!(residual_array.iter(), jacobian_array.axis_iter(Axis(0)))
-        {
-            let residual = *residual;
-            self.step(residual, jacobian.as_slice().unwrap());
-        }
     }
 
     pub fn step_batch(&mut self, batch: &GaussNewtonBatch) {
@@ -151,14 +139,12 @@ mod tests {
 
         let mut gn = GaussNewton::<6>::new();
 
-        let residual_array = array![1.0, 2.0, 3.0];
-        let jacobian_array = array![
-            [1.0, 2.0, 3.0, 4.0, 5.0, 6.0],
-            [1.0, 2.0, 3.0, 4.0, 5.0, 6.0],
-            [1.0, 2.0, 3.0, 4.0, 5.0, 6.0],
-        ];
+        let mut batch = GaussNewtonBatch::new(3, 6);
+        batch.assign(0, 1.0, 1.0, &[1.0, 2.0, 3.0, 4.0, 5.0, 6.0]);
+        batch.assign(0, 2.0, 2.0, &[1.0, 2.0, 3.0, 4.0, 5.0, 6.0]);
+        batch.assign(0, 3.0, 3.0, &[1.0, 2.0, 3.0, 4.0, 5.0, 6.0]);
 
-        gn.step_array(&residual_array, &jacobian_array);
+        gn.step_batch(&batch);
 
         let hessian = gn.hessian;
         let gradient = gn.gradient;

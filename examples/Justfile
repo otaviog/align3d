@@ -1,0 +1,5 @@
+odometry:
+    cargo run --bin odometry --release -- ilrgbd ../datasets/apartment/ 15
+
+readme_sample:
+    cargo run --bin readme_sample --release -- ilrgbd ../datasets/apartment/ 15

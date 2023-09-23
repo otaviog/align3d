@@ -1,19 +1,20 @@
 use align3d::{
     bilateral::BilateralFilter,
-    bin_utils::dataset::load_dataset,
     icp::{multiscale::MultiscaleAlign, MsIcpParams},
     io::dataset::SubsetDataset,
     metrics::TransformMetrics,
     range_image::{RangeImage, RangeImageBuilder},
-    trajectory_builder::TrajectoryBuilder,
-    viz::rgbd_dataset_viewer::RgbdDatasetViewer,
+    trajectory::TrajectoryBuilder,
+    viz::rgbd_dataset_viewer::RgbdDatasetViewer, transform::Transform,
 };
+
 use clap::Parser;
+use examples::load_dataset;
 use kdam::tqdm;
 
 #[derive(Parser)]
 struct Args {
-    /// Format of the dataset: slamtb, ilrgbd, or tum
+    /// Format of the dataset: ilrgbd, or tum
     format: String,
     /// Path to the dataset directory
     dataset: String,
@@ -34,14 +35,12 @@ fn main() {
         dataset
     };
 
-    let range_processing = RangeImageBuilder::default()
-        .with_bilateral_filter(Some(BilateralFilter::default()))
-        .with_normals(true)
-        .with_intensity(true);
+    let range_processing =
+        RangeImageBuilder::default().with_bilateral_filter(Some(BilateralFilter::default()));
 
     let icp_params = MsIcpParams::default();
 
-    let mut traj_builder = TrajectoryBuilder::default();
+    let mut trajectory_build = TrajectoryBuilder::with_start(Transform::eye(), 0.0);
     let mut last_frame: Vec<RangeImage> = range_processing.build(dataset.get(0).unwrap());
 
     for i in tqdm!(
@@ -52,11 +51,11 @@ fn main() {
         let current_frame = range_processing.build(dataset.get(i).unwrap());
         let icp = MultiscaleAlign::new(icp_params.clone(), &last_frame).unwrap();
         let transform = icp.align(&current_frame);
-        traj_builder.accumulate(&transform, Some(i as f32));
+        trajectory_build.accumulate(&transform, Some(i as f32));
         last_frame = current_frame;
     }
 
-    let pred_trajectory = traj_builder.build();
+    let pred_trajectory = trajectory_build.build();
     let gt_trajectory = &dataset.trajectory().unwrap().first_frame_at_origin();
 
     let metrics = TransformMetrics::mean_trajectory_error(&pred_trajectory, gt_trajectory).unwrap();

@@ -4,7 +4,6 @@ use crate::{
     bilateral::BilateralFilter,
     image::RgbdFrame,
     io::dataset::{DatasetError, RgbdDataset, SlamTbDataset},
-    Array2Recycle,
 };
 
 #[fixture]
@@ -21,17 +20,9 @@ impl TestRgbdFrameDataset {
         let (cam, mut rgbd_image, transform) = self.dataset.get(index)?.into_parts();
         rgbd_image.depth = {
             let filter = BilateralFilter::default();
-            filter.filter(&rgbd_image.depth, Array2Recycle::Empty)
+            filter.filter(&rgbd_image.depth)
         };
         Ok(RgbdFrame::new(cam, rgbd_image, transform))
-    }
-
-    pub fn len(&self) -> usize {
-        self.dataset.len()
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.dataset.is_empty()
     }
 }
 

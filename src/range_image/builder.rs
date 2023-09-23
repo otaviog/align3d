@@ -1,4 +1,4 @@
-use crate::{bilateral::BilateralFilter, image::RgbdFrame, Array2Recycle};
+use crate::{bilateral::BilateralFilter, image::RgbdFrame};
 
 use super::RangeImage;
 
@@ -17,10 +17,9 @@ impl Default for RangeImageBuilder {
     /// Creates a new builder with default parameters.
     fn default() -> Self {
         Self {
-            with_normals: false,
-            with_intensity: false,
+            with_normals: true,
+            with_intensity: true,
             bilateral_filter: None,
-            // bilateral_data: Array2Recycle::Empty,
             pyramid_levels: 3,
             blur_sigma: 1.0,
         }
@@ -74,7 +73,7 @@ impl RangeImageBuilder {
     /// A vector of range images, the length of the vector depends on the number of pyramid levels.
     pub fn build(&self, mut frame: RgbdFrame) -> Vec<RangeImage> {
         if let Some(filter) = &self.bilateral_filter {
-            frame.image.depth = filter.filter(&frame.image.depth, Array2Recycle::Empty);
+            frame.image.depth = filter.filter(&frame.image.depth);
         }
         let mut first_image = RangeImage::from_rgbd_frame(&frame);
         if self.with_normals {

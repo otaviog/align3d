@@ -1,10 +1,9 @@
 use nalgebra::Vector3;
 use ndarray::ArrayView1;
 
-use crate::{
-    transform::{Transform, Transformable},
-    viz::node::Mat4x4,
-};
+use crate::transform::{Transform, Transformable};
+
+use super::node::Mat4x4;
 
 #[derive(Clone, Copy)]
 pub struct Sphere3Df {

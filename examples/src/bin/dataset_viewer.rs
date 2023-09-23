@@ -1,6 +1,6 @@
-use align3d::bin_utils::dataset::load_dataset;
 use align3d::{io::dataset::SubsetDataset, viz::rgbd_dataset_viewer::RgbdDatasetViewer};
 use clap::Parser;
+use examples::load_dataset;
 
 #[derive(Parser)]
 struct CommandLine {

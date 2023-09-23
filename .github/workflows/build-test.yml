@@ -22,6 +22,8 @@ jobs:
       run: cargo fmt --verbose --all -- --check
     - name: Run clippy
       run: cargo clippy --verbose --all-targets --all-features -- -D warnings
+    - name: Build examples
+      run: cd examples; cargo build
     - name: Run tests
       run: cargo test --verbose --release --lib
     - name: Build benchmarks

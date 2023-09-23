@@ -1,11 +1,11 @@
 use super::cost_function::PointPlaneDistance;
 use super::icp_params::IcpParams;
 use crate::{
+    extra_math,
     kdtree::R3dTree,
     optim::GaussNewton,
     pointcloud::PointCloud,
     transform::{LieGroup, Transform},
-    trig,
 };
 use itertools::izip;
 use num::Float;
@@ -77,7 +77,7 @@ impl<'target> Icp<'target> {
 
                 let target_normal = target_normals[found_index];
 
-                if trig::angle_between_vectors(&source_normal, &target_normal)
+                if extra_math::angle_between_normals(&source_normal, &target_normal)
                     > self.params.max_normal_angle
                 {
                     continue;

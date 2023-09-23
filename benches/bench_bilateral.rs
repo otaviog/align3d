@@ -1,7 +1,4 @@
-use align3d::{
-    bilateral::{BilateralFilter, BilateralGrid},
-    Array2Recycle,
-};
+use align3d::bilateral::{BilateralFilter, BilateralGrid};
 
 use criterion::{criterion_group, criterion_main, Criterion};
 use nshare::ToNdarray2;
@@ -27,15 +24,14 @@ fn criterion_benchmark(c: &mut Criterion) {
     });
     c.bench_function("bilateral slice operation", |b| {
         let mut grid = BilateralGrid::from_image(&bloei_luma16, 4.5, 30.0);
-        let mut dst_image = bloei_luma16.clone();
         grid.normalize();
         b.iter(|| {
-            grid.slice(&bloei_luma16, &mut dst_image);
+            grid.slice(&bloei_luma16);
         });
     });
     c.bench_function("bilateral filter", |b| {
         b.iter(|| {
-            BilateralFilter::<u16>::default().filter(&bloei_luma16, Array2Recycle::Empty);
+            BilateralFilter::<u16>::default().filter(&bloei_luma16);
         });
     });
 }

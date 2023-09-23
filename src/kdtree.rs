@@ -110,7 +110,7 @@ mod tests {
     use std::time::Instant;
 
     use crate::kdtree::R3dTree;
-    use crate::utils::access::UnflattenVector3;
+    use crate::unit_test::access::UnflattenVector3;
     use nalgebra::Vector3;
     use ndarray::prelude::*;
     use rand::rngs::SmallRng;

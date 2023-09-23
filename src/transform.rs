@@ -294,7 +294,7 @@ pub trait TransformableMove<Type> {
 #[cfg(test)]
 mod tests {
     use crate::transform::LieGroup;
-    use crate::utils::access::FlattenVector3;
+    use crate::unit_test::access::FlattenVector3;
 
     use super::Transform;
     use nalgebra::Vector6;

@@ -1,8 +1,8 @@
 use std::{cell::RefCell, collections::HashMap, rc::Rc, sync::Arc};
 
 use crate::{
-    bounds::Sphere3Df,
     transform::{Transform, Transformable},
+    viz::sphere3d::Sphere3Df,
 };
 use nalgebra::Matrix4;
 use nalgebra_glm::{self, Mat3};

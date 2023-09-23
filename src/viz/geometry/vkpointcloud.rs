@@ -26,13 +26,13 @@ use vulkano::{
 };
 
 use crate::{
-    bounds::Sphere3Df,
     pointcloud::PointCloud,
     range_image::RangeImage,
     viz::{
         controllers::FrameStepInfo,
         misc::get_normal_matrix,
         node::{node_ref, CommandBuffersContext, MakeNode, Node, NodeProperties, NodeRef},
+        sphere3d::Sphere3Df,
         Manager,
     },
 };

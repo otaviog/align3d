@@ -2,7 +2,6 @@ use align3d::bilateral::BilateralFilter;
 use align3d::io::dataset::{RgbdDataset, SlamTbDataset};
 use align3d::pointcloud::PointCloud;
 use align3d::range_image::RangeImage;
-use align3d::Array2Recycle;
 use nalgebra::Vector3;
 use ndarray::Array1;
 use rstest::*;
@@ -36,7 +35,7 @@ pub fn sample_rgbd_pointcloud() -> PointCloud {
 
     frame.image.depth = {
         let filter = BilateralFilter::default();
-        filter.filter(&frame.image.depth, Array2Recycle::Empty)
+        filter.filter(&frame.image.depth)
     };
 
     let mut point_cloud = RangeImage::from_rgbd_frame(&frame);

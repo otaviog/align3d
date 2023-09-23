@@ -1,4 +1,4 @@
-use align3d::{bilateral::BilateralFilter, Array2Recycle};
+use align3d::bilateral::BilateralFilter;
 use image::GrayImage;
 use ndarray::Array2;
 use nshare::ToNdarray2;
@@ -34,12 +34,10 @@ pub fn bloei_luma8() -> Array2<u8> {
 #[rstest]
 fn test_bilateral_filter(bloei_luma8: Array2<u8>) {
     // Warm up.
-    let _filtered_image =
-        BilateralFilter::new(100.0, 10.0).filter(&bloei_luma8, Array2Recycle::Empty);
+    let _filtered_image = BilateralFilter::new(100.0, 10.0).filter(&bloei_luma8);
 
     let now = std::time::Instant::now();
-    let filtered_image =
-        BilateralFilter::new(100.0, 10.0).filter(&bloei_luma8, Array2Recycle::Empty);
+    let filtered_image = BilateralFilter::new(100.0, 10.0).filter(&bloei_luma8);
     println!("Elapsed: {:?}", now.elapsed());
 
     into_image_luma(bloei_luma8)

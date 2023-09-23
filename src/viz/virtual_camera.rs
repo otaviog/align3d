@@ -1,7 +1,7 @@
 use nalgebra::Vector3;
 use nalgebra_glm::Vec3;
 
-use crate::bounds::Sphere3Df;
+use crate::viz::sphere3d::Sphere3Df;
 
 use super::{virtual_projection::PerspectiveVirtualProjectionBuilder, VirtualProjection};
 
@@ -187,7 +187,7 @@ impl VirtualCameraSphericalBuilder {
 mod test {
     use nalgebra::Vector3;
 
-    use crate::bounds::Sphere3Df;
+    use crate::viz::sphere3d::Sphere3Df;
 
     use super::VirtualCameraSphericalBuilder;
 

@@ -1,5 +1,6 @@
 pub mod geometry;
 mod manager;
+mod sphere3d;
 pub use manager::Manager;
 
 mod window;
