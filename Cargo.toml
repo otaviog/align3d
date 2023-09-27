@@ -6,6 +6,8 @@ authors = ["Otavio Gomes <otavio.b.gomes@gmail.com>"]
 license = "MIT"
 include = ["src/**/*", "LICENSE", "README.md", "!**/*_test.*", "!**/*_test/**/*"]
 description = "Alignment with Iterative Closest Point (ICP) for point clouds and images"
+repository = "https://github.com/otaviog/align3d"
+
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [lib]
