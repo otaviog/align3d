@@ -20,16 +20,21 @@ Align3D leverages several Rust libraries to provide its functionality:
 
 ## Getting it
 
+Use Cargo:
 
-Add to your project's `Cargo.toml`:
+```shell
+$ cargo add align3d
+```
 
-```toml
-align3d = { git = "https://github.com/otaviog/align3d" }
+OR, to install with visualization features, use:
+
+```shell
+$ cargo add align3d --features viz
 ```
 
 ## Sample use
 
-The following code do the following:
+The following code does the following:
 
 * loads the IndoorLidarDataset;
 * computes the odometry for 20 frames;
