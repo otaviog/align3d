@@ -123,6 +123,14 @@ impl<const DIM: usize> GaussNewton<DIM> {
         self.count += other.count;
     }
 
+    pub fn add(&mut self, other: &Self) {
+        self.hessian = self.hessian + other.hessian;
+        self.gradient = self.gradient + other.gradient;
+        self.squared_residual_sum =
+            self.squared_residual_sum + other.squared_residual_sum;
+        self.count += other.count;
+    }
+
     pub fn weight(&mut self, weight: f32) {
         self.hessian *= weight * weight;
         self.gradient *= weight;

@@ -88,7 +88,7 @@ impl<'target_lt> ImageIcp<'target_lt> {
         ];
 
         for _ in 0..self.params.max_iterations {
-            izip!(
+            let sub_gn_opts = izip!(
                 source
                     .mask
                     .view()
@@ -109,7 +109,7 @@ impl<'target_lt> ImageIcp<'target_lt> {
                 gn_items.chunks_mut(BATCH_SIZE)
             )
             .par_bridge()
-            .for_each(|(mask_chunk, point_chunk, color_chunk, gn_batch)| {
+            .map(|(mask_chunk, point_chunk, color_chunk, gn_batch)| {
                 for (i, (mask, point, color)) in
                     enumerate(izip!(mask_chunk, point_chunk, color_chunk))
                 {
@@ -128,14 +128,14 @@ impl<'target_lt> ImageIcp<'target_lt> {
 
                     let geom_sqr_distance = (target_point - p).norm_squared();
                     if geom_sqr_distance > max_distance_sqr {
-                        return; // exit closure
+                        continue; // exit closure
                     }
                     let target_normal = target_normals[(v_int as usize, u_int as usize)];
                     if extra_math::angle_between_normals(&p, &target_normal)
                         >= self.params.max_normal_angle
                     //if target_normal.dot(&p) >= normal_angle
                     {
-                        return; // exit closure
+                        continue; // exit closure
                     }
                     let (residual, jacobian) =
                         geometric_distance.jacobian(&p, &target_point, &target_normal);
@@ -161,15 +161,25 @@ impl<'target_lt> ImageIcp<'target_lt> {
                     }
                 }
 
+                let mut color_sub_opt = GaussNewton::<6>::new();
+                let mut geom_sub_opt = GaussNewton::<6>::new();
 
-            });
+                for gn_item in gn_batch {
+                    color_sub_opt.step_batch(&gn_item.color);
+                    geom_sub_opt.step_batch(&gn_item.geom);
+                    gn_item.color.clear();
+                    gn_item.geom.clear();
+                }
 
-            gn_items.iter_mut().for_each(|batch| {
-                color_optim.step_batch(&batch.color);
-                batch.color.clear();
-                geom_optim.step_batch(&batch.geom);
-                batch.geom.clear();
-            });
+                (color_sub_opt, geom_sub_opt)
+            })
+            .collect::<Vec<_>>();
+
+            
+            for i in 1..sub_gn_opts.len() {
+                color_optim.add(&sub_gn_opts[i].0);
+                geom_optim.add(&sub_gn_opts[i].1);
+            }
 
             geom_optim.combine(&color_optim, self.params.weight, self.params.color_weight);
             let residual = geom_optim.mean_squared_residual();
