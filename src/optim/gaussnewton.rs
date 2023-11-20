@@ -1,23 +1,25 @@
 use itertools::izip;
 
 use nalgebra::{ArrayStorage, Cholesky, Const, SMatrix, SVector};
-use ndarray::{Array1, Array2, Axis};
 use num::Zero;
 
-pub struct GaussNewtonBatch {
-    jacobians: Array2<f32>,
-    residuals: Array1<f32>,
-    costs: Array1<f32>,
-    dirty: Array1<bool>,
+#[derive(Clone)]
+pub struct GaussNewtonBatch<const BATCH_SIZE: usize, const JACOBIAN_DIM: usize> {
+    jacobians: [[f32; JACOBIAN_DIM]; BATCH_SIZE],
+    residuals: [f32; BATCH_SIZE],
+    costs: [f32; BATCH_SIZE],
+    dirty: [bool; BATCH_SIZE],
 }
 
-impl GaussNewtonBatch {
-    pub fn new(batch_size: usize, jacobian_size: usize) -> Self {
+impl<const BATCH_SIZE: usize, const JACOBIAN_DIM: usize>
+    GaussNewtonBatch<BATCH_SIZE, JACOBIAN_DIM>
+{
+    pub fn new() -> Self {
         Self {
-            jacobians: Array2::zeros((batch_size, jacobian_size)),
-            residuals: Array1::zeros(batch_size),
-            costs: Array1::zeros(batch_size),
-            dirty: Array1::from_elem(batch_size, true),
+            jacobians: [[0.0f32; JACOBIAN_DIM]; BATCH_SIZE],
+            residuals: [0.0f32; BATCH_SIZE],
+            costs: [0.0f32; BATCH_SIZE],
+            dirty: [true; BATCH_SIZE],
         }
     }
 
@@ -26,12 +28,16 @@ impl GaussNewtonBatch {
             return;
         }
 
-        self.jacobians
-            .row_mut(i)
-            .assign(&Array1::from_vec(jacobian.to_vec()));
+        for j in 0..JACOBIAN_DIM {
+            self.jacobians[i][j] = jacobian[j];
+        }
         self.residuals[i] = residual;
         self.dirty[i] = false;
         self.costs[i] = cost;
+    }
+
+    pub fn clear(&mut self) {
+        self.dirty.fill(true);
     }
 }
 
@@ -83,15 +89,15 @@ impl<const DIM: usize> GaussNewton<DIM> {
         self.count += 1;
     }
 
-    pub fn step_batch(&mut self, batch: &GaussNewtonBatch) {
-        for (dirty, residual, jacobian) in izip!(
-            batch.dirty.iter(),
-            batch.residuals.iter(),
-            batch.jacobians.axis_iter(Axis(0))
-        ) {
+    pub fn step_batch<const BATCH_SIZE: usize>(
+        &mut self,
+        batch: &GaussNewtonBatch<BATCH_SIZE, DIM>,
+    ) {
+        for (dirty, residual, jacobian) in
+            izip!(batch.dirty.iter(), batch.residuals.iter(), batch.jacobians)
+        {
             if !*dirty {
-                let residual = *residual;
-                self.step(residual, jacobian.as_slice().unwrap());
+                self.step(*residual, &jacobian);
             }
         }
     }
@@ -139,7 +145,7 @@ mod tests {
 
         let mut gn = GaussNewton::<6>::new();
 
-        let mut batch = GaussNewtonBatch::new(3, 6);
+        let mut batch = GaussNewtonBatch::<3, 6>::new();
         batch.assign(0, 1.0, 1.0, &[1.0, 2.0, 3.0, 4.0, 5.0, 6.0]);
         batch.assign(1, 2.0, 2.0, &[1.0, 2.0, 3.0, 4.0, 5.0, 6.0]);
         batch.assign(2, 3.0, 3.0, &[1.0, 2.0, 3.0, 4.0, 5.0, 6.0]);

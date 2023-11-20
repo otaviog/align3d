@@ -70,10 +70,14 @@ impl<'target_lt> ImageIcp<'target_lt> {
 
         let mut best_residual = Float::infinity();
         let mut best_transform = optim_transform.clone();
-        let batch_size = 16_384;
 
         // let normal_angle = self.params.max_normal_angle.cos();
-
+        const BATCH_SIZE: usize = 1024;
+        #[derive(Clone)]
+        struct GNBatches {
+            geom: GaussNewtonBatch<BATCH_SIZE, 6>,
+            color: GaussNewtonBatch<BATCH_SIZE, 6>,
+        }
         for _ in 0..self.params.max_iterations {
             izip!(
                 source
@@ -81,85 +85,95 @@ impl<'target_lt> ImageIcp<'target_lt> {
                     .view()
                     .to_shape(source.len())
                     .unwrap()
-                    .axis_chunks_iter(Axis(0), batch_size),
+                    .axis_chunks_iter(Axis(0), BATCH_SIZE),
                 source
                     .points
                     .view()
                     .to_shape(source.len())
                     .unwrap()
-                    .axis_chunks_iter(Axis(0), batch_size),
+                    .axis_chunks_iter(Axis(0), BATCH_SIZE),
                 source_colors
                     .view()
                     .to_shape(source.len())
                     .unwrap()
-                    .axis_chunks_iter(Axis(0), batch_size)
+                    .axis_chunks_iter(Axis(0), BATCH_SIZE)
             )
             .par_bridge()
-            .map(|(mask_chunk, point_chunk, color_chunk)| {
-                let mut color_batch = GaussNewtonBatch::new(batch_size, 6);
-                let mut geom_batch = GaussNewtonBatch::new(batch_size, 6);
-
-                izip!(mask_chunk, point_chunk, color_chunk)
-                    .filter_map(|(&mask, point, color)| {
-                        if mask != 0 {
-                            Some((point, color))
-                        } else {
-                            None
-                        }
-                    })
-                    .enumerate()
-                    .for_each(|(batch_index, (&point, &color))| {
-                        let p = optim_transform.transform_vector(&point);
-                        let (u, v) = self.target.intrinsics.project(&p);
-                        let (u_int, v_int) = ((u + 0.5) as i32, (v + 0.5) as i32);
-                        if let Some(target_point) =
-                            self.target.get_point(v_int as usize, u_int as usize)
-                        {
-                            let geom_sqr_distance = (target_point - p).norm_squared();
-                            if geom_sqr_distance > max_distance_sqr {
-                                return; // exit closure
+            .map(
+                |(mask_chunk, point_chunk, color_chunk)| {
+                    let mut gn_batches = Box::new(GNBatches {
+                        geom: GaussNewtonBatch::<BATCH_SIZE, 6>::new(),
+                        color: GaussNewtonBatch::<BATCH_SIZE, 6>::new(),
+                    });
+                    izip!(mask_chunk, point_chunk, color_chunk)
+                        .filter_map(|(&mask, point, color)| {
+                            if mask != 0 {
+                                Some((point, color))
+                            } else {
+                                None
                             }
-                            let target_normal = target_normals[(v_int as usize, u_int as usize)];
-                            if extra_math::angle_between_normals(&p, &target_normal)
-                                >= self.params.max_normal_angle
-                            //if target_normal.dot(&p) >= normal_angle
+                        })
+                        .enumerate()
+                        .for_each(|(batch_index, (&point, &color))| {
+                            let p = optim_transform.transform_vector(&point);
+                            let (u, v) = self.target.intrinsics.project(&p);
+                            let (u_int, v_int) = ((u + 0.5) as i32, (v + 0.5) as i32);
+                            if let Some(target_point) =
+                                self.target.get_point(v_int as usize, u_int as usize)
                             {
-                                return; // exit closure
-                            }
-                            let (residual, jacobian) =
-                                geometric_distance.jacobian(&p, &target_point, &target_normal);
+                                let geom_sqr_distance = (target_point - p).norm_squared();
+                                if geom_sqr_distance > max_distance_sqr {
+                                    return; // exit closure
+                                }
+                                let target_normal =
+                                    target_normals[(v_int as usize, u_int as usize)];
+                                if extra_math::angle_between_normals(&p, &target_normal)
+                                    >= self.params.max_normal_angle
+                                //if target_normal.dot(&p) >= normal_angle
+                                {
+                                    return; // exit closure
+                                }
+                                let (residual, jacobian) =
+                                    geometric_distance.jacobian(&p, &target_point, &target_normal);
 
-                            geom_batch.assign(batch_index, geom_sqr_distance, residual, &jacobian);
-
-                            // Color part.
-                            let (target_color, du, dv) = intensity_map.bilinear_grad(u, v);
-                            let source_color = color as f32 * 0.003_921_569; // / 255.0;
-                            let ((dfx, dcx), (dfy, dcy)) = self.target.intrinsics.project_grad(&p);
-                            let color_gradient =
-                                Vector3::new(du * dfx, dv * dfy, du * dcx + dv * dcy);
-                            let (color_residual, color_jacobian) = color_distance.jacobian(
-                                &p,
-                                &color_gradient,
-                                source_color,
-                                target_color,
-                            );
-                            if color_residual * color_residual <= max_color_distance_sqr {
-                                color_batch.assign(
+                                gn_batches.geom.assign(
                                     batch_index,
                                     geom_sqr_distance,
-                                    color_residual,
-                                    &color_jacobian,
+                                    residual,
+                                    &jacobian,
                                 );
+
+                                // Color part.
+                                let (target_color, du, dv) = intensity_map.bilinear_grad(u, v);
+                                let source_color = color as f32 * 0.003_921_569; // / 255.0;
+                                let ((dfx, dcx), (dfy, dcy)) =
+                                    self.target.intrinsics.project_grad(&p);
+                                let color_gradient =
+                                    Vector3::new(du * dfx, dv * dfy, du * dcx + dv * dcy);
+                                let (color_residual, color_jacobian) = color_distance.jacobian(
+                                    &p,
+                                    &color_gradient,
+                                    source_color,
+                                    target_color,
+                                );
+                                if color_residual * color_residual <= max_color_distance_sqr {
+                                    gn_batches.color.assign(
+                                        batch_index,
+                                        geom_sqr_distance,
+                                        color_residual,
+                                        &color_jacobian,
+                                    );
+                                }
                             }
-                        }
-                    });
-                (geom_batch, color_batch)
-            })
+                        });
+                        gn_batches
+                },
+            )
             .collect::<Vec<_>>()
             .iter()
-            .for_each(|(geom, color)| {
-                color_optim.step_batch(color);
-                geom_optim.step_batch(geom)
+            .for_each(|batch| {
+                color_optim.step_batch(&batch.color);
+                geom_optim.step_batch(&batch.geom)
             });
 
             geom_optim.combine(&color_optim, self.params.weight, self.params.color_weight);

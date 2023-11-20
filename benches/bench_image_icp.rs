@@ -33,7 +33,7 @@ fn image_icp_benchmark(c: &mut Criterion) {
         &image0,
     );
 
-    c.bench_function("icp align", |b| {
+    c.bench_function("image_icp", |b| {
         b.iter(|| {
             icp.align(&image1);
         });

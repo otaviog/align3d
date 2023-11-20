@@ -91,6 +91,9 @@ path = "tests/test_image_icp.rs"
 harness = false
 required-features = ["viz"]
 
+[profile.release]
+debug = 1
+
 [[bench]]
 name = "bench_mesh"
 path = "benches/bench_mesh.rs"
