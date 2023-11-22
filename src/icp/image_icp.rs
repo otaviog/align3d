@@ -5,9 +5,10 @@ use num::Float;
 use rayon::prelude::{ParallelBridge, ParallelIterator};
 
 use crate::{
+    extra_math,
     optim::GaussNewton,
     range_image::RangeImage,
-    transform::{LieGroup, Transform}, extra_math,
+    transform::{LieGroup, Transform},
 };
 
 use super::{
@@ -116,7 +117,8 @@ impl<'target_lt> ImageIcp<'target_lt> {
 
                     let target_normal = target_normals[(v_int as usize, u_int as usize)];
                     if extra_math::angle_between_normals(&p, &target_normal)
-                        >= self.params.max_normal_angle {
+                        >= self.params.max_normal_angle
+                    {
                         continue;
                     }
 
