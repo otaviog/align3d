@@ -1,14 +1,13 @@
-use itertools::{enumerate, izip};
+use itertools::izip;
 use nalgebra::Vector3;
 use ndarray::Axis;
 use num::Float;
 use rayon::prelude::{ParallelBridge, ParallelIterator};
 
 use crate::{
-    extra_math,
-    optim::{GaussNewton, GaussNewtonBatch},
+    optim::GaussNewton,
     range_image::RangeImage,
-    transform::{LieGroup, Transform},
+    transform::{LieGroup, Transform}, extra_math,
 };
 
 use super::{
@@ -71,21 +70,7 @@ impl<'target_lt> ImageIcp<'target_lt> {
         let mut best_residual = Float::infinity();
         let mut best_transform = optim_transform.clone();
 
-        // let normal_angle = self.params.max_normal_angle.cos();
         const BATCH_SIZE: usize = 4096;
-        #[derive(Clone)]
-        struct GnItem {
-            geom: GaussNewtonBatch<1, 6>,
-            color: GaussNewtonBatch<1, 6>,
-        }
-
-        let mut gn_items = vec![
-            GnItem {
-                geom: GaussNewtonBatch::new(),
-                color: GaussNewtonBatch::new(),
-            };
-            source.len()
-        ];
 
         for _ in 0..self.params.max_iterations {
             let sub_gn_opts = izip!(
@@ -105,19 +90,19 @@ impl<'target_lt> ImageIcp<'target_lt> {
                     .view()
                     .to_shape(source.len())
                     .unwrap()
-                    .axis_chunks_iter(Axis(0), BATCH_SIZE),
-                gn_items.chunks_mut(BATCH_SIZE)
+                    .axis_chunks_iter(Axis(0), BATCH_SIZE)
             )
             .par_bridge()
-            .map(|(mask_chunk, point_chunk, color_chunk, gn_batch)| {
-                for (i, (mask, point, color)) in
-                    enumerate(izip!(mask_chunk, point_chunk, color_chunk))
-                {
+            .map(|(mask_chunk, point_chunk, color_chunk)| {
+                let mut color_sub_opt = GaussNewton::<6>::new();
+                let mut geom_sub_opt = GaussNewton::<6>::new();
+
+                for (mask, point, color) in izip!(mask_chunk, point_chunk, color_chunk) {
                     if *mask == 0 {
                         continue;
                     }
 
-                    let p = optim_transform.transform_vector(&point);
+                    let p = optim_transform.transform_vector(point);
                     let (u, v) = self.target.intrinsics.project(&p);
                     let (u_int, v_int) = ((u + 0.5) as i32, (v + 0.5) as i32);
                     let target_point = self.target.get_point(v_int as usize, u_int as usize);
@@ -125,25 +110,20 @@ impl<'target_lt> ImageIcp<'target_lt> {
                         continue;
                     }
                     let target_point = target_point.unwrap();
-
-                    let geom_sqr_distance = (target_point - p).norm_squared();
-                    if geom_sqr_distance > max_distance_sqr {
-                        continue; // exit closure
+                    if (target_point - p).norm_squared() > max_distance_sqr {
+                        continue;
                     }
+
                     let target_normal = target_normals[(v_int as usize, u_int as usize)];
                     if extra_math::angle_between_normals(&p, &target_normal)
-                        >= self.params.max_normal_angle
-                    //if target_normal.dot(&p) >= normal_angle
-                    {
-                        continue; // exit closure
+                        >= self.params.max_normal_angle {
+                        continue;
                     }
+
                     let (residual, jacobian) =
                         geometric_distance.jacobian(&p, &target_point, &target_normal);
 
-                    gn_batch[i]
-                        .geom
-                        .assign(0, geom_sqr_distance, residual, &jacobian);
-
+                    geom_sub_opt.step(residual, &jacobian);
                     // Color part.
                     let (target_color, du, dv) = intensity_map.bilinear_grad(u, v);
                     let source_color = *color as f32 * 0.003_921_569; // / 255.0;
@@ -152,36 +132,20 @@ impl<'target_lt> ImageIcp<'target_lt> {
                     let (color_residual, color_jacobian) =
                         color_distance.jacobian(&p, &color_gradient, source_color, target_color);
                     if color_residual * color_residual <= max_color_distance_sqr {
-                        gn_batch[i].color.assign(
-                            0,
-                            geom_sqr_distance,
-                            color_residual,
-                            &color_jacobian,
-                        );
+                        color_sub_opt.step(color_residual, &color_jacobian);
                     }
-                }
-
-                let mut color_sub_opt = GaussNewton::<6>::new();
-                let mut geom_sub_opt = GaussNewton::<6>::new();
-
-                for gn_item in gn_batch {
-                    color_sub_opt.step_batch(&gn_item.color);
-                    geom_sub_opt.step_batch(&gn_item.geom);
-                    gn_item.color.clear();
-                    gn_item.geom.clear();
                 }
 
                 (color_sub_opt, geom_sub_opt)
             })
             .collect::<Vec<_>>();
 
-            
-            for i in 1..sub_gn_opts.len() {
-                color_optim.add(&sub_gn_opts[i].0);
-                geom_optim.add(&sub_gn_opts[i].1);
+            for sub_gn in sub_gn_opts.iter() {
+                color_optim.add(&sub_gn.0);
+                geom_optim.add(&sub_gn.1);
             }
 
-            geom_optim.combine(&color_optim, self.params.weight, self.params.color_weight);
+            geom_optim.add_weighted(&color_optim, self.params.weight, self.params.color_weight);
             let residual = geom_optim.mean_squared_residual();
             let update = geom_optim.solve().unwrap();
             optim_transform = &Transform::exp(&LieGroup::Se3(update)) * &optim_transform;
