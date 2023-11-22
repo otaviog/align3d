@@ -1,6 +1,6 @@
 [package]
 name = "align3d"
-version = "1.0.2"
+version = "1.0.3"
 edition = "2021"
 authors = ["Otavio Gomes <otavio.b.gomes@gmail.com>"]
 license = "MIT"
@@ -90,6 +90,9 @@ name = "test_image_icp"
 path = "tests/test_image_icp.rs"
 harness = false
 required-features = ["viz"]
+
+[profile.release]
+debug = 1
 
 [[bench]]
 name = "bench_mesh"

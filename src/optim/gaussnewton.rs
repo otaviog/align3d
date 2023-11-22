@@ -1,41 +1,11 @@
-use itertools::izip;
-
-use nalgebra::{ArrayStorage, Cholesky, Const, SMatrix, SVector};
-use ndarray::{Array1, Array2, Axis};
+use nalgebra::{Cholesky, Const, SMatrix, SVector};
 use num::Zero;
 
-pub struct GaussNewtonBatch {
-    jacobians: Array2<f32>,
-    residuals: Array1<f32>,
-    costs: Array1<f32>,
-    dirty: Array1<bool>,
-}
-
-impl GaussNewtonBatch {
-    pub fn new(batch_size: usize, jacobian_size: usize) -> Self {
-        Self {
-            jacobians: Array2::zeros((batch_size, jacobian_size)),
-            residuals: Array1::zeros(batch_size),
-            costs: Array1::zeros(batch_size),
-            dirty: Array1::from_elem(batch_size, true),
-        }
-    }
-
-    pub fn assign(&mut self, i: usize, cost: f32, residual: f32, jacobian: &[f32]) {
-        if !self.dirty[i] && self.costs[i] < cost {
-            return;
-        }
-
-        self.jacobians
-            .row_mut(i)
-            .assign(&Array1::from_vec(jacobian.to_vec()));
-        self.residuals[i] = residual;
-        self.dirty[i] = false;
-        self.costs[i] = cost;
-    }
-}
-
 /// Implements the standard Gauss Newton optimization
+///
+/// # Type parameters
+///
+/// * `DIM` - The dimension of the problem.
 pub struct GaussNewton<const DIM: usize> {
     hessian: SMatrix<f32, DIM, DIM>,
     gradient: SVector<f32, DIM>,
@@ -50,6 +20,7 @@ impl<const DIM: usize> Default for GaussNewton<DIM> {
 }
 
 impl<const DIM: usize> GaussNewton<DIM> {
+    /// Creates a new Gauss Newton optimizer.
     pub fn new() -> Self {
         Self {
             hessian: SMatrix::zeros(),
@@ -59,6 +30,7 @@ impl<const DIM: usize> GaussNewton<DIM> {
         }
     }
 
+    /// Resets the optimizer.
     pub fn reset(&mut self) {
         self.hessian.set_zero();
         self.gradient.set_zero();
@@ -66,36 +38,49 @@ impl<const DIM: usize> GaussNewton<DIM> {
         self.count = 0;
     }
 
-    pub fn step(&mut self, residual: f32, jacobian: &[f32]) {
-        self.squared_residual_sum += residual * residual;
-
-        let jt_r = SMatrix::from_row_slice(jacobian) * residual;
-
+    /// Adds a new step to the optimizer.
+    ///
+    /// # Arguments
+    ///
+    /// * `residual` - The residual of the step.
+    /// * `jacobian` - The jacobian of the step.
+    pub fn step(&mut self, residual: f32, jacobian: &[f32; DIM]) {
         let mut jt_j = [[0.0; DIM]; DIM];
         for i in 0..DIM {
-            for j in 0..DIM {
-                jt_j[i][j] += jacobian[i] * jacobian[j];
+            let ival = jacobian[i];
+            self.gradient[i] += ival * residual;
+
+            jt_j[i][i] = ival * ival;
+            for j in i + 1..DIM {
+                let jval = jacobian[j];
+                let mul = ival * jval;
+                jt_j[i][j] = mul;
+                jt_j[j][i] = mul;
             }
         }
 
-        self.hessian += SMatrix::from_data(ArrayStorage(jt_j));
-        self.gradient += jt_r;
+        // self.hessian += SMatrix::from_data(ArrayStorage(jt_j));
+        for (i, row) in jt_j.iter().enumerate().take(DIM) {
+            for (j, value) in row.iter().enumerate().take(DIM) {
+                self.hessian[(i, j)] += value;
+            }
+        }
+
+        self.squared_residual_sum += residual * residual;
+
+        // Improved test results.
+        // for i in 0..DIM {
+        //     self.gradient[i] += jacobian[i]*residual;
+        // }
+
         self.count += 1;
     }
 
-    pub fn step_batch(&mut self, batch: &GaussNewtonBatch) {
-        for (dirty, residual, jacobian) in izip!(
-            batch.dirty.iter(),
-            batch.residuals.iter(),
-            batch.jacobians.axis_iter(Axis(0))
-        ) {
-            if !*dirty {
-                let residual = *residual;
-                self.step(residual, jacobian.as_slice().unwrap());
-            }
-        }
-    }
-
+    /// Solve the current gauss newton system.
+    ///
+    /// # Returns
+    ///
+    /// The update vector.
     pub fn solve(&self) -> Option<SVector<f32, DIM>> {
         if self.count == 0 {
             return None;
@@ -103,13 +88,31 @@ impl<const DIM: usize> GaussNewton<DIM> {
         let hessian: SMatrix<f64, DIM, DIM> = nalgebra::convert(self.hessian);
         let gradient: SVector<f64, DIM> = nalgebra::convert(self.gradient);
 
-        let update = Cholesky::<f64, Const<DIM>>::new(hessian)
-            .unwrap()
-            .solve(&gradient);
-        Some(nalgebra::convert(update))
+        Cholesky::<f64, Const<DIM>>::new(hessian)
+            .and_then(|cholesky| Some(nalgebra::convert(cholesky.solve(&gradient))))
     }
 
-    pub fn combine(&mut self, other: &Self, weight1: f32, weight2: f32) {
+    /// Adds the values of another optimizer to this one.
+    /// Use this to combine the state of sub optimizers.
+    ///
+    /// # Arguments
+    ///
+    /// * `other` - The other optimizer.
+    pub fn add(&mut self, other: &Self) {
+        self.hessian += other.hessian;
+        self.gradient += other.gradient;
+        self.squared_residual_sum += other.squared_residual_sum;
+        self.count += other.count;
+    }
+
+    /// Adds the values of another optimizer to this one.
+    /// Use this to combine the state of sub optimizers.
+    /// # Arguments
+    ///
+    /// * `other` - The other optimizer.
+    /// * `weight1` - The weight of this optimizer.
+    /// * `weight2` - The weight of the other optimizer.
+    pub fn add_weighted(&mut self, other: &Self, weight1: f32, weight2: f32) {
         self.hessian = self.hessian * (weight1 * weight1) + other.hessian * (weight2 * weight2);
         self.gradient = self.gradient * weight1 + other.gradient * weight2;
         self.squared_residual_sum =
@@ -117,12 +120,14 @@ impl<const DIM: usize> GaussNewton<DIM> {
         self.count += other.count;
     }
 
+    /// Weights the optimizer.
     pub fn weight(&mut self, weight: f32) {
         self.hessian *= weight * weight;
         self.gradient *= weight;
         self.squared_residual_sum *= weight;
     }
 
+    /// Returns the mean squared residual.
     pub fn mean_squared_residual(&self) -> f32 {
         self.squared_residual_sum / self.count as f32
     }
@@ -139,12 +144,9 @@ mod tests {
 
         let mut gn = GaussNewton::<6>::new();
 
-        let mut batch = GaussNewtonBatch::new(3, 6);
-        batch.assign(0, 1.0, 1.0, &[1.0, 2.0, 3.0, 4.0, 5.0, 6.0]);
-        batch.assign(1, 2.0, 2.0, &[1.0, 2.0, 3.0, 4.0, 5.0, 6.0]);
-        batch.assign(2, 3.0, 3.0, &[1.0, 2.0, 3.0, 4.0, 5.0, 6.0]);
-
-        gn.step_batch(&batch);
+        gn.step(1.0, &[1.0, 2.0, 3.0, 4.0, 5.0, 6.0]);
+        gn.step(2.0, &[1.0, 2.0, 3.0, 4.0, 5.0, 6.0]);
+        gn.step(3.0, &[1.0, 2.0, 3.0, 4.0, 5.0, 6.0]);
 
         let hessian = gn.hessian;
         let gradient = gn.gradient;

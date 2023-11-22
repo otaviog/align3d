@@ -2,3 +2,4 @@
 /.vscode
 out-*
 datasets
+flamegraph.svg
