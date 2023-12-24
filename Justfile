@@ -1,9 +1,6 @@
 about:
     @echo Test
 
-profile_fusion:
-    cargo bench --bench bench_surfel_fusion -- --profile-time=60
-
 bench bench_name:
     cargo bench --bench {{bench_name}}
 
