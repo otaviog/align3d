@@ -59,8 +59,7 @@ fn read_off_faces(
     num_elements: usize,
     parser_context: &mut TextParserContext,
 ) -> Result<Array2<usize>, LoadError> {
-    let mut faces = Vec::<usize>::new();
-    faces.reserve(num_elements * 4);
+    let mut faces = Vec::<usize>::with_capacity(num_elements * 4);
 
     for _ in 0..num_elements {
         let line = parser_context.read_line()?;
