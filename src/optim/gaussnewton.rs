@@ -89,7 +89,7 @@ impl<const DIM: usize> GaussNewton<DIM> {
         let gradient: SVector<f64, DIM> = nalgebra::convert(self.gradient);
 
         Cholesky::<f64, Const<DIM>>::new(hessian)
-            .and_then(|cholesky| Some(nalgebra::convert(cholesky.solve(&gradient))))
+            .map(|cholesky| nalgebra::convert(cholesky.solve(&gradient)))
     }
 
     /// Adds the values of another optimizer to this one.
